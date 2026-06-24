@@ -27,7 +27,7 @@
 │   架构+DOCX+桌面+微信通知  │                                      │
 └──────────────────────────┴──────────────────────────────────────┘
          ↓ 交付 ↓
-   📊 券商级研报 / DD尽调报告 (DOCX) → 桌面 + 微信通知
+   📊 券商级研报 / DD尽调报告 (DOCX) → 桌面输出
 ```
 
 ## ❓ 解决什么问题
@@ -42,7 +42,7 @@
 早期项目的 BP 尽调面临两难：创始人自说自话（信息偏差）vs 昂贵的人工尽调（成本高、周期长）。本管线自动化完成 **VL OCR → 结构化抽取 → 4 维度并行分析 → 竞争格局 → 统稿 → DOCX 交付**，30 分钟内完成全链路。
 
 ### 痛点四：交付链路断裂
-研报写完了，但复制到桌面、转 DOCX、发微信通知——这些"最后一公里"经常被模型遗忘。管线有**强制 finalize 步骤**：对抗验证 → DOCX 生成 → 桌面复制 → 微信推送（三步协议），报告不会丢。
+研报写完了，但复制到桌面、转 DOCX——这些"最后一公里"经常被模型遗忘。管线有**强制 finalize 步骤**：对抗验证 → DOCX 生成 → 桌面复制（三步协议），报告不会丢。
 
 ### 痛点五：数据时效性和真实性
 AI 生成研报最大的隐患：**编造不存在的人名、使用过时的融资状态、引用已撤销的政策**。v5 引入 **ANTI-DEFECT RULES**——每个 step/维度 都有专属验证规则（人员存在性验证、融资状态搜索验证、数据时效性检查等），从根源上防止幻觉。
@@ -67,7 +67,6 @@ ir-bp-workflow/
 │   ├── build_valuation_excel.py     # 估值 Excel 生成
 │   ├── verification_agent.py        # 6层对抗验证
 │   ├── ir_auto_orchestrator.py      # IR 全自动编排器
-│   ├── longshao_notify.py           # 微信通知
 │   │                                # ── v5 新增（牛津论文对齐）──
 │   ├── info_propagation_check.py    # 7-Agent 信息传导验证
 │   ├── sector_agent_middleware.py   # 板块代理中间件
@@ -233,8 +232,6 @@ python3 ir_runtime.py status TASK-20260515-001
 # 列出所有任务
 python3 ir_runtime.py list
 
-# 微信通知
-python3 ir_runtime.py notify "研报已完成，请查收"
 ```
 
 | 命令 | 功能 | 说明 |
@@ -245,7 +242,6 @@ python3 ir_runtime.py notify "研报已完成，请查收"
 | `rename` | 重命名任务 | 修改任务标的、类型或标签，自动同步到索引 |
 | `status` | 查看状态 | 显示任务当前Phase/完成率/步骤详情 |
 | `list` | 列出任务 | 按创建时间排序，显示标的/类型/状态 |
-| `notify` | 微信通知 | 通过龙少推送消息到微信 |
 
 ### 运维工具集
 
@@ -329,7 +325,7 @@ Layer 5: yfinance 估值数据（IR 管线专用）
 ### 全自动交付
 
 ```
-finalize_pipeline() → 对抗验证 → DOCX 生成 → 桌面复制 → 微信通知
+finalize_pipeline() → 对抗验证 → DOCX 生成 → 桌面复制
 ```
 
 ## 🎯 设计理念
@@ -349,6 +345,57 @@ finalize_pipeline() → 对抗验证 → DOCX 生成 → 桌面复制 → 微信
 - **已分析标的**：AVGO、泡泡玛特、优必选、东江环保、佰维存储、阅文集团、中芯国际、及部分融资项目等
 - **交付物**：券商级 DOCX 研报（执行摘要 + 估值分析 + 风险矩阵 + 免责声明）+ 估值 Excel
 - **自动化率**：Phase 0-5 全自动，Zero Human Intervention
+
+## ⚙️ 环境变量配置（.env）
+
+安装后编辑 `.env` 文件，配置你的 API 密钥和服务：
+
+```bash
+# ── VL OCR（BP 管线必需）──
+# 用于 BP 文档的 OCR 识别和结构化抽取
+# 支持任何兼容 OpenAI API 格式的视觉模型（如 qwen3-vl）
+VL_API_BASE=https://your-vl-api-base/v1   # ← 必填
+VL_API_KEY=sk-xxxx                         # ← 必填
+VL_MODEL=qwen3-vl-30b-a3b-instruct        # 默认模型名
+
+# ── 搜索（可选，不配也能用）──
+# SearXNG 本地搜索（推荐）: docker run -d -p 8888:8888 --name searxng searxng/searxng:latest
+SEARXNG_URL=http://127.0.0.1:8888
+
+# HTTP 代理（Google/Scrapling 层需要）
+PROXY_URL=http://127.0.0.1:7897
+
+# ── WorkBuddy MCP 服务（BP 管线必需）──
+# 在 WorkBuddy 设置中启用以下 MCP connector：
+# - qcc-company  （工商验证）
+# - qcc-risk     （风险扫描）
+# - qcc-ipr      （知识产权）
+# - qcc-operation（经营信息）
+```
+
+### 必需 vs 可选配置速查
+
+| 配置项 | 必需？ | 说明 |
+|--------|--------|------|
+| `VL_API_BASE` + `VL_API_KEY` | **BP 必需** | 任何兼容 OpenAI API 的视觉模型服务 |
+| WorkBuddy MCP: `qcc-*` 系列 | **BP 必需** | 在 WorkBuddy Connector 设置中连接企查查 |
+| `SEARXNG_URL` | 推荐 | 提升搜索质量，不配则降级到 DDG |
+| `PROXY_URL` | 按需 | Google/Scrapling 层需要翻墙时使用 |
+| NeoData skill | 推荐 | WorkBuddy 内置，A/HK 股首选数据源 |
+| GitHub connector | 推荐 | 用于 `gh` CLI 搜索能力 |
+
+### 快速验证安装
+
+```bash
+# 1. 检查环境
+python3 ir_runtime.py check
+
+# 2. 试运行 IR 管线
+python3 ir_runtime.py create "测试公司" && python3 ir_runtime.py run TASK-XXXXXXXX-XXX
+
+# 3. 对话触发（推荐）
+# 在 WorkBuddy 中直接说："分析比亚迪" 或 "帮我看下这个 BP"
+```
 
 ## 📄 License
 
