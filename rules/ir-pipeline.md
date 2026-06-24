@@ -59,7 +59,7 @@ team_delete()
 
 # 5. 全部 wave 完成 → finalize
 result = finalize_pipeline(task_id, entity, market)
-# → DOCX 生成 + 桌面投放 + 微信通知（含文件）
+# → DOCX 生成 + 桌面复制
 ```
 
 ## 关键 API（ir_subagent_launcher_wb.py）
@@ -95,7 +95,6 @@ result = finalize_pipeline(task_id, entity, market)
 - Phase 5 `finalize_pipeline()` 必须执行
 - DOCX 失败 → 用 markdown 兜底
 - **研报必须复制到桌面**
-- **微信通知必须尝试发送**（含 `--file` 参数发送报告文件）
 
 ### 5. 输出格式
 - 最终交付物优先 DOCX，DOCX 生成失败才用 markdown
@@ -118,7 +117,7 @@ team_create("ir-TASK-XXX")
 🌊 Wave 4/5 → step6-7 逐个派发 → ✅✅
 🌊 Wave 5/5 → step8_master → ✅
 team_delete()
-📊 finalize → 质量门禁 → DOCX → 桌面 → 微信(含文件) → ✅ Done
+📊 finalize → 质量门禁 → DOCX → 桌面 → ✅ Done
 ```
 
 ---

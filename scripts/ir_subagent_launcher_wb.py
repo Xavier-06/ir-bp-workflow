@@ -173,18 +173,12 @@ _STEP_QUERY_TEMPLATES = {
 
 
 # ═══════════════════════════════════════════════════════
-# 通知（龙少微信，替代 openclaw message send）
+# 通知
 # ═══════════════════════════════════════════════════════
 
 def notify_wx(text: str) -> bool:
-    """通过龙少微信发送通知，失败静默。"""
-    try:
-        sys.path.insert(0, str(ROOT / 'scripts'))
-        from longshao_notify import send_message
-        result = send_message(text)
-        return result.get('ok', False)
-    except Exception:
-        return False
+    """Notification stub — messaging removed for open-source release."""
+    return False
 
 
 # ═══════════════════════════════════════════════════════
@@ -1056,16 +1050,7 @@ def launch_all(task_id: str, entity: str = '', query: str = '', dry_run: bool = 
         'pipeline_manifest_path': str(pipeline_manifest_path(task_id)),
     }
     
-    # 微信通知汇总
-    if not dry_run:
-        notify_wx(
-            f"🐲 IR Pipeline 已派发\n"
-            f"任务: {task_id}\n"
-            f"实体: {entity}\n"
-            f"已派发: {result['total_steps_dispatched']}/{len(LAUNCH_WAVES)} waves\n"
-            f"运行时: WorkBuddy Task\n"
-            f"⚠ 需主 AI 逐 step 派发 Task 子代理执行"
-        )
+    # 通知 — 已移除（开源发布版本不含消息推送）
     
     return result
 
@@ -1352,7 +1337,7 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
     1. 质量门禁
     2. DOCX 生成
     3. 复制到桌面
-    4. 微信通知
+    4. 交付完成
     """
     from pathlib import Path as _P
 
@@ -1459,69 +1444,7 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
     except Exception as e:
         result['desktop_error'] = str(e)
 
-    # 微信通知（三步发送：文本→文件→确认，确保文件真正送达）
-    try:
-        import subprocess
-        notify_script = ROOT / 'scripts' / 'longshao_notify.py'
-        file_name = _P(deliver_path).name if deliver_path else ''
-        file_to_send = deliver_path  # 桌面文件路径
-
-        if notify_script.exists():
-            # 第一步：发送文本通知
-            text_msg = (
-                f"📊 {entity or task_id} 深度研报已生成\n\n"
-                f"📄 文件: {file_name or '(未生成)'}\n"
-                f"📁 桌面已放置\n\n"
-                f"请查阅。（IR管线自动交付）"
-            )
-            text_cmd = [sys.executable, str(notify_script), text_msg]
-            nr = subprocess.run(text_cmd, capture_output=True, text=True, timeout=30)
-            text_ok = False
-            if nr.returncode == 0:
-                try:
-                    text_result = json.loads(nr.stdout.strip())
-                    text_ok = text_result.get('ok', False)
-                except Exception:
-                    text_ok = True
-
-            # 第二步：发送文件（关键！之前的代码只发了文本没发文件）
-            file_ok = False
-            if file_to_send and _P(file_to_send).exists():
-                file_cmd = [sys.executable, str(notify_script), '--file', file_to_send, text_msg]
-                fr = subprocess.run(file_cmd, capture_output=True, text=True, timeout=60)
-                if fr.returncode == 0:
-                    try:
-                        file_result = json.loads(fr.stdout.strip())
-                        file_ok = file_result.get('ok', False)
-                    except Exception:
-                        file_ok = True
-                else:
-                    # 文件发送失败，重试一次
-                    fr2 = subprocess.run(file_cmd, capture_output=True, text=True, timeout=60)
-                    if fr2.returncode == 0:
-                        try:
-                            file_result = json.loads(fr2.stdout.strip())
-                            file_ok = file_result.get('ok', False)
-                        except Exception:
-                            file_ok = True
-
-            result['notified'] = text_ok
-            result['file_sent'] = file_ok
-            if not file_ok and file_to_send:
-                result['file_send_warning'] = '文件发送可能失败，请检查微信是否收到文件'
-        else:
-            # fallback: 直接调用 notify_wx（仅文本）
-            notify_wx(
-                f"📊 {entity or task_id} 深度研报已生成\n\n"
-                f"📄 文件: {file_name or '(未生成)'}\n"
-                f"📁 桌面已放置\n\n"
-                f"请查阅。（IR管线自动交付）"
-            )
-            result['notified'] = True
-            result['file_sent'] = False
-    except Exception as e:
-        result['notify_error'] = str(e)
-        result['file_sent'] = False
+    # 通知 — 已移除（开源发布版本不含消息推送）
 
     result['status'] = 'delivered'
     result['message'] = f"研报已生成并复制到桌面: {deliver_path or '(markdown)'}"

@@ -127,16 +127,6 @@ GOLDEN_SNIPPETS = {
         ],
         "allowed_mention": [],
     },
-    "delivery_protocol": {
-        "pattern": r"longshao_notify\.py",
-        "description": "WeChat delivery protocol",
-        "allowed_in": [
-            "skills/ir-reporter/references/delivery-protocol.md",
-            "skills/ir-coordinator/references/ir-pipeline.md",
-            "skills/ir-coordinator/references/bp-pipeline.md",
-        ],
-        "allowed_mention": [],
-    },
 }
 
 # Collect all checkable files

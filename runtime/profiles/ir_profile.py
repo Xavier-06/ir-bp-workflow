@@ -830,47 +830,9 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
         except Exception as e:
             docx_error = str(e)
 
-    # 4. 交付通知 — 用 wechat-ilink-bot SDK 发送文件（三步发送：文本→文件→确认）
-    # ⚠️ wechat_bot 装在 Python 3.14，系统 Python 3.9 找不到模块
-    # 必须用 subprocess + Python 3.14 调用 longshao_notify.py CLI
+    # 4. 交付通知 — 已移除（开源发布版本不含消息推送）
     delivery_ok = False
-    delivery_error = ""
-    if docx_path:
-        # 找 Python 3.14+（wechat_bot 所在环境）
-        import shutil
-        python314 = shutil.which("python3.14") or ""
-        if not python314:
-            import glob as _glob
-            _candidates = sorted(_glob.glob("/opt/homebrew/Cellar/python@3.14/*/Frameworks/Python.framework/Versions/3.*/Resources/Python.app/Contents/MacOS/Python"), reverse=True)
-            python314 = _candidates[0] if _candidates else ""
-        notify_script = str(runtime_root / "scripts" / "longshao_notify.py")
-        caption = f"🐲 龙少 — 研报交付通知\n📋 任务: {job_ctx.job_id}\n💬 研报已完成，请查收\n📄 文件: {Path(docx_path).name}"
-        if python314:
-            for attempt in range(2):
-                try:
-                    r = subprocess.run(
-                        [python314, notify_script, "--file", str(docx_path), caption],
-                        capture_output=True, text=True, cwd=str(runtime_root), timeout=120,
-                    )
-                    if r.returncode == 0 and r.stdout.strip():
-                        import json as _json
-                        result = _json.loads(r.stdout.strip())
-                        delivery_ok = result.get("ok", False)
-                    else:
-                        delivery_error = f"exit={r.returncode} stderr={r.stderr[:200]}"
-                    if delivery_ok:
-                        break
-                    delivery_error = result.get("msg", "未知错误") if r.returncode == 0 else delivery_error
-                    if attempt == 0:
-                        print(f"  ⚠ 微信交付第{attempt+1}次失败: {delivery_error}，重试中...", flush=True)
-                except Exception as e:
-                    delivery_error = str(e)
-                    if attempt == 0:
-                        print(f"  ⚠ 微信交付第{attempt+1}次异常: {delivery_error}，重试中...", flush=True)
-        else:
-            delivery_error = "Python 3.14 not found, skipping WeChat delivery"
-    else:
-        delivery_error = "No docx_path, skipping delivery notification"
+    delivery_error = "Notification removed for open-source release"
 
     # Collect workspace artifact summary
     workspace_artifacts = {}

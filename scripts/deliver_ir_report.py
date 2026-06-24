@@ -10,8 +10,7 @@ IR 研报交付 — 生成报告并通过 ClawBot/WorkBuddy 文档媒体链投�
 
 说明：
 - 当前已验证 Markdown 文档可通过 media-index + attachments 形成真实文档引用链
-- docx 仍保留本地生成，但微信/ClawBot 首版交付先以 Markdown 文档送达为主
-- `wx_notify.py --file` 已降级为纯文本路径提示，不再作为真实附件发送方案
+- docx 仍保留本地生成，交付以 Markdown 文档 + DOCX 文件为主，通过 media-index 投递
 """
 from __future__ import annotations
 

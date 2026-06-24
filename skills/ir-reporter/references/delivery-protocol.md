@@ -1,6 +1,6 @@
 # 交付协议
 
-**唯一来源**：此文件是交付链路和微信推送规则的 single source of truth。
+**唯一来源**：此文件是交付链路规则的 single source of truth。
 
 ## 交付文件选择（硬规则）
 
@@ -9,34 +9,16 @@
 
 ## 交付动作（必须全部执行）
 
-1. 龙少微信通知（告知报告完成 + 文件路径）：
-```bash
-python3 {IR_RUNTIME}/scripts/longshao_notify.py "📊 {标的名称} 研报已完成。文件位置：{文件路径}"
-```
-如果返回 `ok: false`，直接重试一次（可能是瞬时错误）。
-
-2. 在聊天窗口明确告知用户文件完整路径，方便用户自行获取。
+1. DOCX 生成到 `jobs/{JOB_ID}/delivery/` 目录
+2. 复制到用户桌面（macOS `~/Desktop/`）
+3. 在聊天窗口明确告知用户文件完整路径，方便用户自行获取
 
 **注意**：`deliver_attachments` 工具在用户客户端无法显示附件，**禁止使用**。
 
 ## 交付链路说明
 
-- IR 管线使用 `longshao_notify.py` → wechat_bot SDK → 微信 iLink 协议直接发送消息
-- BP 管线使用 `register_delivery_media.py` → WorkBuddy media-index + message-queue
-- 两者不可混用：IR 研报走微信通知，BP 报告走 media-index 投递
-
-## 微信推送格式
-
-```
-📊 研报完成：{标的名称}
-
-✅ 8 步分析已完成
-📄 报告路径：{workspace}/delivery/{TASK_ID}.docx
-🔍 对抗验证：PASS/PARTIAL
-
-关键发现：
-- {3 条核心结论，每条 ≤30 字}
-```
+- IR 管线：DOCX 生成 → 桌面复制 → 聊天告知路径
+- BP 管线：DOCX 生成 → 桌面复制 → `register_delivery_media.py` → WorkBuddy media-index + message-queue
 
 ## 交付清洗（硬规则）
 

@@ -6,120 +6,247 @@
 ## 🏗️ 双管线架构
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ir-coordinator（调度中心）                     │
-│                    接收指令 → 识别管线 → 全自动执行               │
-├──────────────────────────┬──────────────────────────────────────┤
-│     IR 管线（8步研报）     │       BP 管线（尽调报告）            │
-│                          │                                      │
-│ Phase 0:  环境检测+注册    │ Phase 0:  VL OCR 文档识别            │
-│ Phase 0.5: 公司验证+估值   │ Phase 0.5: 工商/风险验证             │
-│ Phase 1:  8步预搜索       │ Phase 1:  4维度预搜索+URL提取         │
-│ Phase 1.5: URL内容提取     │ Phase 2:  4维度并行分析(Wave1)       │
-│ Phase 12: 三引擎预计算     │ Phase 2.5: 竞争与结论(Wave2)         │
-│ Phase 4:  5波子代理派发    │ Phase 3:  统稿+验证+DOCX交付         │
-│   Wave1: 技术/数据采集     │                                      │
-│   Wave2: 行业/商业/财务/管理/宏观│                                   │
-│   Wave3: 估值              │                                      │
-│   Wave4: 洞察/风险          │                                      │
-│   Wave5: 统稿(11-Agent)    │                                      │
-│ Phase 5:  对抗验证+三层     │                                      │
-│   架构+DOCX+桌面+微信通知  │                                      │
-└──────────────────────────┴──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                      ir-coordinator（调度中心）                       │
+│            接收自然语言指令 → 自动识别管线类型 → 全自动执行             │
+├───────────────────────────────┬─────────────────────────────────────┤
+│     IR 管线（券商研报）         │       BP 管线（尽调报告）              │
+│     9 步 · 5 波子代理           │       33 Phase · 4 波 + 统稿          │
+│                               │                                      │
+│ ┌─ 预搜索阶段 ─────────────┐  │  ┌─ 文档识别 ──────────────────┐     │
+│ │ P0  环境检测 + 任务注册    │  │  │ P01  VL OCR 文档识别        │     │
+│ │ P0.5 公司验证 + 估值预取   │  │  │ P02  企查查工商/风险验证     │     │
+│ │ P1   8步预搜索 + URL提取   │  │  │ P03  研究计划               │     │
+│ │ P1.5 URL内容提取           │  │  │ P04  4维度预搜索            │     │
+│ │ P12  三引擎预计算          │  │  │ P05  共享尽调页初始化        │     │
+│ └──────────────────────────┘  │  │ P06  搜索工单编译            │     │
+│                               │  │ P07  Fact Store 初始化       │     │
+│ ┌─ 5波子代理派发 ─────────┐   │  └──────────────────────────────┘     │
+│ │ W1  技术+数据采集         │   │                                      │
+│ │ W2  行业/商业/财务/管理    │   │  ┌─ 4波并行分析 + 门禁 ────────┐    │
+│ │ W3  估值                  │   │  │ W1-P08~P12  派发→收集→门禁   │    │
+│ │ W4  洞察+风险             │   │  │ W2-P13~P15  派发→收集→门禁   │    │
+│ │ W5  统稿 (11-Agent)       │   │  │ W3-P16~P18  派发→收集→门禁   │    │
+│ └──────────────────────────┘   │  │ W4-P20~P22  派发→收集→门禁   │    │
+│                               │  └──────────────────────────────┘     │
+│ ┌─ 交付阶段 ─────────────┐    │                                      │
+│ │ 跨Step一致性 + 对抗验证   │    │  ┌─ 校验+统稿+交付 ────────────┐    │
+│ │ DOCX生成 + 桌面复制       │    │  │ P24  Claim覆盖校验 [repair] │    │
+│ └─────────────────────────┘    │  │ P25  跨维度一致性             │    │
+│                               │  │ P26  Section Package校验      │    │
+│                               │  │ P27~P28 统稿 [repair]         │    │
+│                               │  │ P29  对抗评审                 │    │
+│                               │  │ P30  最终组装                 │    │
+│                               │  │ P31  可读性审查               │    │
+│                               │  │ P32  投资判断汇总             │    │
+│                               │  │ P33  交付 DOCX + 桌面         │    │
+│                               │  └──────────────────────────────┘     │
+├───────────────────────────────┴─────────────────────────────────────┤
+│                         共享基础设施                                  │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────┐ │
+│  │ 有状态编排器   │ │ 搜索网关(6层) │ │ Fact Store   │ │ 文件锁机制  │ │
+│  │ kernel.py     │ │ search_gw    │ │ fact_store   │ │ bp_file_lock│ │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
          ↓ 交付 ↓
-   📊 券商级研报 / DD尽调报告 (DOCX) → 桌面输出
+   📊 券商级研报 / DD尽调报告 (DOCX) → 桌面 + 聊天窗口告知路径
 ```
 
 ## ❓ 解决什么问题
 
 ### 痛点一：AI 投研"浅尝辄止"
-市面 AI 研报工具只能生成"资料汇编"——堆砌公开信息，缺乏投研逻辑深度。真正的券商研报需要 8 个维度的系统性分析（数据/行业/商业/财务/管理层/洞察/风险/估值/统稿），单轮对话无法完成。
+市面 AI 研报工具只能生成"资料汇编"——堆砌公开信息，缺乏投研逻辑深度。真正的券商研报需要 9 个维度的系统性分析（数据/行业/商业/财务/管理层/洞察/估值/风险/统稿），单轮对话无法完成。
 
 ### 痛点二：多 Agent 协作"各自为政"
 现有 Agent 框架（AutoGPT、CrewAI）的痛点：子 Agent 挂掉（code=10003）、上下文断裂、数据口径不一致、最终需要人工拼接。我们构建了**有状态编排器**——统一状态协调、manifest 派发、自动重试、断点续跑。
 
 ### 痛点三：BP 尽调"信息黑洞"
-早期项目的 BP 尽调面临两难：创始人自说自话（信息偏差）vs 昂贵的人工尽调（成本高、周期长）。本管线自动化完成 **VL OCR → 结构化抽取 → 4 维度并行分析 → 竞争格局 → 统稿 → DOCX 交付**，30 分钟内完成全链路。
+早期项目的 BP 尽调面临两难：创始人自说自话（信息偏差）vs 昂贵的人工尽调（成本高、周期长）。本管线自动化完成 **VL OCR → 结构化抽取 → 4 维度并行分析 → 竞争格局 → 统稿 → DOCX 交付**，33 个 Phase 全链路自动。
 
 ### 痛点四：交付链路断裂
 研报写完了，但复制到桌面、转 DOCX——这些"最后一公里"经常被模型遗忘。管线有**强制 finalize 步骤**：对抗验证 → DOCX 生成 → 桌面复制（三步协议），报告不会丢。
 
 ### 痛点五：数据时效性和真实性
-AI 生成研报最大的隐患：**编造不存在的人名、使用过时的融资状态、引用已撤销的政策**。v5 引入 **ANTI-DEFECT RULES**——每个 step/维度 都有专属验证规则（人员存在性验证、融资状态搜索验证、数据时效性检查等），从根源上防止幻觉。
+AI 生成研报最大的隐患：**编造不存在的人名、使用过时的融资状态、引用已撤销的政策**。管线引入 **ANTI-DEFECT RULES**——每个 step/维度都有专属验证规则（人员存在性验证、融资状态搜索验证、数据时效性检查等），从根源上防止幻觉。
+
+## 🧠 核心设计
+
+### 设计一：有状态编排器（Phase-Driven Orchestrator）
+
+管线由 Phase 序列驱动，每个 Phase 有明确的输入/输出声明和依赖关系。编排器（`kernel.py`）负责：
+
+| 能力 | 机制 |
+|------|------|
+| Phase 状态机 | `pending → running → completed / failed`，持久化到 `job_record.json` |
+| 断点续跑 | 中断后从任意 Phase 恢复，不丢中间结果 |
+| 依赖回填 | `phase_prerequisites()` + `phase_outputs()` 声明依赖图，缺失时精准回填而非从头重跑 |
+| 暂停恢复 | `needs_dispatch` → 暂停等子代理 → `has_more` 机制循环派发 → 自动推进 |
+| 三种执行模式 | 同步直跑 / 后台轮询（heavy phase）/ 暂停等派发（子代理） |
+
+### 设计二：Profile 模式 — 双管线共享内核
+
+IR 和 BP 管线共用同一套编排器、搜索网关、子代理发射器等基础设施，差异通过 Profile 定义：
+
+```
+runtime/profiles/
+├── base.py          # 抽象基类：phases() / handler() / dispatch()
+├── ir_profile.py    # IR 管线：9 步 + 5 波
+├── bp_profile.py    # BP 管线：33 Phase + 4 波 + 统稿
+└── ic_profile.py    # IC 管线：行业研究（第三管线）
+```
+
+### 设计三：Wave Evidence Gate Repair 机制
+
+门禁不再是非 PASS 即 FAIL 的二元判断。gate FAIL 时触发 repair 子代理修复，而非直接终止管线：
+
+```
+gate FAIL → REPAIR verdict → 生成 repair manifest（按 role 聚合）
+    → sequential 派发单个 repair 子代理 → 重跑 gate
+    → 超过 _MAX_BLOCKING_RETRIES → 降级为 WARN 放行
+```
+
+覆盖范围：
+- **Wave 门禁**（P10/P15/P18/P22）：每个 wave 收集后检查 evidence 完整性
+- **Claim 覆盖校验**（P24）：检查所有 claim 是否有足够证据支持
+- **统稿收集**（P28）：脚注密度动态阈值（每 2000 字 ≥ 3 个脚注）
+
+关键设计决策：
+- **Sequential 派发**：repair 子代理逐个执行（而非并行），避免 fact_store/sidecar 写冲突
+- **T1/T2 早期项目降级**：种子轮到 A 轮的项目，blocking claims 直接降级为 WARN，不走 repair
+- **文件锁**：`bp_file_lock.py` 提供 `locked_read_modify_write()` + `atomic_write()`，repair 子代理写共享文件时加 flock
+
+### 设计四：Sequential Dispatch — 防并行写冲突
+
+BP 管线的 4 个 wave 各有多个 role（如 Wave1 有技术/数据两个 role），每个 role 都要往 `fact_store.json` 和 `section sidecar` 写数据。之前并行派发导致数据丢失。
+
+解决方案：参照 IR 管线的 `has_more` 机制，prepare 函数每次只返回一个 manifest：
+
+```
+prepare() → 找第一个未完成的 role → 返回 {needs_dispatch: true, has_more: true, manifests: [1个]}
+    → kernel 看到 has_more=true → next_phase = 当前 phase（重跑）
+    → 主 AI 派发下一个 role
+    → 所有 role 派完 → has_more: false → kernel 推进到 collect phase
+```
+
+### 设计五：ANTI-DEFECT RULES — 反幻觉验证体系
+
+每个 step/维度内置专属验证规则，从根源防止 AI 幻觉：
+
+| 规则 | 适用步骤 | 防御目标 |
+|------|---------|---------|
+| 融资状态验证 | step1, BP 竞争 | 防止引用已 IPO 公司的过时融资数据 |
+| 人员存在性验证 | step5, BP 团队 | 防止编造不存在的高管/董事姓名 |
+| 数据时效性检查 | step4, step6b | 确保财务/估值数据在 6 个月内 |
+| 可比公司状态验证 | step6b, BP 估值 | 确认 comps 表中公司仍在经营/已上市 |
+| 政策时效性验证 | step7, BP 行业 | 确认引用的政策仍然有效 |
+| 竞品运营状态 | step3, BP 技术 | 确认竞品未被收购/重组/转型 |
+| 审计意见检查 | step4 | 关注审计意见变更（无保留→保留 = 红旗） |
+| 跨 step 一致性 | step8 | 同一实体在不同 step 中的状态描述一致 |
+
+### 设计六：搜索系统 — 6 层降级链 + NeoData
+
+```
+Layer 0: NeoData 金融数据（A/HK股行情、财报、板块、研报）— 需 WorkBuddy NeoData skill
+Layer 1: DuckDuckGo（通用搜索，免密钥）
+Layer 2: SearXNG 本地实例（Baidu + Bing 补充）
+Layer 3: Google 直接抓取（走代理，自己解析）
+Layer 4: Scrapling StealthyFetcher（深度正文提取）
+Layer 5: yfinance 估值数据（IR 管线专用）
+```
+
+- **金融查询自动路由**：搜索网关自动检测金融类查询（股价/财报/估值/PE 等），优先走 NeoData
+- **数据源优先级**：A/HK 股 → NeoData → yfinance(交叉验证) → web_search；美股 → yfinance → web_search
+- 7 个适配器（NeoData/DDG/SearXNG/SEC/HKEX/Yahoo/RSS），支持实体解析、查询计划、证据评级
+
+### 设计七：4 角色 Agent 协作
+
+| Agent | 职责 | 触发方式 |
+|-------|------|---------|
+| **ir-coordinator** | 调度中心，识别管线类型，编排全自动执行 | 用户对话直接触发 |
+| **ir-researcher** | 单维度数据采集，自主补搜闭环 | coordinator 内部调度 |
+| **ir-reporter** | 统稿 + DOCX + 对抗验证 + 交付 | coordinator 内部调度 |
+| **ir-verifier** | 6 层对抗验证（L1-L5 脚本 + L6 人工论证） | coordinator 内部调度 |
+
+### 设计八：质量门禁矩阵
+
+| 门禁 | IR 管线 | BP 管线 | 失败策略 |
+|------|--------|--------|---------|
+| Step/Wave 完整性 | <50% → 熔断 | evidence gate FAIL → repair → 降级放行 | repair 子代理修复 |
+| 跨维度一致性 | 跨 Step 一致性 FAIL → 必须修正 | P25 HIGH→WARN 放行 | 不阻断交付 |
+| ANTI-DEFECT | 每个 step 输出前验证 | 每个 wave gate 验证 | 搜索验证而非信任模型 |
+| Claim 覆盖 | — | P24 not_addressed → repair → 降级 | repair 子代理补证据 |
+| 统稿质量 | — | P28 脚注密度不达标 → repair | repair 子代理补脚注 |
+| 对抗评审 | L6 主动找证据推翻结论 | P29 对抗评审 | T1/T2 降级为 WARN |
+| 完成率 | <50% → 阻断交付 | — | 不交付半成品 |
+
+### 设计九：全自动交付
+
+```
+finalize_pipeline() → 对抗验证 → DOCX 生成 → 桌面复制 → 聊天窗口告知路径
+```
 
 ## 📦 目录结构
 
 ```
 ir-bp-workflow/
-├── runtime/                     # 核心运行时（双管线共用）
-│   ├── profiles/                # 管线 Profile
-│   │   ├── bp_profile.py        # BP 管线定义（含竞争与结论强制派发+附件收集）
-│   │   └── ...
-│   ├── entrypoints/             # 入口点
-│   ├── intake/                  # 输入处理
-│   └── orchestrator/            # 管线编排器
-├── scripts/                     # 功能脚本（180+）
-│   ├── ir_subagent_launcher_wb.py   # IR 子代理发射器（含 ANTI-DEFECT RULES）
-│   ├── bp_subagent_launcher_wb.py   # BP 子代理发射器（含 ANTI-DEFECT RULES）
-│   ├── search_gateway.py            # 搜索网关 v5（含 NeoData Layer 0）
+├── runtime/                         # 核心运行时（三线共用）
+│   ├── profiles/                    # 管线 Profile
+│   │   ├── base.py                  # 抽象基类
+│   │   ├── ir_profile.py            # IR 管线（9步 + 5波）
+│   │   ├── bp_profile.py            # BP 管线（33 Phase + 4波 + 统稿）
+│   │   ├── bp_constants.py          # BP 共享常量
+│   │   └── ic_profile.py            # IC 管线（行业研究）
+│   ├── entrypoints/                 # 入口点
+│   ├── intake/                      # 输入处理（BP OCR）
+│   └── orchestrator/                # 管线编排器
+│       └── kernel.py                # Phase 执行引擎
+├── scripts/                         # 功能脚本（180+）
+│   ├── ir_subagent_launcher_wb.py   # IR 子代理发射器
+│   ├── bp_subagent_launcher_wb.py   # BP 子代理发射器
+│   ├── ic_subagent_launcher.py      # IC 子代理发射器
+│   ├── search_gateway.py            # 搜索网关 v5（6层降级链）
 │   ├── build_ir_broker_report_docx.py  # IR 研报 DOCX
 │   ├── build_bp_dd_report_docx.py   # BP DD DOCX
 │   ├── build_valuation_excel.py     # 估值 Excel 生成
 │   ├── verification_agent.py        # 6层对抗验证
+│   ├── bp_file_lock.py              # 文件锁（防并行写冲突）
+│   ├── bp_utils.py                  # BP 公共工具
+│   ├── bp_delivery_gate.py          # 交付门禁
+│   ├── bp_claim_coverage_validator.py  # Claim 覆盖校验
+│   ├── bp_wave_evidence_gate.py     # Wave 证据门禁
+│   ├── bp_narrative_assembler.py    # 叙事组装器
+│   ├── bp_company_verify.py         # 公司验证（企查查 MCP）
 │   ├── ir_auto_orchestrator.py      # IR 全自动编排器
-│   │                                # ── v5 新增（牛津论文对齐）──
 │   ├── info_propagation_check.py    # 7-Agent 信息传导验证
 │   ├── sector_agent_middleware.py   # 板块代理中间件
-│   ├── sector_benchmarks.py/v2.py   # 行业基准测试（静态/动态/hybrid）
+│   ├── sector_benchmarks.py/v2.py   # 行业基准测试
 │   ├── ensemble_runner.py           # 多策略集成执行器
-│   ├── financial_metrics_precompute.py  # 五大维度财务指标预计算
-│   │                                # ── 运维工具集 ──
-│   ├── check-reminders.py/sh        # 提醒检查
-│   ├── check-skills.sh              # Skills 健康检查
-│   ├── cleanup_*.sh                 # 任务/记忆/会话清理
-│   ├── memory-cmd.sh / memory-decay.sh  # 记忆命令与老化
-│   ├── start_local_searxng.sh       # 本地 SearXNG 启动
-│   ├── watch-agent.sh               # Agent 监控
-│   ├── hkex_playwright_probe.js     # 港交所 Playwright 探针
-│   ├── tavily_search.mjs            # Tavily 搜索模块
-│   ├── load_workspace_env.sh        # 工作区环境加载
-│   └── ...
-├── instruction_store_ir/        # IR 角色指令库 v4（11 个角色）
-├── instruction_store_bp/        # BP 角色指令库 v4（7 个维度）
-├── skills/                      # AI Agent Skill 定义
-│   ├── ir-coordinator/SKILL.md  # 🧠 调度中心
-│   ├── ir-researcher/SKILL.md   # 🔍 数据采集 Agent
-│   ├── ir-reporter/SKILL.md     # 📝 统稿 Agent
-│   └── ir-verifier/SKILL.md     # 🛡️ 对抗验证 Agent
-├── search/                      # 搜索子系统
-│   ├── adapters/                # 7 个搜索引擎适配器
-│   │   ├── ddg.py               # DuckDuckGo
-│   │   ├── hkex.py              # 港交所
-│   │   ├── rss.py               # RSS/Atom
-│   │   ├── searxng.py           # SearXNG
-│   │   ├── sec.py               # SEC EDGAR
-│   │   ├── tavily.py            # Tavily
-│   │   └── yahoo.py             # Yahoo Finance
-│   └── models/                  # 搜索数据模型
-│       ├── evidence.py          # 证据评级
-│       ├── provider_result.py   # 搜索结果
-│       ├── query_plan.py        # 查询计划
-│       └── search_hit.py        # 搜索命中
-├── memory/                      # 分层记忆系统
-│   ├── memoryAge.py             # 记忆老化策略
-│   ├── memory_bridge.py         # 记忆桥接
-│   ├── hot/                     # 热记忆（当前任务）
-│   ├── warm/                    # 温记忆（用户偏好）
-│   └── topics/                  # 主题记忆（知识库）
-├── rules/                       # 执行协议
-│   └── ir-pipeline.md           # IR 管线 Zero Human Intervention 协议
-├── research/                    # 研究子系统
-├── content/                     # 内容抓取（Scrapling 三层递进）
-├── config/                      # 配置文件
-├── docs/                        # 文档
-├── setup.sh                     # 🚀 一键安装脚本
-├── .env.example                 # 环境变量模板
-├── requirements.txt             # Python 依赖
+│   ├── financial_metrics_precompute.py  # 财务指标预计算
+│   └── ...                          # 运维工具集（清理/监控/健康检查）
+├── instruction_store_ir/            # IR 角色指令库（11 个角色）
+├── instruction_store_bp/            # BP 角色指令库（7 个维度）
+├── skills/                          # AI Agent Skill 定义
+│   ├── ir-coordinator/SKILL.md      # 🧠 调度中心
+│   ├── ir-researcher/SKILL.md       # 🔍 数据采集 Agent
+│   ├── ir-reporter/SKILL.md         # 📝 统稿 Agent
+│   └── ir-verifier/SKILL.md         # 🛡️ 对抗验证 Agent
+├── search/                          # 搜索子系统
+│   ├── adapters/                    # 7 个搜索引擎适配器
+│   │   ├── ddg.py / hkex.py / rss.py / searxng.py
+│   │   ├── sec.py / tavily.py / yahoo.py
+│   └── models/                      # 搜索数据模型
+├── memory/                          # 分层记忆系统
+├── research/                        # 研究子系统
+├── content/                         # 内容抓取（Scrapling 三层递进）
+├── routing/                         # 路由子系统
+├── rules/                           # 执行协议
+├── docs/                            # 文档
+├── tests/                           # 测试
+├── setup.sh                         # 🚀 一键安装脚本
+├── ir_runtime.py                    # CLI 管理入口
+├── run_bp.py                        # BP 管线运行脚本
+├── .env.example                     # 环境变量模板
+├── requirements.txt                 # Python 依赖
 └── README.md
 ```
 
@@ -152,11 +279,11 @@ cd ~/.workbuddy/ir_runtime && bash setup.sh
 
 ### MCP 工具依赖
 
-BP 管线的 Phase 0.5 工商验证和维度分析大量依赖企查查 MCP（WorkBuddy 内置），需要在 WorkBuddy 设置中连接 `qcc-company` 服务：
+BP 管线的 Phase 02 工商验证和维度分析大量依赖企查查 MCP（WorkBuddy 内置），需要在 WorkBuddy 设置中连接 `qcc-company` 服务：
 
 | MCP 工具 | 能力 | 管线用途 |
 |---------|------|---------|
-| `mcp__qcc-company` | 工商信息（股东、注册资本、法人、变更记录、分支机构、对外投资） | Phase 0.5 验证、竞争分析、产业链分析 |
+| `mcp__qcc-company` | 工商信息（股东、注册资本、法人、变更记录、分支机构、对外投资） | P02 验证、竞争分析、产业链分析 |
 | `mcp__qcc-risk` | 风险信息（诉讼、失信被执行人、行政处罚、经营异常） | 团队合规维度 |
 | `mcp__qcc-ipr` | 知识产权（专利、商标、著作权） | 团队合规维度 |
 | `mcp__qcc-operation` | 经营信息（招投标、资质许可、年报） | 竞争分析、行业供应链、估值 |
@@ -184,7 +311,7 @@ PROXY_URL=你的代理端口
 
 **配置 SearXNG**（推荐，提升搜索质量）：
 ```bash
-docker run -d -p 你的端口 --name searxng searxng/searxng:latest
+docker run -d -p 8888:8888 --name searxng searxng/searxng:latest
 ```
 
 **配置 NeoData**（推荐，A/HK 股首选数据源）：
@@ -231,7 +358,6 @@ python3 ir_runtime.py status TASK-20260515-001
 
 # 列出所有任务
 python3 ir_runtime.py list
-
 ```
 
 | 命令 | 功能 | 说明 |
@@ -254,84 +380,16 @@ python3 ir_runtime.py list
 | `cleanup_completed_tasks.sh` | 已完成任务清理 | `bash scripts/cleanup_completed_tasks.sh` |
 | `cleanup_memory.sh` | 记忆文件清理 | `bash scripts/cleanup_memory.sh` |
 | `cleanup_sessions.sh` | 会话文件清理 | `bash scripts/cleanup_sessions.sh` |
-| `memory-cmd.sh` | 记忆命令入口 | `bash scripts/memory-cmd.sh [cmd]` |
-| `memory-decay.sh` | 记忆老化处理 | `bash scripts/memory-decay.sh --days 30` |
 | `start_local_searxng.sh` | 启动本地SearXNG | `bash scripts/start_local_searxng.sh` |
 | `watch-agent.sh` | Agent运行监控 | `bash scripts/watch-agent.sh` |
 | `load_workspace_env.sh` | 环境变量加载 | `source scripts/load_workspace_env.sh` |
 | `python_ssl_env.sh` | Python SSL配置 | `source scripts/python_ssl_env.sh` |
 | `tools/patch_paths.py` | 路径修复工具 | `python3 tools/patch_paths.py --root $HOME/.workbuddy/ir_runtime` |
 
-## 🧠 核心设计
-
-### 长链推理：8 步 IR 研报
-
-4 个 wave、8 个 step 的渐进式推理链，每个 step 依赖前序输出：
-
-| Wave | Steps | 推理深度 |
-|------|-------|---------|
-| Wave 1 | step1_data | 基础数据（估值/财务/市场）+ **融资状态验证** |
-| Wave 2 | step2+3+4+5 | 并行深度分析（行业/商业/财务/管理层）+ **人员/竞品真实性验证** |
-| Wave 3 | step6+6b+7 | 高阶推理（差异化洞察/**预测与估值**/风险催化）+ **可比公司状态验证** |
-| Wave 4 | step8_master | 综合统稿（基于前 7 步完整输出）+ **跨 step 一致性检查** |
-
-### ANTI-DEFECT RULES：反幻觉验证体系
-
-每个 step/维度内置专属验证规则，从根源防止 AI 幻觉：
-
-| 规则 | 适用步骤 | 防御目标 |
-|------|---------|---------|
-| 融资状态验证 | step1, BP 竞争 | 防止引用已 IPO 公司的过时融资数据 |
-| 人员存在性验证 | step5, BP 团队 | 防止编造不存在的高管/董事姓名 |
-| 数据时效性检查 | step4, step6b | 确保财务/估值数据在 6 个月内 |
-| 可比公司状态验证 | step6b, BP 估值 | 确认 comps 表中公司仍在经营/已上市 |
-| 政策时效性验证 | step7, BP 行业 | 确认引用的政策仍然有效 |
-| 竞品运营状态 | step3, BP 技术 | 确认竞品未被收购/重组/转型 |
-| 审计意见检查 | step4 | 关注审计意见变更（无保留→保留 = 红旗） |
-| 跨 step 一致性 | step8 | 同一实体在不同 step 中的状态描述一致 |
-
-### 搜索系统：6 层降级链 + NeoData
-
-```
-Layer 0: NeoData 金融数据（A/HK股行情、财报、板块、研报）
-Layer 1: DuckDuckGo（通用搜索）
-Layer 2: SearXNG 本地实例（Baidu + Bing 补充）
-Layer 3: Google 直接抓取（走代理，自己解析）
-Layer 4: Scrapling StealthyFetcher（深度正文提取）
-Layer 5: yfinance 估值数据（IR 管线专用）
-```
-
-- **金融查询自动路由**：搜索网关自动检测金融类查询（股价/财报/估值/PE 等），优先走 NeoData
-- **数据源优先级**：A/HK 股 → NeoData → yfinance(交叉验证) → web_search；美股 → yfinance → web_search
-- 7 个适配器（NeoData/DDG/SearXNG/SEC/HKEX/Yahoo/RSS），支持实体解析、查询计划、证据评级
-
-### 多 Agent 协作：4 角色分工
-
-| Agent | 职责 | 触发方式 |
-|-------|------|---------|
-| **ir-coordinator** | 调度中心，编排全自动执行 | 用户对话直接触发 |
-| **ir-researcher** | 单维度数据采集，自主补搜闭环 | coordinator 内部调度 |
-| **ir-reporter** | 统稿 + DOCX + 对抗验证 + 交付 | coordinator 内部调度 |
-| **ir-verifier** | 6 层对抗验证（L1-L5 脚本 + L6 人工论证） | coordinator 内部调度 |
-
-### 质量门禁
-
-- Step1 完整性 <50% → 熔断
-- 跨 Step 一致性 FAIL → 必须修正
-- **ANTI-DEFECT RULES** → 每个 step 输出前必须完成验证
-- 完成率 <50% → 阻断交付
-- 对抗验证 L6 → 主动找证据推翻结论
-
-### 全自动交付
-
-```
-finalize_pipeline() → 对抗验证 → DOCX 生成 → 桌面复制
-```
-
 ## 🎯 设计理念
 
 1. **Phase 驱动** — 管线由 Phase 序列组成，可独立运行/暂停/恢复
-2. **Profile 模式** — IR/BP 共享编排内核，Profile 定义差异
+2. **Profile 模式** — IR/BP/IC 共享编排内核，Profile 定义差异
 3. **子代理自主闭环** — 数据缺口时自主补搜，不回主控等待
 4. **搜索可插拔** — 网关抽象层 + NeoData Layer 0，支持多种搜索引擎/插件
 5. **断点续跑** — 中断后从任意 Phase 恢复
@@ -341,10 +399,12 @@ finalize_pipeline() → 对抗验证 → DOCX 生成 → 桌面复制
 
 ## 📊 项目数据
 
-- **160+ 个 Python 脚本**，**~28,000 行代码**
+- **300+ 个 Python 文件**，**~77,000 行代码**
+- **IR 管线**：9 步分析 + 5 波子代理 + 对抗验证
+- **BP 管线**：33 Phase + 4 波并行分析 + 3 层 repair 机制
 - **已分析标的**：AVGO、泡泡玛特、优必选、东江环保、佰维存储、阅文集团、中芯国际、及部分融资项目等
 - **交付物**：券商级 DOCX 研报（执行摘要 + 估值分析 + 风险矩阵 + 免责声明）+ 估值 Excel
-- **自动化率**：Phase 0-5 全自动，Zero Human Intervention
+- **自动化率**：全管线全自动，Zero Human Intervention
 
 ## ⚙️ 环境变量配置（.env）
 

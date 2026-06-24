@@ -21,7 +21,7 @@ last_updated: 2026-04-23
 - `get_current_wave_index(task_id)` — 根据输出文件推算当前 wave
 - `launch_next_wave(task_id, entity, query, market)` — 发射当前 wave，返回 task() 工具指令
 - `get_pipeline_status(task_id)` — 管线状态快照
-- `finalize_pipeline(task_id, entity, market)` — Phase 5 全自动（质检→DOCX→桌面→微信）
+- `finalize_pipeline(task_id, entity, market)` — Phase 5 全自动（质检→DOCX→桌面复制）
 
 **kernel.py 修复**：`needs_dispatch` 分支改为暂停返回（`return results`），不再直接跑 collect
 
@@ -31,7 +31,7 @@ last_updated: 2026-04-23
 - 质量门禁内联（避免导入 run_ir_pipeline.py 触发重量级模块链）
 - DOCX 生成用 subprocess 调用 `build_ir_broker_report_docx.py`（函数名是 `main()`/`convert_markdown_to_docx`，不是 `build_docx`）
 - DOCX 失败自动用 markdown 兜底
-- 自动复制到桌面 + 微信通知
+- 自动复制到桌面
 
 **执行协议（rules/ir-pipeline.md）**：
 - 主 AI 循环调用 `launch_next_wave()` 直到 `all_done=True`

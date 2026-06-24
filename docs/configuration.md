@@ -21,9 +21,6 @@ VL_API_BASE=https://your-vl-api.example.com/v1
 VL_API_KEY=your-api-key
 VL_MODEL=qwen3-vl-30b-a3b-instruct
 
-# 微信通知（可选）
-WECHAT_BOT_KEY=your-wechat-bot-key
-
 # SearXNG 本地搜索引擎（可选，提升搜索质量）
 SEARXNG_URL=http://localhost:8888
 

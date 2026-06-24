@@ -430,15 +430,7 @@ class ResearchRunner:
                     _lines.append(f'  {i}. {sq}')
                 _lines.append('展开查询数：' + str(total))
                 _msg = '\n'.join(_lines)
-                # 2026-04-13: WorkBuddy 版 — 用龙少微信替代 `openclaw message send --channel feishu`
-                try:
-                    import sys as _sys
-                    from pathlib import Path as _P
-                    _sys.path.insert(0, str(_P(__file__).resolve().parent.parent / 'scripts'))
-                    from longshao_notify import send_message as _send_wx
-                    _send_wx(f"📋 {plan.entity} 研究计划\n\n{_msg}")
-                except Exception:
-                    pass
+                # Notification removed — open-source release
             except Exception:
                 pass
     

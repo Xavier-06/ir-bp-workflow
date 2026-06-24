@@ -1256,16 +1256,7 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'cn') -> dic
 
         result['desktop_path'] = deliver_path
 
-    # 微信通知
-    try:
-        notify_wx(
-            f"📊 {entity or task_id} 行业深度研究已完成\n\n"
-            f"📁 桌面已放置\n\n"
-            f"请查阅。（IC管线自动交付）"
-        )
-        result['notified'] = True
-    except Exception:
-        result['notified'] = False
+    # 通知 — 已移除（开源发布版本不含消息推送）
 
     result['status'] = 'delivered'
     result['message'] = f"行业研报已生成并复制到桌面: {deliver_path or '(markdown)'}"

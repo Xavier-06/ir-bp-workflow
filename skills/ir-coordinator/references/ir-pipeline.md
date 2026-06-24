@@ -195,13 +195,9 @@ result = finalize_pipeline(task_id, entity, market)
 
 ## IR 交付规则
 
-- `finalize_pipeline()` **必须执行**（全自动：质检 → DOCX → 桌面 → 微信通知）
+- `finalize_pipeline()` **必须执行**（全自动：质检 → DOCX → 桌面复制）
 - DOCX 失败 → 用 markdown 兜底
-- **研报必须复制到桌面**
-- **微信通知必须尝试发送**（通过 `longshao_notify.py` → wechat_bot SDK）
-  - ⚠️ `longshao_notify.py` 已升级为三步发送（文本通知→文件→确认文本）
-  - 如果 `--file` 调用返回 `ok: false`，必须重试一次
-  - 即使返回 `ok: true`，也要提醒用户检查微信是否收到（SDK send_file 静默失败不抛异常）
+- **研报必须复制到桌面**（macOS `~/Desktop/`）
 - 交付完成后，在聊天窗口告知用户文件完整路径
 - **禁止**使用 `deliver_attachments`（客户端不显示附件）
 
