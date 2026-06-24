@@ -95,7 +95,100 @@ runtime/profiles/
 └── ic_profile.py    # IC 管线：行业研究（第三管线）
 ```
 
-### 设计三：Wave Evidence Gate Repair 机制
+### 设计三：证据链 — 从 Claim 到 Report 的数据流
+
+管线的核心理念是 **evidence chain（证据链）**：每个分析结论都必须有可追溯的证据支撑，而非 AI 凭空生成。数据在管线中按以下链路流动：
+
+```
+Claim（待验证的主张）
+  → Search（搜索网关 6 层降级链）
+    → Source（来源评级：T0官方/T1权威/T2可信/T3一般）
+      → Fact（结构化事实，存入 Fact Store）
+        → Section（维度分析，含 Section Package）
+          → Gate（证据门禁校验）
+            → Synthesis（统稿）
+              → Report（最终 DOCX）
+```
+
+#### 子代理三文件输出契约
+
+每个 BP 子代理（无论是分析 role 还是 repair role）完成后必须输出 **3 个文件**，这是管线的硬契约：
+
+```
+jobs/{JOB_ID}/outputs/
+├── bp_phase2_{slug}.md             ← 文件 1：Markdown 正文
+├── bp_phase2_{slug}-facts.json     ← 文件 2：事实 Sidecar
+└── bp_phase2_{slug}-section.json   ← 文件 3：Section Package Sidecar
+```
+
+| 文件 | 格式 | 内容 | 下游消费者 | 为什么需要它 |
+|------|------|------|-----------|-------------|
+| **`.md`** | Markdown | 该维度的完整分析文本（>100 bytes） | 统稿子代理直接读取，拼入最终报告 | 人类可读的分析产物 |
+| **`-facts.json`** | JSON | 结构化事实数组：每条含 `fact_id`, `claim`, `value`, `unit`, `period`, `source_url`, `source_tier`, `source_quote`, `confidence`（>10 bytes） | Fact Store 合并（P11）→ Claim 覆盖校验（P24）→ 统稿脚注生成 | 将"AI 说了什么"变成"可验证的结构化数据"，是整个证据链的核心 |
+| **`-section.json`** | JSON | Section Package：`schema_version`, `section_id`, `section_title`, `key_messages`, `claims[]`（含 `fact_ids` 引用）, `counter_evidence`, `data_gaps`, `markdown_draft`（>10 bytes） | Section Package 校验（P26）→ 门禁判定 PASS/FAIL | 结构化的"这一节说了什么、哪些是核心观点、哪些有证据、哪些是数据缺口" |
+
+**写入顺序**：子代理先写 `.md` 再写 sidecar（JSON 序列化耗时较长）。因此 collect 阶段不能只看 `.md` 是否存在就认为完成。
+
+**完成判定（`_role_outputs_complete`）**：三文件全部存在 + 体积达标 + JSON 合法 + 文件大小稳定（3 秒内不增长）才算一个 role 完成。
+
+#### Fact Store — 全局事实数据库
+
+所有子代理的 facts sidecar 在 P11（Fact Store Merge）阶段合并为中央 `bp_fact_store.json`：
+
+```json
+{
+  "task_id": "TASK-20260615-001",
+  "entity": "XX科技",
+  "market": "cn",
+  "facts": [
+    {
+      "fact_id": "F-001",
+      "claim": "2024年营收",
+      "value": "3.2",
+      "unit": "亿元",
+      "source_url": "https://...",
+      "source_tier": "T1",
+      "source_quote": "原文摘录...",
+      "confidence": "high"
+    }
+  ],
+  "conflicts": []
+}
+```
+
+Fact Store 的作用：
+- **Claim 覆盖校验（P24）**：检查每个 claim 是否有对应的 fact 证据，没有则触发 repair
+- **统稿脚注生成（P27-28）**：统稿子代理从 Fact Store 提取 source_url 生成脚注，而非自己编造
+- **跨维度一致性**：不同 role 对同一指标的引用通过 fact_id 关联，避免矛盾
+
+#### Section Package — 结构化质量校验
+
+Section Package 让管线能用程序化的方式校验每个维度的输出质量，而非依赖 AI 主观判断：
+
+```json
+{
+  "schema_version": "bp_section_package.v2",
+  "section_id": "tech",
+  "section_title": "技术与产品",
+  "key_messages": ["核心技术壁垒为...", "产品矩阵覆盖..."],
+  "claims": [
+    {
+      "claim": "自研 XX 算法精度达 99.5%",
+      "fact_ids": ["F-042", "F-043"],
+      "reasoning": "来源为论文 + 客户验证",
+      "confidence": "high",
+      "source_quality": "T1"
+    }
+  ],
+  "counter_evidence": ["竞品 YY 声称同等精度..."],
+  "data_gaps": ["缺少第三方独立评测"],
+  "markdown_draft": "## 技术与产品\n..."
+}
+```
+
+校验维度：`claims` 是否有 `fact_ids` 引用 → `fact_ids` 是否在 Fact Store 中存在 → `counter_evidence` 是否非空 → `data_gaps` 是否标注 → 门禁综合判定 PASS / FAIL / WARN。
+
+### 设计四：Wave Evidence Gate Repair 机制
 
 门禁不再是非 PASS 即 FAIL 的二元判断。gate FAIL 时触发 repair 子代理修复，而非直接终止管线：
 
