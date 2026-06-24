@@ -1,0 +1,101 @@
+{
+  "meta": {
+    "version": 3,
+    "created_at": "2026-05-29T22:00:00",
+    "updated_at": "2026-06-02T23:20:00",
+    "changelog": "v3: P1P2升级 — 新增催化剂/共识挑战/场景敏感性Agent + P2深度增强"
+  },
+  "roles": [
+    {
+      "key": "行业_投研假说",
+      "name": "投研假说 Agent (Wave 0)",
+      "file": "行业_投研假说.md"
+    },
+    {
+      "key": "行业_概览",
+      "name": "行业概览 Agent",
+      "file": "行业_概览.md"
+    },
+    {
+      "key": "行业_政策扫描",
+      "name": "政策扫描 Agent",
+      "file": "行业_政策扫描.md"
+    },
+    {
+      "key": "行业_产业链分析",
+      "name": "产业链分析 Agent",
+      "file": "行业_产业链分析.md"
+    },
+    {
+      "key": "行业_环节分析_W2",
+      "name": "环节分析 Agent (Wave2: 竞争/技术/市场)",
+      "file": "行业_环节分析_W2.md"
+    },
+    {
+      "key": "行业_环节分析_W3",
+      "name": "环节分析 Agent (Wave3: 财务/估值/资本)",
+      "file": "行业_环节分析_W3.md"
+    },
+    {
+      "key": "行业_环节小结",
+      "name": "环节小结 Agent",
+      "file": "行业_环节小结.md"
+    },
+    {
+      "key": "行业_跨环节对比",
+      "name": "跨环节对比 Agent",
+      "file": "行业_跨环节对比.md"
+    },
+    {
+      "key": "行业_催化剂分析",
+      "name": "催化剂分析 Agent (Wave 5)",
+      "file": "行业_催化剂分析.md"
+    },
+    {
+      "key": "行业_共识挑战",
+      "name": "共识挑战 Agent (Wave 5)",
+      "file": "行业_共识挑战.md"
+    },
+    {
+      "key": "行业_投资机会",
+      "name": "投资机会 Agent",
+      "file": "行业_投资机会.md"
+    },
+    {
+      "key": "行业_风险评估",
+      "name": "风险评估 Agent",
+      "file": "行业_风险评估.md"
+    },
+    {
+      "key": "行业_场景敏感性",
+      "name": "场景敏感性 Agent (Wave 6)",
+      "file": "行业_场景敏感性.md"
+    },
+    {
+      "key": "行业_统稿",
+      "name": "行业研报统稿 Agent",
+      "file": "行业_统稿.md"
+    },
+    {
+      "key": "行业_投资手册",
+      "name": "投资手册 Agent (Wave 8)",
+      "file": "行业_投资手册.md"
+    }
+  ],
+  "pipeline_bindings": {
+    "ic": {
+      "step_executive_hypothesis": "行业_投研假说",
+      "step_ind_overview": "行业_概览",
+      "step_policy_scan": "行业_政策扫描",
+      "step_value_chain": "行业_产业链分析",
+      "step_cross_chain_compare": "行业_跨环节对比",
+      "step_catalyst_analysis": "行业_催化剂分析",
+      "step_consensus_challenge": "行业_共识挑战",
+      "step_investment_thesis": "行业_投资机会",
+      "step_risk_assessment": "行业_风险评估",
+      "step_scenario_sensitivity": "行业_场景敏感性",
+      "step_master_report": "行业_统稿",
+      "step_investment_playbook": "行业_投资手册"
+    }
+  }
+}

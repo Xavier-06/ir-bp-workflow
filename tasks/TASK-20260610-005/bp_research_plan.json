@@ -1,0 +1,1310 @@
+{
+  "schema_version": "bp_research_plan.v2",
+  "task_id": "TASK-20260610-005",
+  "entity": "目标公司",
+  "market": "us",
+  "query": "",
+  "input_file": "/Users/xavier/Documents/work/BP/乾昇真空BP2026.pdf",
+  "created_at": "2026-06-10T15:59:08.807326+00:00",
+  "objective": "围绕 目标公司 的商业计划书形成证据可追溯、反证充分、估值可复算、交付可门禁的投资尽调研究计划。",
+  "prepared_by": "script_scaffold_plus_orchestrator_enrichment",
+  "generation_roles": {
+    "script": "schema_fact_requirements_coverage_matrix_validation",
+    "orchestrator_agent": "strategic_questions_claim_prioritization_owner_assignment"
+  },
+  "core_questions": [
+    {
+      "question_id": "BQ1",
+      "question": "目标公司 的工商主体、股权结构、实控人和核心团队是否真实、稳定且与 BP 表述一致？",
+      "priority": "critical",
+      "owner_section": "bp_company_team_compliance",
+      "supporting_sections": [
+        "bp_dealbreaker_risk",
+        "bp_competition_positioning"
+      ],
+      "required_fact_keys": [
+        "company_registration",
+        "ownership",
+        "controller",
+        "team_background",
+        "governance_risk"
+      ],
+      "decision_relevance": "决定投资主体可信度、关键人风险和后续尽调对象是否明确。"
+    },
+    {
+      "question_id": "BQ2",
+      "question": "目标公司 的产品矩阵、量产状态、客户/订单/收入证据是否证明其已进入可商业化阶段？",
+      "priority": "critical",
+      "owner_section": "bp_product_commercial",
+      "supporting_sections": [
+        "bp_market_supply_chain",
+        "bp_customer_revenue_validation",
+        "bp_valuation_return",
+        "bp_competition_positioning"
+      ],
+      "required_fact_keys": [
+        "product_matrix",
+        "commercial_stage",
+        "customer_evidence",
+        "revenue_evidence",
+        "order_evidence"
+      ],
+      "decision_relevance": "决定公司是技术样机、试用阶段还是可销售产品，直接影响估值和投资条件。"
+    },
+    {
+      "question_id": "BQ3",
+      "question": "目标公司 的技术路线、知识产权、认证和性能声称是否有独立证据支撑？",
+      "priority": "high",
+      "owner_section": "bp_tech_ip_moat",
+      "supporting_sections": [
+        "bp_competition_positioning",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "tech_route",
+        "ipr_evidence",
+        "certification",
+        "performance_evidence",
+        "moat_evidence"
+      ],
+      "decision_relevance": "决定技术壁垒是否真实存在，避免把 BP 宣传口径写成投资结论。"
+    },
+    {
+      "question_id": "BQ4",
+      "question": "目标公司 所处市场的 TAM/SAM/SOM、增速、渗透率和供应链位置是否支持 BP 的增长假设？",
+      "priority": "high",
+      "owner_section": "bp_market_supply_chain",
+      "supporting_sections": [
+        "bp_valuation_return",
+        "bp_competition_positioning",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "market_size",
+        "growth_rate",
+        "sam_som",
+        "penetration_assumption",
+        "supply_chain_position"
+      ],
+      "decision_relevance": "决定市场空间和增长天花板是否足以支撑融资故事。"
+    },
+    {
+      "question_id": "BQ5",
+      "question": "目标公司 的竞品、替代方案、差异化和进入壁垒是否经得起横向比较？",
+      "priority": "high",
+      "owner_section": "bp_competition_positioning",
+      "supporting_sections": [
+        "bp_product_commercial",
+        "bp_tech_ip_moat",
+        "bp_market_supply_chain"
+      ],
+      "required_fact_keys": [
+        "competitor_set",
+        "differentiation",
+        "substitution_risk",
+        "market_position",
+        "moat_evidence"
+      ],
+      "decision_relevance": "决定标的是否真的领先，以及竞争结论是否依赖未验证的产品/技术事实。"
+    },
+    {
+      "question_id": "BQ6",
+      "question": "目标公司 的融资诉求、估值区间、可比公司、退出路径和 MOIC/IRR 假设是否可复算？",
+      "priority": "high",
+      "owner_section": "bp_valuation_return",
+      "supporting_sections": [
+        "bp_company_team_compliance",
+        "bp_product_commercial",
+        "bp_tech_ip_moat",
+        "bp_market_supply_chain",
+        "bp_customer_revenue_validation",
+        "bp_competition_positioning"
+      ],
+      "required_fact_keys": [
+        "financing_terms",
+        "valuation_multiples",
+        "peer_set",
+        "exit_path",
+        "return_model",
+        "sensitivity"
+      ],
+      "decision_relevance": "决定风险收益比和是否有条件推进。估值不得使用未验证营收/订单作为主假设。"
+    },
+    {
+      "question_id": "BQ7",
+      "question": "哪些反证、数据缺口或 Deal Breakers 会直接推翻 目标公司 的投资建议？",
+      "priority": "critical",
+      "owner_section": "bp_dealbreaker_risk",
+      "supporting_sections": [
+        "bp_company_team_compliance",
+        "bp_product_commercial",
+        "bp_tech_ip_moat",
+        "bp_market_supply_chain",
+        "bp_valuation_return",
+        "bp_customer_revenue_validation"
+      ],
+      "required_fact_keys": [
+        "deal_breakers",
+        "counter_evidence",
+        "legal_risk",
+        "commercial_gap",
+        "valuation_downside"
+      ],
+      "decision_relevance": "强制形成反方视角，防止最终报告只拼接正向故事。"
+    }
+  ],
+  "strategic_questions": [
+    {
+      "question_id": "BSQ1",
+      "question": "目标公司 的 核心产品 是否已有可独立验证的付费客户、订单或交付证据？",
+      "priority": "critical",
+      "owner_section": "bp_customer_revenue_validation",
+      "supporting_sections": [
+        "bp_product_commercial",
+        "bp_valuation_return",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "customer_evidence",
+        "order_evidence",
+        "revenue_evidence",
+        "commercial_stage"
+      ],
+      "decision_relevance": "这是 BP 尽调最容易从故事变成事实的分水岭。"
+    },
+    {
+      "question_id": "BSQ2",
+      "question": "BP 对 核心技术路线 的领先性描述，是可量化技术壁垒，还是尚未验证的宣传口径？",
+      "priority": "high",
+      "owner_section": "bp_tech_ip_moat",
+      "supporting_sections": [
+        "bp_competition_positioning",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "tech_route",
+        "performance_evidence",
+        "ipr_evidence",
+        "certification",
+        "moat_evidence"
+      ],
+      "decision_relevance": "决定技术溢价是否成立。"
+    },
+    {
+      "question_id": "BSQ3",
+      "question": "目标公司 的融资估值在未验证客户/营收情景下还能否成立？",
+      "priority": "critical",
+      "owner_section": "bp_valuation_return",
+      "supporting_sections": [
+        "bp_customer_revenue_validation",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "financing_terms",
+        "valuation_multiples",
+        "peer_set",
+        "return_model",
+        "sensitivity",
+        "commercial_gap"
+      ],
+      "decision_relevance": "防止估值模型把未验证商业化数据当作主假设。"
+    },
+    {
+      "question_id": "BSQ4",
+      "question": "如果要否决 目标公司，最强的 3 条反证或 Deal Breakers 是什么？",
+      "priority": "critical",
+      "owner_section": "bp_dealbreaker_risk",
+      "supporting_sections": [
+        "bp_company_team_compliance",
+        "bp_product_commercial",
+        "bp_tech_ip_moat",
+        "bp_market_supply_chain",
+        "bp_valuation_return",
+        "bp_customer_revenue_validation"
+      ],
+      "required_fact_keys": [
+        "deal_breakers",
+        "counter_evidence",
+        "legal_risk",
+        "commercial_gap",
+        "valuation_downside"
+      ],
+      "decision_relevance": "强制后续报告保留反方审查，而不是只写支持理由。"
+    }
+  ],
+  "fact_requirements": [
+    {
+      "fact_key": "company_registration",
+      "description": "工商主体、成立时间、注册资本、经营范围、主体状态",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_company_team_compliance"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "ownership",
+      "description": "股权结构、股东、出资、历史融资和穿透关系",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official",
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_company_team_compliance",
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "controller",
+      "description": "实际控制人、控制链和关键人依赖",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_company_team_compliance",
+        "bp_dealbreaker_risk"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "team_background",
+      "description": "创始人/核心团队履历、任职、教育、过往成果",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official",
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender"
+      ],
+      "required_for": [
+        "bp_company_team_compliance"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "governance_risk",
+      "description": "诉讼、处罚、失信、关联交易、劳动或知识产权争议",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_company_team_compliance",
+        "bp_dealbreaker_risk"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "product_matrix",
+      "description": "产品线、型号、目标场景、交付状态、价格或规格",
+      "source_priority": [
+        "company_official",
+        "customer_disclosure",
+        "bp_source_document"
+      ],
+      "required_for": [
+        "bp_product_commercial"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "commercial_stage",
+      "description": "研发、样机、试用、小批量、量产、规模销售等阶段证据",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_product_commercial",
+        "bp_customer_revenue_validation",
+        "bp_valuation_return"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "fact_key": "customer_evidence",
+      "description": "客户、试用、合作、采购、招投标或合同线索",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_product_commercial",
+        "bp_customer_revenue_validation",
+        "bp_competition_positioning"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "fact_key": "order_evidence",
+      "description": "订单、收入、交付、产能利用或在手合同证据",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_product_commercial",
+        "bp_customer_revenue_validation",
+        "bp_valuation_return"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "fact_key": "revenue_evidence",
+      "description": "营收规模、收入结构、回款或商业闭环证据",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_product_commercial",
+        "bp_customer_revenue_validation",
+        "bp_valuation_return"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "fact_key": "tech_route",
+      "description": "技术路线、主流替代路线和路线成熟度",
+      "source_priority": [
+        "technical_standard",
+        "academic_paper",
+        "industry_report",
+        "patent_database"
+      ],
+      "required_for": [
+        "bp_tech_ip_moat",
+        "bp_competition_positioning"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "ipr_evidence",
+      "description": "专利、软著、商标、论文、专有认证或知识产权覆盖",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official",
+        "patent_database"
+      ],
+      "required_for": [
+        "bp_tech_ip_moat"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "certification",
+      "description": "资质、认证、测试报告及有效期",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official",
+        "technical_standard"
+      ],
+      "required_for": [
+        "bp_tech_ip_moat",
+        "bp_company_team_compliance"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "performance_evidence",
+      "description": "性能参数、测试结果、第三方验证及口径",
+      "source_priority": [
+        "third_party_test",
+        "technical_standard",
+        "academic_paper",
+        "customer_disclosure"
+      ],
+      "required_for": [
+        "bp_tech_ip_moat"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "moat_evidence",
+      "description": "壁垒证据：技术、客户、渠道、资质、成本、规模或数据",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_tech_ip_moat",
+        "bp_competition_positioning"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "market_size",
+      "description": "TAM/SAM/SOM、细分市场规模和统计口径",
+      "source_priority": [
+        "industry_report",
+        "government_statistics",
+        "association_data",
+        "listed_peer_filings"
+      ],
+      "required_for": [
+        "bp_market_supply_chain",
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "growth_rate",
+      "description": "行业增速、渗透率、需求驱动和周期变量",
+      "source_priority": [
+        "industry_report",
+        "government_statistics",
+        "association_data"
+      ],
+      "required_for": [
+        "bp_market_supply_chain"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "sam_som",
+      "description": "可服务市场和可获得市场的推算参数",
+      "source_priority": [
+        "industry_report",
+        "customer_or_partner_disclosure",
+        "bp_source_document"
+      ],
+      "required_for": [
+        "bp_market_supply_chain",
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "penetration_assumption",
+      "description": "渗透率假设、对标对象和必要条件",
+      "source_priority": [
+        "industry_report",
+        "listed_peer_filings",
+        "reputable_media"
+      ],
+      "required_for": [
+        "bp_market_supply_chain",
+        "bp_valuation_return"
+      ],
+      "criticality": "medium"
+    },
+    {
+      "fact_key": "supply_chain_position",
+      "description": "产业链位置、上下游、供应商/客户议价和关键资源",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_market_supply_chain"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "competitor_set",
+      "description": "竞品名单、当前状态、产品能力和融资/经营阶段",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_competition_positioning",
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "differentiation",
+      "description": "与竞品相比的差异化、领先性和可替代性",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "technical_standard"
+      ],
+      "required_for": [
+        "bp_competition_positioning"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "substitution_risk",
+      "description": "替代方案、客户自研、进口替代或价格战风险",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "industry_report"
+      ],
+      "required_for": [
+        "bp_competition_positioning"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "market_position",
+      "description": "市场份额、排名、客户认可或生态位置",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_competition_positioning"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "financing_terms",
+      "description": "融资轮次、融资金额、投前/投后估值、资金用途",
+      "source_priority": [
+        "bp_source_document",
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "valuation_multiples",
+      "description": "PS/PE/EV 等估值倍数及适用条件",
+      "source_priority": [
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "peer_set",
+      "description": "可比公司/交易样本、口径、阶段和排除理由",
+      "source_priority": [
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report",
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender"
+      ],
+      "required_for": [
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "exit_path",
+      "description": "IPO、并购、股权转让等退出路径及可行性",
+      "source_priority": [
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report",
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender"
+      ],
+      "required_for": [
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "return_model",
+      "description": "MOIC/IRR、稀释、跟投、退出估值和持有期假设",
+      "source_priority": [
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report",
+        "bp_source_document"
+      ],
+      "required_for": [
+        "bp_valuation_return"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "sensitivity",
+      "description": "估值敏感性、下行情景和关键变量弹性",
+      "source_priority": [
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_valuation_return",
+        "bp_dealbreaker_risk"
+      ],
+      "criticality": "high"
+    },
+    {
+      "fact_key": "deal_breakers",
+      "description": "会直接阻断投资的事实、缺口或反证",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official",
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_dealbreaker_risk"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "fact_key": "counter_evidence",
+      "description": "与 BP 主张相反的证据和替代解释",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official",
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_dealbreaker_risk"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "fact_key": "legal_risk",
+      "description": "重大诉讼、处罚、资质缺失、监管限制",
+      "source_priority": [
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_company_team_compliance",
+        "bp_dealbreaker_risk"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "fact_key": "commercial_gap",
+      "description": "客户/订单/收入/交付无法验证造成的商业化缺口",
+      "source_priority": [
+        "industry_report",
+        "reputable_media",
+        "customer_or_partner_disclosure",
+        "public_tender",
+        "company_registry",
+        "government_disclosure",
+        "court_or_regulatory_database",
+        "company_official"
+      ],
+      "required_for": [
+        "bp_product_commercial",
+        "bp_customer_revenue_validation",
+        "bp_dealbreaker_risk"
+      ],
+      "criticality": "critical"
+    },
+    {
+      "fact_key": "valuation_downside",
+      "description": "估值下修空间、倍数压缩和退出失败情景",
+      "source_priority": [
+        "peer_financing_database",
+        "listed_peer_filings",
+        "market_database",
+        "valuation_report"
+      ],
+      "required_for": [
+        "bp_valuation_return",
+        "bp_dealbreaker_risk"
+      ],
+      "criticality": "high"
+    }
+  ],
+  "section_requirements": {
+    "bp_company_team_compliance": {
+      "must_answer": [
+        "BQ1"
+      ],
+      "required_fact_keys": [
+        "company_registration",
+        "ownership",
+        "controller",
+        "team_background",
+        "governance_risk",
+        "legal_risk"
+      ],
+      "required_outputs": [
+        "answers",
+        "claims",
+        "facts_used",
+        "counter_evidence",
+        "data_gaps",
+        "narrative_blocks",
+        "markdown_draft"
+      ]
+    },
+    "bp_product_commercial": {
+      "must_answer": [
+        "BQ2"
+      ],
+      "required_fact_keys": [
+        "product_matrix",
+        "commercial_stage",
+        "customer_evidence",
+        "order_evidence",
+        "revenue_evidence",
+        "commercial_gap"
+      ],
+      "required_outputs": [
+        "answers",
+        "claims",
+        "facts_used",
+        "counter_evidence",
+        "data_gaps",
+        "narrative_blocks",
+        "markdown_draft"
+      ]
+    },
+    "bp_tech_ip_moat": {
+      "must_answer": [
+        "BQ3"
+      ],
+      "required_fact_keys": [
+        "tech_route",
+        "ipr_evidence",
+        "certification",
+        "performance_evidence",
+        "moat_evidence"
+      ],
+      "required_outputs": [
+        "answers",
+        "claims",
+        "facts_used",
+        "counter_evidence",
+        "data_gaps",
+        "narrative_blocks",
+        "markdown_draft"
+      ]
+    },
+    "bp_market_supply_chain": {
+      "must_answer": [
+        "BQ4"
+      ],
+      "required_fact_keys": [
+        "market_size",
+        "growth_rate",
+        "sam_som",
+        "penetration_assumption",
+        "supply_chain_position"
+      ],
+      "required_outputs": [
+        "answers",
+        "claims",
+        "facts_used",
+        "counter_evidence",
+        "data_gaps",
+        "narrative_blocks",
+        "markdown_draft"
+      ]
+    },
+    "bp_competition_positioning": {
+      "must_answer": [
+        "BQ5"
+      ],
+      "required_fact_keys": [
+        "competitor_set",
+        "differentiation",
+        "substitution_risk",
+        "market_position",
+        "moat_evidence"
+      ],
+      "required_outputs": [
+        "answers",
+        "claims",
+        "facts_used",
+        "counter_evidence",
+        "data_gaps",
+        "narrative_blocks",
+        "markdown_draft"
+      ]
+    },
+    "bp_valuation_return": {
+      "must_answer": [
+        "BQ6"
+      ],
+      "required_fact_keys": [
+        "financing_terms",
+        "valuation_multiples",
+        "peer_set",
+        "exit_path",
+        "return_model",
+        "sensitivity",
+        "valuation_downside"
+      ],
+      "required_outputs": [
+        "answers",
+        "claims",
+        "facts_used",
+        "counter_evidence",
+        "data_gaps",
+        "narrative_blocks",
+        "markdown_draft"
+      ]
+    },
+    "bp_customer_revenue_validation": {
+      "must_answer": [
+        "BQ2"
+      ],
+      "required_fact_keys": [
+        "customer_evidence",
+        "order_evidence",
+        "revenue_evidence",
+        "commercial_stage",
+        "commercial_gap"
+      ],
+      "required_outputs": [
+        "answers",
+        "claims",
+        "facts_used",
+        "counter_evidence",
+        "data_gaps",
+        "narrative_blocks",
+        "markdown_draft"
+      ]
+    },
+    "bp_dealbreaker_risk": {
+      "must_answer": [
+        "BQ7"
+      ],
+      "required_fact_keys": [
+        "deal_breakers",
+        "counter_evidence",
+        "legal_risk",
+        "commercial_gap",
+        "valuation_downside"
+      ],
+      "required_outputs": [
+        "answers",
+        "claims",
+        "facts_used",
+        "counter_evidence",
+        "data_gaps",
+        "deal_breakers",
+        "narrative_blocks",
+        "markdown_draft"
+      ]
+    }
+  },
+  "coverage_matrix": {
+    "BQ1": {
+      "owner": "bp_company_team_compliance",
+      "supporting_sections": [
+        "bp_dealbreaker_risk",
+        "bp_competition_positioning"
+      ],
+      "required_fact_keys": [
+        "company_registration",
+        "ownership",
+        "controller",
+        "team_background",
+        "governance_risk"
+      ],
+      "priority": "critical"
+    },
+    "BQ2": {
+      "owner": "bp_product_commercial",
+      "supporting_sections": [
+        "bp_market_supply_chain",
+        "bp_customer_revenue_validation",
+        "bp_valuation_return",
+        "bp_competition_positioning"
+      ],
+      "required_fact_keys": [
+        "product_matrix",
+        "commercial_stage",
+        "customer_evidence",
+        "revenue_evidence",
+        "order_evidence"
+      ],
+      "priority": "critical"
+    },
+    "BQ3": {
+      "owner": "bp_tech_ip_moat",
+      "supporting_sections": [
+        "bp_competition_positioning",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "tech_route",
+        "ipr_evidence",
+        "certification",
+        "performance_evidence",
+        "moat_evidence"
+      ],
+      "priority": "high"
+    },
+    "BQ4": {
+      "owner": "bp_market_supply_chain",
+      "supporting_sections": [
+        "bp_valuation_return",
+        "bp_competition_positioning",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "market_size",
+        "growth_rate",
+        "sam_som",
+        "penetration_assumption",
+        "supply_chain_position"
+      ],
+      "priority": "high"
+    },
+    "BQ5": {
+      "owner": "bp_competition_positioning",
+      "supporting_sections": [
+        "bp_product_commercial",
+        "bp_tech_ip_moat",
+        "bp_market_supply_chain"
+      ],
+      "required_fact_keys": [
+        "competitor_set",
+        "differentiation",
+        "substitution_risk",
+        "market_position",
+        "moat_evidence"
+      ],
+      "priority": "high"
+    },
+    "BQ6": {
+      "owner": "bp_valuation_return",
+      "supporting_sections": [
+        "bp_company_team_compliance",
+        "bp_product_commercial",
+        "bp_tech_ip_moat",
+        "bp_market_supply_chain",
+        "bp_customer_revenue_validation",
+        "bp_competition_positioning"
+      ],
+      "required_fact_keys": [
+        "financing_terms",
+        "valuation_multiples",
+        "peer_set",
+        "exit_path",
+        "return_model",
+        "sensitivity"
+      ],
+      "priority": "high"
+    },
+    "BQ7": {
+      "owner": "bp_dealbreaker_risk",
+      "supporting_sections": [
+        "bp_company_team_compliance",
+        "bp_product_commercial",
+        "bp_tech_ip_moat",
+        "bp_market_supply_chain",
+        "bp_valuation_return",
+        "bp_customer_revenue_validation"
+      ],
+      "required_fact_keys": [
+        "deal_breakers",
+        "counter_evidence",
+        "legal_risk",
+        "commercial_gap",
+        "valuation_downside"
+      ],
+      "priority": "critical"
+    },
+    "BSQ1": {
+      "owner": "bp_customer_revenue_validation",
+      "supporting_sections": [
+        "bp_product_commercial",
+        "bp_valuation_return",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "customer_evidence",
+        "order_evidence",
+        "revenue_evidence",
+        "commercial_stage"
+      ],
+      "priority": "critical"
+    },
+    "BSQ2": {
+      "owner": "bp_tech_ip_moat",
+      "supporting_sections": [
+        "bp_competition_positioning",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "tech_route",
+        "performance_evidence",
+        "ipr_evidence",
+        "certification",
+        "moat_evidence"
+      ],
+      "priority": "high"
+    },
+    "BSQ3": {
+      "owner": "bp_valuation_return",
+      "supporting_sections": [
+        "bp_customer_revenue_validation",
+        "bp_dealbreaker_risk"
+      ],
+      "required_fact_keys": [
+        "financing_terms",
+        "valuation_multiples",
+        "peer_set",
+        "return_model",
+        "sensitivity",
+        "commercial_gap"
+      ],
+      "priority": "critical"
+    },
+    "BSQ4": {
+      "owner": "bp_dealbreaker_risk",
+      "supporting_sections": [
+        "bp_company_team_compliance",
+        "bp_product_commercial",
+        "bp_tech_ip_moat",
+        "bp_market_supply_chain",
+        "bp_valuation_return",
+        "bp_customer_revenue_validation"
+      ],
+      "required_fact_keys": [
+        "deal_breakers",
+        "counter_evidence",
+        "legal_risk",
+        "commercial_gap",
+        "valuation_downside"
+      ],
+      "priority": "critical"
+    }
+  },
+  "claim_matrix": [
+    {
+      "claim_id": "BC001",
+      "claim": "目标公司 的团队履历、行业资源或顾问背书支持公司执行力。",
+      "owner_section": "bp_company_team_compliance",
+      "priority": "critical",
+      "source": "bp_or_inferred_from_intake",
+      "status": "planned",
+      "required_fact_keys": []
+    },
+    {
+      "claim_id": "BC002",
+      "claim": "目标公司 的核心产品已达到 BP 所称商业化或量产阶段。",
+      "owner_section": "bp_product_commercial",
+      "priority": "critical",
+      "source": "bp_or_inferred_from_intake",
+      "status": "planned",
+      "required_fact_keys": []
+    },
+    {
+      "claim_id": "BC003",
+      "claim": "目标公司 的技术路线、专利、认证或性能参数构成可持续壁垒。",
+      "owner_section": "bp_tech_ip_moat",
+      "priority": "high",
+      "source": "bp_or_inferred_from_intake",
+      "status": "planned",
+      "required_fact_keys": []
+    },
+    {
+      "claim_id": "BC004",
+      "claim": "目标公司 的市场规模、增速和 TAM/SAM/SOM 假设足以支持增长空间。",
+      "owner_section": "bp_market_supply_chain",
+      "priority": "high",
+      "source": "bp_or_inferred_from_intake",
+      "status": "planned",
+      "required_fact_keys": []
+    },
+    {
+      "claim_id": "BC005",
+      "claim": "目标公司 的客户、订单、收入或渠道进展可以被独立验证。",
+      "owner_section": "bp_customer_revenue_validation",
+      "priority": "critical",
+      "source": "bp_or_inferred_from_intake",
+      "status": "planned",
+      "required_fact_keys": []
+    },
+    {
+      "claim_id": "BC006",
+      "claim": "目标公司 的竞品比较、领先性或唯一性声明成立。",
+      "owner_section": "bp_competition_positioning",
+      "priority": "high",
+      "source": "bp_or_inferred_from_intake",
+      "status": "planned",
+      "required_fact_keys": []
+    },
+    {
+      "claim_id": "BC007",
+      "claim": "目标公司 的融资估值、可比公司和退出路径支持目标回报。",
+      "owner_section": "bp_valuation_return",
+      "priority": "high",
+      "source": "bp_or_inferred_from_intake",
+      "status": "planned",
+      "required_fact_keys": []
+    }
+  ],
+  "must_answer": [
+    "当前投资判断快照",
+    "BP 核心声称验证状态",
+    "公司与团队可信度",
+    "产品商业化和客户/订单证据",
+    "技术/IP/认证壁垒",
+    "市场空间和供应链位置",
+    "竞争定位和替代方案",
+    "估值、回报和下行情景",
+    "Deal Breakers、反证和数据缺口"
+  ],
+  "forbidden": [
+    "把 BP 自述当作已验证外部事实",
+    "无 fact_id 的核心结论",
+    "用未验证客户/收入支撑估值主假设",
+    "忽略 critical claim 的 not_addressed 状态",
+    "最终报告按子代理章节直接拼接"
+  ],
+  "source_policy": {
+    "bp_source_document": "只能作为 BP claim 来源，不能单独支撑主结论",
+    "critical_claims": "必须绑定官方/监管/数据库/客户或第三方证据；否则进入 data_gaps",
+    "valuation_claims": "必须使用可比口径和敏感性，不得使用未验证营收/订单作为主假设"
+  },
+  "section_package_schema": {
+    "required_fields": [
+      "section_id",
+      "section_title",
+      "key_messages",
+      "answers",
+      "claim_ids_covered",
+      "claims",
+      "facts_used",
+      "counter_evidence",
+      "data_gaps",
+      "narrative_blocks",
+      "markdown_draft"
+    ],
+    "answer_fields": [
+      "question_id",
+      "answer",
+      "fact_ids",
+      "confidence",
+      "limits"
+    ],
+    "claim_fields": [
+      "claim",
+      "claim_id",
+      "fact_ids",
+      "reasoning",
+      "confidence",
+      "source_quality"
+    ]
+  },
+  "stop_conditions": [
+    "all_critical_claims_addressed_or_blocked",
+    "all_core_questions_have_answers_or_data_gaps",
+    "every_core_claim_binds_fact_ids_or_is_disclosed_as_unverified",
+    "valuation_uses_only_verified_commercial_assumptions_or_labels_sensitivity",
+    "final_delivery_gate_passed"
+  ],
+  "plan_status": "ready",
+  "validation": {
+    "ready": true,
+    "errors": []
+  }
+}
