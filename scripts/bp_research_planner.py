@@ -575,12 +575,28 @@ def apply_enrichment(skeleton: dict[str, Any], enrichment: dict[str, Any]) -> di
         for question in plan.get("core_questions", []) + plan.get("strategic_questions", [])
     }
 
-    # 6. 更新状态
+    # 6. 更新状态 — generation_roles 精确反映实际替换情况
     plan["enrichment_status"] = "applied"
-    plan["generation_roles"] = {
-        "script": "schema_fact_requirements_coverage_matrix_claim_matrix_validation",
-        "llm_enrichment": "strategic_questions_claim_prioritization_bp_specific_claims",
-    }
+    actually_enriched = []
+    if enriched_sq:
+        actually_enriched.append("strategic_questions")
+    if deltas:
+        actually_enriched.append("claim_prioritization")
+    if additional:
+        actually_enriched.append("bp_specific_claims")
+    if excluded:
+        actually_enriched.append("fact_key_filtering")
+
+    if actually_enriched:
+        plan["generation_roles"] = {
+            "script": "schema_fact_requirements_coverage_matrix_claim_matrix_validation",
+            "llm_enrichment": "+".join(actually_enriched),
+        }
+    else:
+        plan["generation_roles"] = {
+            "script": "schema_fact_requirements_coverage_matrix_claim_matrix_validation",
+            "script_template_enrichment": "strategic_questions_via_profile_products_and_tech_keywords",
+        }
 
     # 7. 重新校验（先设 plan_status 以满足 validator 的前置检查）
     plan["plan_status"] = "ready"

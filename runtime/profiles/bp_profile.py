@@ -11,6 +11,17 @@ from pathlib import Path
 from typing import Any
 
 from runtime.profiles.base import JobContext, PipelineProfile
+from runtime.profiles.bp_constants import (
+    BP_ALL_ROLE_SLUGS,
+    BP_LEGACY_ROLE_SLUGS,
+    BP_QCC_CONNECTOR_IDS,
+    BP_WAVE1_ROLE_SLUGS,
+    BP_WAVE2_ROLE_SLUGS,
+    BP_WAVE3_ROLE_SLUGS,
+    BP_WAVE4_ROLE_SLUGS,
+    COLLECT_RETRY_COUNT,
+    COLLECT_RETRY_INTERVAL,
+)
 from scripts.bp_utils import read_attempt_count
 
 
@@ -1588,30 +1599,7 @@ def _run_bp_investment_judgment(runtime_root: Path, job_ctx: JobContext) -> dict
 # Wave 4: Deal Breaker —— 读 Wave1/2/3 全量输出
 # Wave 5: 统稿 —— 读全部 8 个维度
 
-BP_WAVE1_ROLE_SLUGS: dict[str, str] = {
-    "bp_company_team_compliance": "company_team_compliance",
-    "bp_product_commercial": "product_commercial",
-    "bp_tech_ip_moat": "tech_ip_moat",
-    "bp_market_supply_chain": "market_supply_chain",
-}
-BP_WAVE2_ROLE_SLUGS: dict[str, str] = {
-    "bp_customer_revenue_validation": "customer_revenue_validation",
-}
-BP_WAVE3_ROLE_SLUGS: dict[str, str] = {
-    "bp_competition_positioning": "competition_positioning",
-    "bp_valuation_return": "valuation_return",
-}
-BP_WAVE4_ROLE_SLUGS: dict[str, str] = {
-    "bp_dealbreaker_risk": "dealbreaker_risk",
-}
-BP_LEGACY_ROLE_SLUGS: dict[str, str] = {
-    "bp_团队与合规": "team",
-    "bp_技术与产品": "tech",
-    "bp_行业与供应链": "industry",
-    "bp_估值": "valuation",
-    "bp_竞争与结论": "competition",
-}
-BP_ALL_ROLE_SLUGS: dict[str, str] = BP_WAVE1_ROLE_SLUGS | BP_WAVE2_ROLE_SLUGS | BP_WAVE3_ROLE_SLUGS | BP_WAVE4_ROLE_SLUGS
+# Wave role slug 常量已统一至 bp_constants.py，此处通过模块顶部 import 引用。
 
 
 def _bp_role_output_path(outputs_dir: Path, role: str) -> Path:

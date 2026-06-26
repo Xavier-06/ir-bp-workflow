@@ -325,10 +325,13 @@ _RISK_KEY_LABELS: dict[str, str] = {
 
 # ── 辅助函数 ───────────────────────────────────────────
 
-def read_stage_from_task(task_dir: str | Path) -> str:
-    """从 task 目录中读取 stage_tier。
+def read_stage_from_task(task_dir: str | Path, default: str = "T3") -> str:
+    """从 task 目录中读取 stage_tier（统一入口）。
 
-    优先从 bp_shared_state.json 读取，其次从 bp_step0_profile.json 读取。
+    查找顺序：bp_shared_state.json → bp_step0_profile.json → company_verify_report.json。
+    全部找不到时返回 default（默认 T3，即不放宽也不收紧）。
+
+    gate 类调用方建议传 default="T4"（保守），handler 类传 default="T3"。
     """
     task_dir = Path(task_dir)
 
@@ -350,7 +353,9 @@ def read_stage_from_task(task_dir: str | Path) -> str:
             try:
                 profile = json.loads(profile_path.read_text(encoding="utf-8"))
                 stage_text = profile.get("financing_stage", "")
-                return classify_stage(stage_text)
+                tier = classify_stage(stage_text)
+                if tier in TIER_ORDER:
+                    return tier
             except Exception:
                 pass
 
@@ -363,11 +368,13 @@ def read_stage_from_task(task_dir: str | Path) -> str:
             if tier in TIER_ORDER:
                 return tier
             stage_text = cv.get("financing_stage", "")
-            return classify_stage(stage_text)
+            tier = classify_stage(stage_text)
+            if tier in TIER_ORDER:
+                return tier
         except Exception:
             pass
 
-    return "T1"
+    return default
 
 
 # ── CLI ────────────────────────────────────────────────

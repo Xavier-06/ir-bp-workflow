@@ -27,6 +27,7 @@ from runtime.profiles.bp_profile import (
     _run_bp_shared_page_init,
     _run_bp_shared_page_refresh,
     _run_research_plan,
+    _run_research_plan_collect,
 )
 from scripts.bp_narrative_assembler import assemble_bp_report
 
@@ -169,6 +170,10 @@ def test_bp_narrative_assembly_keeps_machine_metadata_out_of_delivery_markdown(t
 
 
 def test_run_research_plan_writes_bp_due_diligence_plan(tmp_path):
+    """Phase03 v5: 脚本生成骨架 → needs_dispatch → 主 AI enrichment → collect 合并。
+
+    本测试验证骨架生成 + enrichment collect 的完整路径（无 LLM enrichment 时走 fallback）。
+    """
     job_ctx = SimpleNamespace(
         job_id="BP-PLAN",
         entity="测试公司",
@@ -178,10 +183,31 @@ def test_run_research_plan_writes_bp_due_diligence_plan(tmp_path):
         workspace=None,
     )
 
+    # Step 1: 骨架生成（返回 needs_dispatch）
     result = _run_research_plan(tmp_path, job_ctx)
-
     assert result["ok"] is True
-    path = tmp_path / "tasks" / "BP-PLAN" / "bp_research_plan.json"
+    assert result.get("needs_dispatch") is True
+
+    task_dir = tmp_path / "tasks" / "BP-PLAN"
+
+    # 骨架文件应存在
+    skeleton_path = task_dir / "bp_research_plan_skeleton.json"
+    assert skeleton_path.exists()
+    skeleton = json.loads(skeleton_path.read_text(encoding="utf-8"))
+    assert skeleton["schema_version"] == "bp_research_plan.v2"
+    assert skeleton["entity"] == "测试公司"
+    assert skeleton["plan_status"] == "skeleton_ready"
+    assert len(skeleton["core_questions"]) >= 7
+    assert len(skeleton["strategic_questions"]) >= 3
+    assert skeleton["fact_requirements"]
+    assert skeleton["section_requirements"]
+
+    # Step 2: collect（无 enrichment 文件 → fallback 到模板版）
+    result_collect = _run_research_plan_collect(tmp_path, job_ctx)
+    assert result_collect["ok"] is True
+
+    path = task_dir / "bp_research_plan.json"
+    assert path.exists()
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == "bp_research_plan.v2"
     assert payload["task_id"] == "BP-PLAN"
@@ -189,8 +215,7 @@ def test_run_research_plan_writes_bp_due_diligence_plan(tmp_path):
     assert payload["market"] == "cn"
     assert payload["plan_status"] == "ready"
     assert payload["prepared_by"] == "script_scaffold_plus_orchestrator_enrichment"
-    assert payload["generation_roles"]["script"] == "schema_fact_requirements_coverage_matrix_validation"
-    assert payload["generation_roles"]["orchestrator_agent"] == "strategic_questions_claim_prioritization_owner_assignment"
+    assert payload["generation_roles"]["script"] == "schema_fact_requirements_coverage_matrix_claim_matrix_validation"
     assert len(payload["core_questions"]) >= 7
     assert len(payload["strategic_questions"]) >= 3
     assert payload["fact_requirements"]

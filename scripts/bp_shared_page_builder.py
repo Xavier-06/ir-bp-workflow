@@ -329,6 +329,103 @@ def _facts_from_sidecars(task_dir: Path) -> list[dict[str, Any]]:
     return facts
 
 
+def _derive_recommendation(
+    claim_status: dict[str, dict[str, Any]],
+    risks: list[dict[str, Any]],
+    stage_tier: str,
+    task_dir: Path,
+) -> dict[str, Any]:
+    """从 claim_status 和 risks 推导投资建议，不再硬编码 undecided。
+
+    优先从 bp_investment_judgment.json 读取（Phase32 产物），
+    如果不存在则基于 claim 覆盖率和风险数量动态推导。
+    """
+    # 优先：从 Phase32 investment_judgment 读取
+    judgment = _load_json(task_dir / "bp_investment_judgment.json", {})
+    if judgment:
+        overall_risk = judgment.get("overall_risk_level", "")
+        dealbreaker_count = judgment.get("dealbreaker_flag_count", 0)
+        synthesis = judgment.get("synthesis_executive_summary", "")
+        if "Deal Breaker" in overall_risk or dealbreaker_count > 0:
+            return {
+                "verdict": "no_go",
+                "confidence": "high",
+                "supporting_reasons": [overall_risk],
+                "deal_breakers": [
+                    flag for d in judgment.get("dimensions", [])
+                    for flag in d.get("risk_flags", [])
+                    if any(kw in flag for kw in ("失信", "诉讼", "造假", "deal breaker", "阻断", "致命"))
+                ][:3],
+            }
+        if "HIGH" in overall_risk:
+            return {
+                "verdict": "cautious_no_go",
+                "confidence": "medium",
+                "supporting_reasons": [overall_risk, f"数据缺口: {judgment.get('total_data_gaps', 0)}"],
+                "deal_breakers": [],
+            }
+        if "MEDIUM" in overall_risk:
+            return {
+                "verdict": "conditional",
+                "confidence": "medium",
+                "supporting_reasons": [overall_risk],
+                "deal_breakers": [],
+            }
+        return {
+            "verdict": "proceed",
+            "confidence": "high",
+            "supporting_reasons": [overall_risk],
+            "deal_breakers": [],
+        }
+
+    # 降级：基于 claim_status 推导
+    if not claim_status:
+        return {
+            "verdict": "undecided",
+            "confidence": "low",
+            "supporting_reasons": ["尚无 claim 数据"],
+            "deal_breakers": [],
+        }
+
+    total = len(claim_status)
+    supported = sum(1 for c in claim_status.values() if c.get("status") == "supported")
+    not_addressed = sum(1 for c in claim_status.values() if c.get("status") == "not_addressed")
+    critical_not_addressed = sum(
+        1 for c in claim_status.values()
+        if c.get("status") == "not_addressed" and c.get("priority") in ("critical", "high")
+    )
+    coverage_rate = supported / total if total else 0
+    high_risks = [r for r in risks if r.get("severity") == "high"]
+
+    if critical_not_addressed > 2:
+        verdict = "undecided"
+        confidence = "low"
+        reasons = [f"{critical_not_addressed} 个 critical/high claim 未验证"]
+    elif coverage_rate >= 0.6 and not high_risks:
+        verdict = "proceed"
+        confidence = "medium"
+        reasons = [f"claim 覆盖率 {coverage_rate:.0%}", f"{supported}/{total} claims supported"]
+    elif coverage_rate >= 0.3:
+        verdict = "conditional"
+        confidence = "medium"
+        reasons = [f"claim 覆盖率 {coverage_rate:.0%}", f"{not_addressed} 个 claim 未验证"]
+    else:
+        verdict = "undecided"
+        confidence = "low"
+        reasons = [f"claim 覆盖率仅 {coverage_rate:.0%}，数据不足以形成判断"]
+
+    if stage_tier in ("T1", "T2") and verdict == "undecided":
+        verdict = "conditional"
+        reasons.append(f"{stage_tier} 早期阶段，部分未验证为正常状态")
+
+    return {
+        "verdict": verdict,
+        "confidence": confidence,
+        "supporting_reasons": reasons,
+        "deal_breakers": [r.get("description", "") for r in high_risks][:3],
+    }
+
+
 def build_shared_state(task_dir: Path, after_wave: int = 0) -> dict[str, Any]:
     task_dir = Path(task_dir)
     plan = _load_json(task_dir / "bp_research_plan.json", {})
@@ -376,12 +473,7 @@ def build_shared_state(task_dir: Path, after_wave: int = 0) -> dict[str, Any]:
         "stage_tier": stage_tier,
         "stage_label": stage_meta.get("label", ""),
         "financing_stage": financing_stage,
-        "current_recommendation": {
-            "verdict": "undecided",
-            "confidence": "low",
-            "supporting_reasons": [],
-            "deal_breakers": [],
-        },
+        "current_recommendation": _derive_recommendation(claim_status, risks, stage_tier, task_dir),
         "claim_status": claim_status,
         "fact_index": fact_index,
         "open_questions": open_questions,

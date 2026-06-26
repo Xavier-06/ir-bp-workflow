@@ -182,15 +182,8 @@ def build_investment_judgment(task_dir: Path) -> dict[str, Any]:
     total_data_gaps = sum(len(d["data_gaps"]) for d in dimensions)
 
     # ── 融资阶段感知：T1 放宽 customer/revenue gap 权重 ──
-    stage_tier = "T1"
-    try:
-        profile_path = task_dir / "bp_step0_profile.json"
-        if profile_path.exists():
-            from scripts.bp_stage_utils import classify_stage
-            profile = json.loads(profile_path.read_text(encoding="utf-8"))
-            stage_tier = classify_stage(profile.get("financing_stage", ""))
-    except Exception:
-        pass
+    from scripts.bp_stage_utils import read_stage_from_task
+    stage_tier = read_stage_from_task(task_dir, default="T3")
 
     if dealbreaker_count > 0:
         overall_risk = "HIGH — 存在 Deal Breaker"

@@ -317,14 +317,9 @@ def build_repair_manifests(
 
 
 def _read_stage_tier(task_dir: Path) -> str:
-    """Read stage_tier from bp_step0_profile.json or bp_shared_state.json."""
-    profile = load_json(task_dir / "bp_step0_profile.json", {})
-    tier = str(profile.get("stage_tier") or "").strip().upper()
-    if tier:
-        return tier
-    shared = load_json(task_dir / "bp_shared_state.json", {})
-    tier = str(shared.get("stage_tier") or "").strip().upper()
-    return tier if tier else "T4"
+    """Read stage_tier — 统一使用 bp_stage_utils.read_stage_from_task。"""
+    from scripts.bp_stage_utils import read_stage_from_task
+    return read_stage_from_task(task_dir, default="T4")
 
 
 def evaluate_bp_wave_evidence_gate(

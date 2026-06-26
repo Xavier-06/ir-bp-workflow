@@ -81,14 +81,9 @@ def evaluate_bp_delivery_gate(task_dir: Path) -> dict[str, Any]:
     task_dir = Path(task_dir)
     checks: list[dict[str, Any]] = []
     
-    # Read stage_tier for T1/T2 degradation (2026-06-12, fixed 2026-06-13)
-    # stage_tier 由 phase12_shared_page_init 计算并写入 bp_shared_state.json，
-    # bp_step0_profile.json 中可能为 None。必须 fallback 到 shared state。
-    profile = load_json(task_dir / "bp_step0_profile.json", {})
-    stage_tier = str(profile.get("stage_tier") or "").strip().upper()
-    if not stage_tier:
-        shared = load_json(task_dir / "bp_shared_state.json", {})
-        stage_tier = str(shared.get("stage_tier") or "").strip().upper()
+    # Read stage_tier — 统一使用 bp_stage_utils.read_stage_from_task
+    from scripts.bp_stage_utils import read_stage_from_task
+    stage_tier = read_stage_from_task(task_dir, default="T4")
     is_early_stage = stage_tier in {"T1", "T2"}
     
     # Track deferred fixes for early stage delivery

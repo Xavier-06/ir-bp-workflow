@@ -222,7 +222,9 @@ def _fact_tier(fact: dict[str, Any]) -> str:
                 "database": "database",
                 "public_tender": "public_tender",
                 "listed_peer_filings": "listed_peer_filings",
-                "inferred": "bp",  # inferred from BP data = bp level
+                "inferred": "bp",  # 默认保守：无来源标记的推断视为 BP 级别
+                "inferred_from_external": "media",  # 子代理明确标注来自外部推断
+                "inferred_from_bp": "bp",  # 子代理明确标注来自 BP 推断
                 "analysis": "bp",  # internal analysis = bp level
             }
             return _TIER_MAP.get(val, val)
@@ -360,16 +362,9 @@ def _load_or_initialize_coverage(task_dir: Path) -> dict[str, Any]:
 
 
 def _read_stage_tier(task_dir: Path) -> str:
-    """Read stage_tier from bp_step0_profile.json or bp_shared_state.json."""
-    profile = load_json(task_dir / "bp_step0_profile.json", {})
-    tier = str(profile.get("stage_tier") or "").strip().upper()
-    if tier:
-        return tier
-    shared = load_json(task_dir / "bp_shared_state.json", {})
-    tier = str(shared.get("stage_tier") or "").strip().upper()
-    if tier:
-        return tier
-    return "T4"  # Default to most conservative if unknown
+    """Read stage_tier — 统一使用 bp_stage_utils.read_stage_from_task。"""
+    from scripts.bp_stage_utils import read_stage_from_task
+    return read_stage_from_task(task_dir, default="T4")
 
 
 def evaluate_bp_claim_coverage(task_dir: Path) -> dict[str, Any]:
