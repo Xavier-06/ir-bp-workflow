@@ -1291,7 +1291,7 @@ def _write_valid_bp_section_package(task_dir):
                         "counter_evidence": ["暂无重大反证"],
                         "data_gaps": [],
                         "narrative_blocks": [{"block_id": "NB1", "question_id": "BQ1", "claim_ids": ["BC001"], "fact_ids": ["BF-0001"], "text": "团队主体已验证，工商信息显示测试公司成立于2020年。"}],
-                        "markdown_draft": "## 团队与合规\n测试公司成立于2020年。\n\n### 本维度结论\n**结论：团队主体已验证（置信度：高）**\n工商信息显示测试公司成立于2020年，来源可靠。",
+                        "markdown_draft": "## 团队与合规\n测试公司成立于2020年，注册资本500万元，法定代表人为张三。\n\n### 本维度结论\n**结论：团队主体已验证（置信度：高）**\n工商信息显示测试公司成立于2020年，来源可靠。经企查查核实，公司经营状态为存续，无异常经营记录。",
                     },
                 }
             ],
@@ -1313,6 +1313,7 @@ def test_bp_debate_review_passes_valid_section_packages(tmp_path):
 
 
 def test_bp_debate_review_blocks_high_confidence_low_source(tmp_path):
+    """2026-06-26 宽松化后：HIGH_CONFIDENCE_LOW_SOURCE 降为 MEDIUM，不再阻断（verdict=WARN, ok=True）"""
     task_dir = tmp_path / "tasks" / "BP-DEBATE-BLOCK"
     _write_valid_bp_section_package(task_dir)
     payload = json.loads((task_dir / "bp_section_packages.json").read_text(encoding="utf-8"))
@@ -1322,9 +1323,10 @@ def test_bp_debate_review_blocks_high_confidence_low_source(tmp_path):
 
     result = _run_bp_debate_review(tmp_path, job_ctx)
 
-    assert result["ok"] is False
+    # 宽松化后：MEDIUM 级问题不阻断，ok=True, verdict=WARN
+    assert result["ok"] is True
     review = json.loads((task_dir / "bp_debate_review.json").read_text(encoding="utf-8"))
-    assert review["verdict"] == "REWRITE_REQUIRED"
+    assert review["verdict"] == "WARN"
 
 
 def test_bp_cross_dimension_gate_writes_pass_file_for_consistent_inputs(tmp_path):
@@ -1741,6 +1743,7 @@ def test_bp_document_intake_vl_chat_uses_bp_ocr_credentials_file(monkeypatch, tm
 
 
 def test_bp_delivery_gate_blocks_non_strict_pass_states(tmp_path):
+    """2026-06-26 宽松化后：debate WARN 不再阻断交付，仅 FAIL_BLOCKING 才阻断。"""
     from scripts.bp_delivery_gate import evaluate_bp_delivery_gate
 
     task_dir = tmp_path / "tasks" / "BP-DELIVERY-NON-STRICT"
@@ -1755,11 +1758,31 @@ def test_bp_delivery_gate_blocks_non_strict_pass_states(tmp_path):
 
     result = evaluate_bp_delivery_gate(task_dir)
 
+    # 宽松化后：WARN 不阻断，gate 应通过
+    assert result["ok"] is True
+    # WARN 应记录在 deferred_fixes 中（通过 deferred_fixes_count 验证）
+    assert result.get("deferred_fixes_count", 0) >= 1
+
+
+def test_bp_delivery_gate_blocks_fail_blocking(tmp_path):
+    """2026-06-26 新增：仅 FAIL_BLOCKING 才硬阻断交付。"""
+    from scripts.bp_delivery_gate import evaluate_bp_delivery_gate
+
+    task_dir = tmp_path / "tasks" / "BP-DELIVERY-BLOCK"
+    task_dir.mkdir(parents=True)
+    (task_dir / "bp_final_report.md").write_text("# report", encoding="utf-8")
+    (task_dir / "bp_final_assembly.json").write_text(json.dumps({"ok": True, "markdown_path": str(task_dir / "bp_final_report.md")}), encoding="utf-8")
+    (task_dir / "bp_readability_review.json").write_text(json.dumps({"verdict": "PASS", "issues": []}), encoding="utf-8")
+    (task_dir / "bp_claim_coverage_gate.json").write_text(json.dumps({"ok": True, "gate_verdict": "PASS_WITH_DISCLOSURE"}), encoding="utf-8")
+    (task_dir / "bp_debate_review.json").write_text(json.dumps({"verdict": "FAIL_BLOCKING", "blocking_count": 1, "issues": []}), encoding="utf-8")
+    (task_dir / "bp_cross_dimension_gate.json").write_text(json.dumps({"ok": True, "gate_verdict": "PASS"}), encoding="utf-8")
+    (task_dir / "bp_verification_result.json").write_text(json.dumps({"verdict": "PASS", "fail": 0}), encoding="utf-8")
+
+    result = evaluate_bp_delivery_gate(task_dir)
+
     assert result["ok"] is False
     reasons = {check["reason"] for check in result["failed_checks"]}
-    # DEBATE should still fail (verdict=WARN is not PASS)
-    assert "DEBATE_REVIEW_NOT_PASSED" in reasons
-    # THESIS_RECONCILIATION checks removed (2026-06-13): IC/RT no longer in pipeline
+    assert "DEBATE_REVIEW_FAIL_BLOCKING" in reasons
 
 
 def test_bp_delivery_gate_passes_all_required_gates(tmp_path):

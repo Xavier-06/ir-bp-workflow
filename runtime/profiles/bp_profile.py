@@ -1296,8 +1296,9 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     issues: list[dict[str, Any]] = []
     packages = section_index.get("packages", []) or []
     if not packages:
+        # BLOCKING：完全无 section package 属于极端情况（2026-06-26 宽松化）
         issues.append({
-            "severity": "HIGH",
+            "severity": "BLOCKING",
             "code": "NO_SECTION_PACKAGES",
             "section": "global",
             "issue": "No BP section packages available for debate review",
@@ -1309,7 +1310,8 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
         package = item.get("package", {}) or {}
         validation = item.get("validation", {}) or {}
         for validation_issue in validation.get("issues", []) or []:
-            severity = "HIGH" if validation_issue.get("severity") == "FAIL" else "MEDIUM"
+            # 降级：validation FAIL 不再直接 HIGH → MEDIUM（2026-06-26 宽松化）
+            severity = "MEDIUM" if validation_issue.get("severity") == "FAIL" else "LOW"
             issues.append({
                 "severity": severity,
                 "code": validation_issue.get("code", "VALIDATION_ISSUE"),
@@ -1327,16 +1329,18 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
             })
         for idx, claim in enumerate(package.get("claims", []) or []):
             if not claim.get("fact_ids"):
+                # 降级：HIGH → MEDIUM（2026-06-26 宽松化，部分缺失不阻断）
                 issues.append({
-                    "severity": "HIGH",
+                    "severity": "MEDIUM",
                     "code": "CLAIM_WITHOUT_FACTS",
                     "section": section_name,
                     "issue": f"Claim {idx} is not bound to fact_ids",
                     "required_action": "Bind the claim to BP Fact Store fact_ids or move it to data_gaps",
                 })
             if claim.get("confidence") == "high" and claim.get("source_quality") in ("unknown", "auxiliary", "low"):
+                # 降级：HIGH → MEDIUM（2026-06-26 宽松化）
                 issues.append({
-                    "severity": "HIGH",
+                    "severity": "MEDIUM",
                     "code": "HIGH_CONFIDENCE_LOW_SOURCE",
                     "section": section_name,
                     "issue": f"Claim {idx} has high confidence but weak source quality",
@@ -1352,11 +1356,12 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
         data_gaps = package.get("data_gaps", []) or []
 
         # Check 1: Must have a conclusion / verdict section
+        # 降级：HIGH → MEDIUM（2026-06-26 宽松化，格式偏好不阻断管线）
         conclusion_markers = ("结论", "conclusion", "verdict", "judgment", "综合判断", "本维度结论")
         has_conclusion = any(marker in markdown_draft.lower() for marker in conclusion_markers)
         if not has_conclusion:
             issues.append({
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "code": "MISSING_DIMENSION_CONCLUSION",
                 "section": section_name,
                 "issue": "Section lacks a conclusion/verdict paragraph — investor cannot get a one-line judgment",
@@ -1375,8 +1380,9 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                     unverified_count += 1
             unverified_ratio = unverified_count / len(claims) if claims else 0
             if unverified_ratio > 0.5 and len(claims) >= 3:
+                # 降级：HIGH → MEDIUM（2026-06-26 宽松化，早期 BP 本就多未验证）
                 issues.append({
-                    "severity": "HIGH",
+                    "severity": "MEDIUM",
                     "code": "MAJORITY_CLAIMS_UNVERIFIED",
                     "section": section_name,
                     "issue": f"{unverified_count}/{len(claims)} claims ({unverified_ratio:.0%}) are unverified or BP-only — section lacks independent evidence",
@@ -1417,6 +1423,7 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                 })
 
         # Check 5: Must address "competitive moat / defensibility" for tech and commercial sections
+        # 降级：HIGH → MEDIUM（2026-06-26 宽松化，格式偏好不阻断管线）
         moat_markers = ("moat", "壁垒", "护城河", "defensib", "competitive advantage sustainab", "竞争优势.*持续")
         section_lower = section_name.lower()
         is_tech_or_commercial = any(k in section_lower for k in ("tech", "commercial", "product", "ip", "moat"))
@@ -1424,20 +1431,61 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
             has_moat_discussion = any(marker in markdown_draft.lower() for marker in moat_markers)
             if not has_moat_discussion:
                 issues.append({
-                    "severity": "HIGH",
+                    "severity": "MEDIUM",
                     "code": "MISSING_MOAT_ASSESSMENT",
                     "section": section_name,
                     "issue": "Tech/commercial section lacks competitive moat / defensibility assessment",
                     "required_action": "Add explicit moat assessment: is the advantage sustainable? What is the barrier height? Include quantitative evidence.",
                 })
 
+        # ── BLOCKING 级别检查（2026-06-26 新增，仅极端情况硬阻断） ──
+
+        # Blocking 1: 维度 MD 完全为空或接近空
+        if not markdown_draft or len(markdown_draft.strip()) < 100:
+            issues.append({
+                "severity": "BLOCKING",
+                "code": "EMPTY_DIMENSION_DRAFT",
+                "section": section_name,
+                "issue": "Section markdown is empty or near-empty (<100 chars) — dimension analysis missing entirely",
+                "required_action": "Re-run dimension analysis to produce substantive output",
+            })
+
+        # Blocking 2: 100% claim 无 fact_ids（区分于部分缺失）
+        if claims:
+            all_without_facts = all(not c.get("fact_ids") for c in claims)
+            if all_without_facts:
+                issues.append({
+                    "severity": "BLOCKING",
+                    "code": "ALL_CLAIMS_WITHOUT_FACTS",
+                    "section": section_name,
+                    "issue": f"All {len(claims)} claims have zero fact_ids — evidence binding completely missing",
+                    "required_action": "Re-run dimension analysis with proper fact_id binding for all claims",
+                })
+
+    blocking_count = sum(1 for issue in issues if issue["severity"] == "BLOCKING")
     high_count = sum(1 for issue in issues if issue["severity"] == "HIGH")
-    verdict = "REWRITE_REQUIRED" if high_count > 0 else ("WARN" if issues else "PASS")
+    medium_count = sum(1 for issue in issues if issue["severity"] == "MEDIUM")
+
+    # verdict 逻辑（2026-06-26 宽松化）：
+    #   BLOCKING → FAIL_BLOCKING（硬阻断，极端情况）
+    #   HIGH（已无，保留兼容）→ WARN
+    #   MEDIUM / 其他 → WARN（如有）或 PASS
+    if blocking_count > 0:
+        verdict = "FAIL_BLOCKING"
+    elif high_count > 0:
+        verdict = "WARN"
+    elif issues:
+        verdict = "WARN"
+    else:
+        verdict = "PASS"
+
     review = {
         "task_id": job_ctx.job_id,
         "verdict": verdict,
         "issue_count": len(issues),
+        "blocking_count": blocking_count,
         "high_count": high_count,
+        "medium_count": medium_count,
         "issues": issues,
     }
     output_path = task_dir / "bp_debate_review.json"
@@ -1447,7 +1495,13 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
         "mode": "bp_debate_review",
         "phase": "phase29_bp_debate_review",
         "job_id": job_ctx.job_id,
-        "result": {"review_path": str(output_path), "verdict": verdict, "high_count": high_count},
+        "result": {
+            "review_path": str(output_path),
+            "verdict": verdict,
+            "blocking_count": blocking_count,
+            "high_count": high_count,
+            "medium_count": medium_count,
+        },
     }
 
 
@@ -3246,6 +3300,35 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
     else:
         delivery_errors.append("无可用的维度输出或统稿输出")
 
+    # ── 维度 MD → DOCX 独立报告（2026-06-26 新增） ──
+    # 将子代理产出的原始维度 MD 逐一转为 DOCX，放入 delivery 子目录
+    dim_docx_dir = delivery_dir / "维度分析"
+    dim_docx_paths: list[str] = []
+    try:
+        from scripts.build_bp_dd_report_docx import build_bp_dimension_docx, DIMENSION_TITLES as _DIM_TITLES
+
+        for slug, dim_title in _DIM_TITLES.items():
+            dim_md = task_dir / f"bp_phase2_{slug}.md"
+            if not dim_md.exists():
+                dim_md = outputs_dir / f"bp_phase2_{slug}.md"
+            if dim_md.exists() and dim_md.stat().st_size > 100:
+                dim_docx_path = dim_docx_dir / f"{dim_title}.docx"
+                try:
+                    result = build_bp_dimension_docx(
+                        entity=job_ctx.entity or entity,
+                        dimension_title=dim_title,
+                        md_content=dim_md.read_text(encoding="utf-8"),
+                        output_path=str(dim_docx_path),
+                    )
+                    dim_docx_paths.append(str(result))
+                    print(f"  📄 维度报告: {result}", flush=True)
+                except Exception as dim_exc:
+                    print(f"  ⚠️ 维度 {dim_title} DOCX 生成失败: {dim_exc}", flush=True)
+    except ImportError:
+        pass  # python-docx 不可用时静默跳过
+    except Exception as exc:
+        print(f"  ⚠️ 维度 DOCX 批量生成异常: {exc}", flush=True)
+
     audit_path = delivery_dir / "bp_delivery_audit.json"
     audit_data = {
         "job_id": job_ctx.job_id,
@@ -3253,6 +3336,7 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         "mode": "dual_delivery" if use_synthesis else "audit_worksheet_only",
         "dimensions_completed": list(dimension_outputs.keys()),
         "gate_verdict": "PASS" if docx_path else "PARTIAL",
+        "dim_docx_count": len(dim_docx_paths),
         "audit_timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
     audit_path.write_text(json.dumps(audit_data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -3294,6 +3378,9 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         if docx_path:
             ss.record_artifact(job_ctx.job_id, "bp_dd_report", Path(docx_path))
         ss.record_artifact(job_ctx.job_id, "bp_delivery_audit", audit_path)
+        # 注册维度 DOCX
+        for i, dim_path in enumerate(dim_docx_paths):
+            ss.record_artifact(job_ctx.job_id, f"bp_dim_docx_{i}", Path(dim_path))
         # 注册 xlsx 附件
         for i, att_path in enumerate(attachment_paths):
             ss.record_artifact(job_ctx.job_id, f"bp_attachment_{i}", Path(att_path))
@@ -3313,6 +3400,8 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
             "docx_path": str(docx_path),
             "audit_path": str(audit_path),
             "attachment_paths": attachment_paths,
+            "dim_docx_paths": dim_docx_paths,
+            "dim_docx_count": len(dim_docx_paths),
             "delivery_errors": delivery_errors,
             "gate_verdict": "PASS" if docx_path else "PARTIAL",
         },

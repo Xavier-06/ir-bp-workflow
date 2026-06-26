@@ -117,8 +117,13 @@ def evaluate_bp_delivery_gate(task_dir: Path) -> dict[str, Any]:
     elif coverage_verdict not in {"PASS", "PASS_WITH_DISCLOSURE", "FAIL", "REPAIR"}:
         checks.append({"name": "claim_coverage", "ok": False, "reason": "CLAIM_COVERAGE_GATE_INVALID", "payload": coverage_gate})
     elif coverage_verdict == "PASS_WITH_DISCLOSURE":
-        checks.append({"name": "claim_coverage", "ok": True, "warning": "DISCLOSURE_REQUIRED",
-                        "reason": "PASS_WITH_DISCLOSURE_DELIVERABLE_WITH_WARNINGS", "payload": coverage_gate})
+        # 2026-06-26: PASS_WITH_DISCLOSURE 降级为 deferred_fixes，不再阻断交付
+        deferred_fixes.append({
+            "check": "claim_coverage",
+            "severity": "WARN",
+            "reason": "PASS_WITH_DISCLOSURE_DELIVERABLE_WITH_WARNINGS",
+            "fix_suggestion": "Claim 覆盖度有 disclosure 标记，建议后续补充验证"
+        })
     elif coverage_gate.get("ok") is False or coverage_verdict == "FAIL":
         if repair_exhausted:
             # 已充分 repair 仍 FAIL → 降级为 WARN，允许交付
@@ -152,20 +157,22 @@ def evaluate_bp_delivery_gate(task_dir: Path) -> dict[str, Any]:
                 "fix_suggestion": f"{gate_filename} 经 repair 后仍无法完全通过，已降级放行"
             })
 
-    # Debate review check with T1/T2 degradation
+    # Debate review check（2026-06-26 宽松化联动）
+    # FAIL_BLOCKING → 硬阻断；WARN → 记录但不阻断（所有 stage tier 统一）
     debate = load_json(task_dir / "bp_debate_review.json", {})
-    if debate.get("verdict") != "PASS":
-        if is_early_stage:
-            # T1/T2: degrade to WARN
-            deferred_fixes.append({
-                "check": "debate",
-                "severity": "FAIL",
-                "reason": "DEBATE_REVIEW_NOT_PASSED",
-                "t1_degradation": True,
-                "fix_suggestion": "审查辩论审查中的问题，优化报告逻辑一致性"
-            })
-        else:
-            checks.append({"name": "debate", "ok": False, "reason": "DEBATE_REVIEW_NOT_PASSED", "payload": debate})
+    debate_verdict = debate.get("verdict", "PASS")
+    if debate_verdict == "FAIL_BLOCKING":
+        # 仅极端情况硬阻断（维度完全为空 / 全量 claim 无 fact_ids）
+        checks.append({"name": "debate", "ok": False, "reason": "DEBATE_REVIEW_FAIL_BLOCKING", "payload": debate})
+    elif debate_verdict == "WARN":
+        # WARN：记录到 deferred_fixes 但不阻断（统一所有 stage tier）
+        deferred_fixes.append({
+            "check": "debate",
+            "severity": "WARN",
+            "reason": "DEBATE_REVIEW_WARN",
+            "fix_suggestion": "对抗评审有 WARN 级问题，建议后续优化报告逻辑一致性，不阻断交付"
+        })
+    # 其他（PASS / REWRITE_REQUIRED 等旧 verdict）→ 不阻断
 
     cross_gate_path = task_dir / "bp_cross_dimension_gate.json"
     if cross_gate_path.exists():

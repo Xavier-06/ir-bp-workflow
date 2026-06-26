@@ -1074,6 +1074,148 @@ def _build_bp_dd_markdown(
     return output
 
 
+# ── 单维度 DOCX 生成（2026-06-26 新增）──────────────────
+
+
+def build_bp_dimension_docx(
+    entity: str,
+    dimension_title: str,
+    md_content: str,
+    output_path: str,
+) -> Path:
+    """将单个维度的 Markdown 内容转为独立 DOCX 报告。
+
+    复用 build_bp_dd_report 的样式体系和 _render_markdown_to_doc 渲染逻辑，
+    但精简为单维度：单页封面 + 维度标题 + 正文 + 免责声明。
+
+    Args:
+        entity: 公司/项目名
+        dimension_title: 维度标题（如 "1. 团队与合规"）
+        md_content: Markdown 原文
+        output_path: 输出 .docx 路径
+    """
+    try:
+        from docx import Document
+        from docx.shared import Pt, Cm, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+    except ImportError:
+        # python-docx 不可用时静默跳过
+        import logging
+        logging.getLogger(__name__).warning(
+            "build_bp_dimension_docx: python-docx not available, skipping %s", dimension_title)
+        return Path(output_path)
+
+    doc = Document()
+
+    # ── 样式 ──
+    style = doc.styles["Normal"]
+    font = style.font
+    font.name = _F()
+    font.size = Pt(11)
+    _set_eastasia_font_on_style(style, _F())
+    style.paragraph_format.space_after = Pt(6)
+    style.paragraph_format.line_spacing = 1.2
+
+    for level, size_pt, sp_before in [(1, 16, 24), (2, 13, 10), (3, 11.5, 8)]:
+        h_style = doc.styles[f"Heading {level}"]
+        h_style.font.name = _F()
+        h_style.font.size = Pt(size_pt)
+        h_style.font.bold = True
+        h_style.font.color.rgb = RGBColor(0x1F, 0x4E, 0x79)
+        _set_eastasia_font_on_style(h_style, _F())
+        h_style.paragraph_format.space_before = Pt(sp_before)
+        h_style.paragraph_format.space_after = Pt(4)
+
+    for list_style_name in ["List Bullet", "List Number"]:
+        try:
+            ls = doc.styles[list_style_name]
+            ls.font.name = _F()
+            ls.font.size = Pt(10.5)
+            _set_eastasia_font_on_style(ls, _F())
+            ls.paragraph_format.space_after = Pt(3)
+        except KeyError:
+            pass
+
+    # ── 精简封面 ──
+    for _ in range(3):
+        doc.add_paragraph("")
+
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = title.add_run("商业计划尽调报告")
+    run.font.name = _F()
+    run.font.size = Pt(22)
+    run.font.bold = True
+    run.font.color.rgb = RGBColor(0x1F, 0x4E, 0x79)
+    _set_eastasia_font_on_run(run, _F())
+
+    doc.add_paragraph("")
+
+    dim_title_para = doc.add_paragraph()
+    dim_title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = dim_title_para.add_run(dimension_title)
+    run.font.name = _F()
+    run.font.size = Pt(18)
+    run.font.color.rgb = RGBColor(0x4A, 0x4A, 0x6A)
+    _set_eastasia_font_on_run(run, _F())
+
+    doc.add_paragraph("")
+
+    entity_para = doc.add_paragraph()
+    entity_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = entity_para.add_run(entity)
+    run.font.name = _F()
+    run.font.size = Pt(14)
+    run.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
+    _set_eastasia_font_on_run(run, _F())
+
+    doc.add_paragraph("")
+
+    meta = doc.add_paragraph()
+    meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = meta.add_run(f"生成日期: {time.strftime('%Y年%m月%d日')}")
+    run.font.name = _F()
+    run.font.size = Pt(10)
+    run.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+
+    doc.add_page_break()
+
+    # ── 渲染正文 ──
+    content = _clean_dimension_output(md_content)
+
+    # 跳过子代理输出的顶部 # 标题（与 build_bp_dd_report 维度模式一致）
+    lines = content.split("\n")
+    first_h1_idx = next(
+        (idx for idx, l in enumerate(lines) if l.strip().startswith("# ")),
+        -1
+    )
+    if first_h1_idx >= 0:
+        lines = lines[first_h1_idx + 1:]
+        content = "\n".join(lines)
+
+    _render_markdown_to_doc(doc, content)
+
+    # ── 免责声明 ──
+    doc.add_page_break()
+    doc.add_heading("免责声明", level=1)
+    for d in [
+        "本报告由 AI 辅助生成，基于 BP 材料及公开网络搜索结果整理，仅供内部参考。",
+        "本报告不构成任何投资建议。投资决策需基于独立判断。",
+    ]:
+        p = doc.add_paragraph(style="List Bullet")
+        run = p.add_run(d)
+        run.font.name = _F()
+        run.font.size = Pt(10)
+        run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+        _set_eastasia_font_on_run(run, _F())
+
+    # ── 保存 ──
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(output))
+    return output
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="Build BP DD Report")
