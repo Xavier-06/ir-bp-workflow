@@ -134,8 +134,14 @@ def _bp_entity_market(job_ctx: JobContext) -> tuple[str, str]:
 
 
 def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 03: BP 尽调研究计划。"""
-    from scripts.bp_research_planner import build_bp_research_plan, write_bp_research_plan
+    """Phase 03: BP 尽调研究计划 — needs_dispatch 模式。
+
+    v5: 脚本生成骨架 → 主 AI enrichment → 合并为最终计划。
+    首次执行：生成骨架 plan → 返回 needs_dispatch + instruction
+    主 AI 读 instruction → 输出 bp_research_plan_enrichment.json
+    恢复时由 _run_research_plan_collect 合并 enrichment
+    """
+    from scripts.bp_research_planner import build_bp_research_plan_skeleton, write_bp_research_plan
 
     task_dir = _task_dir(runtime_root, job_ctx)
     metadata = job_ctx.metadata or {}
@@ -152,11 +158,10 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
         except Exception:
             claim_inventory = None
 
-    # 读取 stage_tier，传给 fact_requirements 调整 criticality 权重
     from scripts.bp_stage_utils import read_stage_from_task
     stage_tier = read_stage_from_task(task_dir)
 
-    plan = build_bp_research_plan(
+    skeleton = build_bp_research_plan_skeleton(
         task_id=job_ctx.job_id,
         entity=entity,
         query=getattr(job_ctx, "query", "") or metadata.get("query", ""),
@@ -167,21 +172,134 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
         stage_tier=stage_tier,
     )
 
-    # T1（种子/天使轮）：BC005 降为 medium，避免 evidence gate 白卡一轮
-    if stage_tier == "T1":
-        for claim in plan.get("claim_matrix", []):
-            if claim.get("claim_id") == "BC005":
-                claim["priority"] = "medium"
-                print(f"  📋 T1 降级 BC005 priority: critical → medium", flush=True)
-                break
+    # 写入骨架（后续 enrich 后覆盖，但先存盘作为中间产物）
+    skeleton_path = task_dir / "bp_research_plan_skeleton.json"
+    skeleton_path.write_text(json.dumps(skeleton, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    plan_path = write_bp_research_plan(task_dir, plan)
+    # 写入 enrichment instruction
+    instruction_path = task_dir / "bp_phase03_enrichment_instruction.md"
+    instruction_path.write_text(_research_plan_enrichment_instruction(
+        entity=entity, stage_tier=stage_tier, task_dir=task_dir,
+    ), encoding="utf-8")
+
     return {
-        "ok": plan.get("plan_status") == "ready",
+        "ok": True,
+        "needs_dispatch": True,
+        "has_more": False,
         "mode": "bp_research_plan",
         "phase": "phase03_research_plan",
         "job_id": job_ctx.job_id,
-        "result": {"plan_path": str(plan_path), "plan_status": plan.get("plan_status", "blocked"), "validation": plan.get("validation", {})},
+        "dispatch_info": {
+            "instruction_path": str(instruction_path),
+            "skeleton_path": str(skeleton_path),
+            "task_dir": str(task_dir),
+        },
+        "instruction": _research_plan_enrichment_instruction(entity=entity, stage_tier=stage_tier, task_dir=task_dir),
+    }
+
+
+def _research_plan_enrichment_instruction(entity: str, stage_tier: str, task_dir: Path) -> str:
+    """生成 phase03 enrichment 的主 AI 指令。"""
+    return f"""\
+PHASE03 RESEARCH PLAN ENRICHMENT — 主 AI 执行
+
+## 背景
+脚本已生成确定性骨架计划（{entity}，{stage_tier} 阶段）。
+你需要阅读 BP 原始内容和骨架计划，输出定制化的 enrichment delta。
+
+## 输入文件
+1. 骨架计划: `{task_dir / 'bp_research_plan_skeleton.json'}`
+2. BP 原文: `{task_dir / 'bp_ocr_text.txt'}`
+3. 公司 Profile: `{task_dir / 'bp_step0_profile.json'}`
+4. Enrichment 指令库: `instruction_store_bp/bp_research_plan_enrichment.md`
+
+## 执行步骤
+
+1. 读取 instruction_store_bp/bp_research_plan_enrichment.md 了解完整要求
+2. 读取骨架计划，理解 section/fact/claim 结构
+3. 读取 BP 原文（重点读业务描述、市场数据、财务预测部分）
+4. 读取公司 profile
+5. 按 instruction 要求生成 4 个增量输出:
+   - strategic_questions (5 条，替代模板版)
+   - claim_priority_deltas (调整 default claims 优先级)
+   - additional_claims (BP 独有的声称)
+   - excluded_fact_keys (不相关的 fact 裁剪)
+6. 将输出写入 `{task_dir / 'bp_research_plan_enrichment.json'}`
+7. 用 start_phase='phase03_research_plan_collect' 恢复管线
+
+## 输出格式
+严格遵循 instruction_store_bp/bp_research_plan_enrichment.md 中定义的 JSON schema。
+所有 fact_key 引用必须是骨架计划 fact_requirements 中已有的。
+所有 owner_section 必须是 8 个 BP section 之一。
+"""
+
+
+def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 03 collect: 读取主 AI 的 enrichment，合并到骨架计划。"""
+    from scripts.bp_research_planner import apply_enrichment, write_bp_research_plan
+
+    task_dir = _task_dir(runtime_root, job_ctx)
+
+    # 读取骨架
+    skeleton_path = task_dir / "bp_research_plan_skeleton.json"
+    if not skeleton_path.exists():
+        # fallback: 直接用 build_bp_research_plan 生成（无 enrichment 的降级路径）
+        from scripts.bp_research_planner import build_bp_research_plan
+        metadata = job_ctx.metadata or {}
+        entity, market = _bp_entity_market(job_ctx)
+        profile = _load_bp_profile(task_dir)
+        from scripts.bp_stage_utils import read_stage_from_task
+        stage_tier = read_stage_from_task(task_dir)
+        claim_inventory_path = task_dir / "bp_claim_inventory.json"
+        claim_inventory = None
+        if claim_inventory_path.exists():
+            try:
+                claim_inventory = json.loads(claim_inventory_path.read_text(encoding="utf-8"))
+            except Exception:
+                claim_inventory = None
+        plan = build_bp_research_plan(
+            task_id=job_ctx.job_id, entity=entity,
+            query=getattr(job_ctx, "query", "") or metadata.get("query", ""),
+            market=market, input_file=metadata.get("input_file", ""),
+            profile=profile, claim_inventory=claim_inventory, stage_tier=stage_tier,
+        )
+        plan_path = write_bp_research_plan(task_dir, plan)
+        return {
+            "ok": plan.get("plan_status") == "ready",
+            "mode": "bp_research_plan",
+            "phase": "phase03_research_plan_collect",
+            "job_id": job_ctx.job_id,
+            "result": {"plan_path": str(plan_path), "enrichment": "skipped_fallback"},
+        }
+
+    skeleton = json.loads(skeleton_path.read_text(encoding="utf-8"))
+
+    # 读取 enrichment
+    enrichment_path = task_dir / "bp_research_plan_enrichment.json"
+    enrichment: dict[str, Any] = {}
+    if enrichment_path.exists():
+        try:
+            enrichment = json.loads(enrichment_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"  ⚠️ [phase03_collect] enrichment JSON 解析失败: {exc}，使用空 enrichment", flush=True)
+    else:
+        print(f"  ⚠️ [phase03_collect] enrichment 文件不存在，使用模板版 strategic_questions", flush=True)
+
+    # 合并
+    plan = apply_enrichment(skeleton, enrichment)
+    plan_path = write_bp_research_plan(task_dir, plan)
+
+    return {
+        "ok": plan.get("plan_status") == "ready",
+        "mode": "bp_research_plan",
+        "phase": "phase03_research_plan_collect",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "plan_path": str(plan_path),
+            "plan_status": plan.get("plan_status", "blocked"),
+            "enrichment_status": plan.get("enrichment_status", "none"),
+            "validation": plan.get("validation", {}),
+        },
     }
 
 
@@ -3223,7 +3341,8 @@ class BPProfile(PipelineProfile):
             # 序号仅用于注释和日志，不影响执行。
             "phase01_document_intake": lambda job_ctx: _run_document_intake(runtime_root, job_ctx),              # 01
             "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),               # 02 [heavy_bg]
-            "phase03_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),                 # 03
+            "phase03_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),                 # 03 → needs_dispatch (enrichment)
+            "phase03_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx), # 03c
             "phase04_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),                         # 04 [heavy_bg]
             "phase05_bp_shared_page_init": lambda job_ctx: _run_bp_shared_page_init(runtime_root, job_ctx),     # 05
             "phase06_search_plan_compile": lambda job_ctx: _run_bp_search_plan_compile(runtime_root, job_ctx),  # 06
@@ -3288,7 +3407,8 @@ class BPProfile(PipelineProfile):
         return {
             "phase01_document_intake": ["bp_step0_profile.json", "bp_claim_inventory.json"],
             "phase02_company_verify": ["company_verify_report.json"],
-            "phase03_research_plan": ["bp_research_plan.json"],
+            "phase03_research_plan": ["bp_research_plan_skeleton.json"],
+            "phase03_research_plan_collect": ["bp_research_plan.json"],
             "phase04_presearch": ["bp_presearch_results.json"],
             "phase05_bp_shared_page_init": ["bp_shared_diligence_page.md"],
             "phase06_search_plan_compile": ["bp_search_plan.json"],

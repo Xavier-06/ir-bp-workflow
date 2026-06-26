@@ -284,7 +284,20 @@ def build_strategic_questions(entity: str, query: str, profile: dict[str, Any] |
     ]
 
 
-def _default_claim_matrix(entity: str) -> list[dict[str, Any]]:
+def _section_to_fact_keys(stage_tier: str = "T3") -> dict[str, list[str]]:
+    """从 _build_fact_requirements() 反推 section → fact_keys 映射。
+
+    每条 fact requirement 声明了 required_for（哪些 section 需要它），
+    反转为 section 需要哪些 fact_keys，供 claim_matrix 填充。
+    """
+    mapping: dict[str, list[str]] = {}
+    for req in _build_fact_requirements(stage_tier):
+        for section in req["required_for"]:
+            mapping.setdefault(section, []).append(req["fact_key"])
+    return mapping
+
+
+def _default_claim_matrix(entity: str, stage_tier: str = "T3") -> list[dict[str, Any]]:
     defaults = [
         ("BC001", f"{entity} 的团队履历、行业资源或顾问背书支持公司执行力。", "bp_company_team_compliance", "critical"),
         ("BC002", f"{entity} 的核心产品已达到 BP 所称商业化或量产阶段。", "bp_product_commercial", "critical"),
@@ -297,24 +310,29 @@ def _default_claim_matrix(entity: str) -> list[dict[str, Any]]:
         ("BC009", f"{entity} 的核心产品与同场景竞品在关键性能参数和价格上具有可比竞争力。", "bp_competition_positioning", "high"),
         ("BC010", f"{entity} 的目标应用场景对客户选型有明确的性能、认证、价格门槛要求。", "bp_market_supply_chain", "high"),
     ]
-    return [
-        {
+    s2f = _section_to_fact_keys(stage_tier)
+    # ── Layer 3: T1/T2 BC005 降级统一在 planner 内处理 ──
+    early_stage_priority_override = {"BC005": "medium"} if stage_tier in ("T1", "T2") else {}
+    claims = []
+    for claim_id, claim, owner, priority in defaults:
+        prio = early_stage_priority_override.get(claim_id, priority)
+        claims.append({
             "claim_id": claim_id,
             "claim": claim,
             "owner_section": owner,
-            "priority": priority,
+            "priority": prio,
             "source": "bp_or_inferred_from_intake",
             "status": "planned",
-            "required_fact_keys": [],
-        }
-        for claim_id, claim, owner, priority in defaults
-    ]
+            "required_fact_keys": s2f.get(owner, []),
+        })
+    return claims
 
 
-def build_claim_matrix(entity: str, claim_inventory: dict[str, Any] | list[Any] | None = None) -> list[dict[str, Any]]:
+def build_claim_matrix(entity: str, claim_inventory: dict[str, Any] | list[Any] | None = None, stage_tier: str = "T3") -> list[dict[str, Any]]:
     if not claim_inventory:
-        return _default_claim_matrix(entity)
+        return _default_claim_matrix(entity, stage_tier)
     raw_claims = claim_inventory.get("claims", []) if isinstance(claim_inventory, dict) else claim_inventory
+    s2f = _section_to_fact_keys(stage_tier)
     rows: list[dict[str, Any]] = []
     for idx, item in enumerate(raw_claims or [], 1):
         if isinstance(item, str):
@@ -340,9 +358,9 @@ def build_claim_matrix(entity: str, claim_inventory: dict[str, Any] | list[Any] 
             "priority": priority,
             "source": "bp_claim_inventory",
             "status": "planned",
-            "required_fact_keys": [],
+            "required_fact_keys": s2f.get(owner, []),
         })
-    return rows or _default_claim_matrix(entity)
+    return rows or _default_claim_matrix(entity, stage_tier)
 
 
 def validate_bp_research_plan_ready(plan: dict[str, Any]) -> dict[str, Any]:
@@ -398,7 +416,7 @@ def build_bp_research_plan(
     strategic_questions = build_strategic_questions(entity, query, profile)
     fact_requirements = _build_fact_requirements(stage_tier)
     section_requirements = _build_section_requirements()
-    claim_matrix = build_claim_matrix(entity, claim_inventory)
+    claim_matrix = build_claim_matrix(entity, claim_inventory, stage_tier)
     coverage_matrix = {
         question["question_id"]: {
             "owner": question["owner_section"],
@@ -419,8 +437,8 @@ def build_bp_research_plan(
         "objective": f"围绕 {entity} 的商业计划书形成证据可追溯、反证充分、估值可复算、交付可门禁的投资尽调研究计划。",
         "prepared_by": "script_scaffold_plus_orchestrator_enrichment",
         "generation_roles": {
-            "script": "schema_fact_requirements_coverage_matrix_validation",
-            "orchestrator_agent": "strategic_questions_claim_prioritization_owner_assignment",
+            "script": "schema_fact_requirements_coverage_matrix_claim_matrix_validation",
+            "script_template_enrichment": "strategic_questions_via_profile_products_and_tech_keywords",
         },
         "core_questions": core_questions,
         "strategic_questions": strategic_questions,
@@ -468,6 +486,108 @@ def build_bp_research_plan(
     validation = validate_bp_research_plan_ready(plan)
     plan["plan_status"] = "ready" if validation["ready"] else "blocked"
     plan["validation"] = validation
+    return plan
+
+
+def build_bp_research_plan_skeleton(
+    task_id: str,
+    entity: str,
+    query: str,
+    market: str = "cn",
+    input_file: str = "",
+    profile: dict[str, Any] | None = None,
+    claim_inventory: dict[str, Any] | list[Any] | None = None,
+    stage_tier: str = "T3",
+) -> dict[str, Any]:
+    """生成确定性骨架计划（不含 LLM enrichment）。
+
+    与 build_bp_research_plan 的区别：
+    - strategic_questions 使用模板拼接（确定性）
+    - 返回 plan_status="skeleton_ready"，等待主 AI enrichment
+    - enrichment 合并后调用 apply_enrichment() 得到最终计划
+    """
+    plan = build_bp_research_plan(
+        task_id=task_id, entity=entity, query=query, market=market,
+        input_file=input_file, profile=profile,
+        claim_inventory=claim_inventory, stage_tier=stage_tier,
+    )
+    plan["plan_status"] = "skeleton_ready"
+    plan["enrichment_status"] = "pending"
+    return plan
+
+
+def apply_enrichment(skeleton: dict[str, Any], enrichment: dict[str, Any]) -> dict[str, Any]:
+    """将主 AI 的 enrichment delta 合并到骨架计划，生成最终计划。
+
+    enrichment 结构（由 instruction_store_bp/bp_research_plan_enrichment.md 定义）:
+    - strategic_questions: 替换模板版
+    - claim_priority_deltas: 调整 claim priority
+    - additional_claims: 新增 BP-specific claims
+    - excluded_fact_keys: 标记不相关的 fact_keys
+    """
+    plan = dict(skeleton)
+
+    # 1. 替换 strategic_questions（如果 enrichment 提供了）
+    enriched_sq = enrichment.get("strategic_questions") or []
+    if enriched_sq:
+        # 保留模板版作为 fallback，用 enriched 版替换
+        plan["_template_strategic_questions"] = plan.get("strategic_questions", [])
+        plan["strategic_questions"] = enriched_sq
+
+    # 2. 应用 claim priority deltas
+    deltas = enrichment.get("claim_priority_deltas") or []
+    if deltas:
+        claim_index = {c["claim_id"]: c for c in plan.get("claim_matrix", [])}
+        for delta in deltas:
+            cid = delta.get("claim_id", "")
+            if cid in claim_index:
+                claim_index[cid]["priority"] = delta.get("new_priority", claim_index[cid]["priority"])
+                claim_index[cid]["_enrichment_reason"] = delta.get("reason", "")
+
+    # 3. 新增 additional claims
+    additional = enrichment.get("additional_claims") or []
+    if additional:
+        s2f = _section_to_fact_keys(skeleton.get("stage_tier", "T3"))
+        for claim in additional:
+            # 确保 required_fact_keys 有值（如果 enrichment 没给，从 section 反推）
+            if not claim.get("required_fact_keys"):
+                claim["required_fact_keys"] = s2f.get(claim.get("owner_section", ""), [])
+            plan.setdefault("claim_matrix", []).append(claim)
+
+    # 4. 标记 excluded fact keys
+    excluded = enrichment.get("excluded_fact_keys") or []
+    if excluded:
+        plan["excluded_fact_keys"] = excluded
+        excluded_keys = {item.get("fact_key") for item in excluded if isinstance(item, dict)}
+        plan["fact_requirements"] = [
+            fr for fr in plan.get("fact_requirements", [])
+            if fr.get("fact_key") not in excluded_keys
+        ]
+
+    # 5. 重建 coverage matrix（包含 enriched strategic_questions）
+    plan["coverage_matrix"] = {
+        question["question_id"]: {
+            "owner": question["owner_section"],
+            "supporting_sections": question.get("supporting_sections", []),
+            "required_fact_keys": question["required_fact_keys"],
+            "priority": question.get("priority", "high"),
+        }
+        for question in plan.get("core_questions", []) + plan.get("strategic_questions", [])
+    }
+
+    # 6. 更新状态
+    plan["enrichment_status"] = "applied"
+    plan["generation_roles"] = {
+        "script": "schema_fact_requirements_coverage_matrix_claim_matrix_validation",
+        "llm_enrichment": "strategic_questions_claim_prioritization_bp_specific_claims",
+    }
+
+    # 7. 重新校验（先设 plan_status 以满足 validator 的前置检查）
+    plan["plan_status"] = "ready"
+    validation = validate_bp_research_plan_ready(plan)
+    plan["plan_status"] = "ready" if validation["ready"] else "blocked"
+    plan["validation"] = validation
+
     return plan
 
 
