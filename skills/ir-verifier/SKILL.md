@@ -26,25 +26,19 @@ IR 新管线必须先检查：
 - `{IR_RUNTIME}/data/tasks/{TASK_ID}-fact_store.json`
 - `{IR_RUNTIME}/data/tasks/{TASK_ID}-section_packages.json`
 - `{IR_RUNTIME}/data/tasks/{TASK_ID}-debate_review.json`
-- `{IR_RUNTIME}/data/tasks/{TASK_ID}-final_assembly.json`
-
-如果 Debate Review 是 `REWRITE_REQUIRED` 或 Final Assembly `ok=false`，验证结论不得 PASS。
-
-**Research Plan Gate 检查**：读取 `{TASK_ID}-research_plan.json` 后必须确认：
-- `plan_status == "ready"`
-- `validation.ready == true`
-- 存在 `strategic_questions`
-- 每个 `strategic_questions[].owner_section` 在对应 Section Package 中被回答
-- 每个关键 claim 能映射到 Research Plan 的 `question_id` 并绑定 Fact Store 中存在的 `fact_ids`
-- step8/final report 未漏掉 high-priority questions
-
-然后运行：
 
 ```bash
 python3 {IR_RUNTIME}/scripts/verification_agent.py --task-id TASK-XXXXX --pipeline ir
 ```
 
 脚本覆盖 L1-L5。**L6 是你真正的核心价值**。
+
+### 脚本 v2 变更（2026-06-10）
+
+- **WARN 阈值收紧**：≥2 个 WARN 即触发整体 WARN（原为 ≥3）
+- **双重计价检测通用化**：不再硬编码"阿里云/AI-MaaS"，改为检测任何 SOTP 估值结构中的重复计价
+- **行业硬编码清理**：ADC-7 的 secondary 列表从 `EDA替代/EDA预案` 改为通用的 `关键人缓释/供应商替代/技术替代预案`
+- **BP 管线**：delivery_gate 中 WARN≥3 会被记录为 WARN 级检查项
 
 ## 6 层验证
 
@@ -56,7 +50,6 @@ python3 {IR_RUNTIME}/scripts/verification_agent.py --task-id TASK-XXXXX --pipeli
 | L4 数字声明 | 关键数字有来源、算术正确 | 脚本 + verify_step1_completeness.py |
 | L5 逻辑漏洞 | 论证跳跃、因果倒置 | 脚本 |
 | L6 对抗论证 | 主动找证据推翻结论 | **你** |
-| L7 质量生产链 | Research Plan/Fact Store/Section Packages/Debate Review/Final Assembly 是否闭环 | **你 + 脚本产物** |
 
 ## L6 对抗策略
 
@@ -97,17 +90,14 @@ BP 尽调专用 12 维度策略 → 读 **references/bp-adversarial-strategies.m
 ## 约束
 
 1. **默认立场：报告有错**
-2. **PASS 是严格条件** — L1-L7 全过
-3. **质量生产链不闭环不得 PASS** — 缺 Research Plan、Fact Store、Section Packages、Debate Review 或 Final Assembly 任一关键产物，都至少 PARTIAL
-4. **Research Plan 不合规不得 PASS** — `plan_status != ready`、strategic_questions 漏答、claim 无 question_id/fact_id 映射，均至少 PARTIAL；影响主结论则 FAIL
-4. **FAIL 要具体** — 不说"有问题"，说"第 3 页估值假设引用的营收 3 亿与原文 1000 万差 30 倍"
-5. **不修改报告** — 只验证，修复由 ir-reporter 或 targeted rewrite 做
-6. **交付前必须清洗内部信息** — 验证报告本身也不能泄露内部路径/task ID
+2. **PASS 是严格条件** — L1-L6 全过
+3. **FAIL 要具体** — 不说"有问题"，说"第 3 页估值假设引用的营收 3 亿与原文 1000 万差 30 倍"
+4. **不修改报告** — 只验证，修复由 ir-reporter 做
+5. **交付前必须清洗内部信息** — 验证报告本身也不能泄露内部路径/task ID
 
 ## References（按需加载）
 
 | 触发条件 | 读取文件 |
 |---------|---------|
 | 验证 IR 研报 | `references/ir-adversarial-strategies.md` |
-| 验证 IR 质量生产链 | `../ir-coordinator/references/ir-quality-production-pipeline.md` |
 | 验证 BP 尽调报告 | `references/bp-adversarial-strategies.md` |

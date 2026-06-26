@@ -2,11 +2,23 @@
 
 ## VL OCR 识别
 
-- **API**: qwen3-vl-30b-a3b-instruct（兼容 OpenAI 格式的 VL 模型）
-- **API Base**: 通过 `VL_API_BASE` 环境变量设置
-- **API Key**: 通过 `VL_API_KEY` 环境变量设置
-- **Model**: `qwen3-vl-30b-a3b-instruct`（默认）
-- **环境变量必须在 `.env` 中配置**，见 `.env.example`
+- **Model**: `qwen3-vl-30b-a3b-instruct`（OpenAI-compatible API）
+- **API Base**: `https://api.tokenpony.cn/v1`
+- **API Key**: 通过 `BP_OCR_API_KEY` 环境变量或 `.credentials/investment-research.env` 文件配置
+
+### 配置加载优先级（代码 `ocr_pdf.py`）
+
+1. 环境变量 `BP_OCR_API_KEY` / `BP_OCR_MODEL` / `BP_OCR_BASE_URL`
+2. 项目 `.credentials/investment-research.env` 文件中同名 key
+3. model 默认值 `qwen3-vl-30b-a3b-instruct`，base_url 无默认值（必须配置）
+
+### .credentials/investment-research.env 格式
+
+```env
+BP_OCR_API_KEY=sk-xxx
+BP_OCR_BASE_URL=https://api.tokenpony.cn/v1
+BP_OCR_MODEL=qwen3-vl-30b-a3b-instruct
+```
 
 ## 支持格式
 
@@ -20,6 +32,10 @@ PDF / PPTX / DOCX / 图片
 ## 自动提取字段
 
 公司名 / 行业 / 融资阶段 / 商业模式 / 团队 / 财务 / 竞争优势
+
+## Fallback
+
+qwen-vl 不可用时自动降级为 Tesseract OCR（`pdf2image` + `pytesseract`）
 
 ## 融资阶段判断规则（硬性约束）
 

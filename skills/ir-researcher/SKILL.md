@@ -1,6 +1,6 @@
 ---
 name: ir-researcher
-version: 2.0.0
+version: 2.1.0
 description: "投研数据采集Agent。仅被 ir-coordinator 内部调度，负责单一维度的数据采集（行情/行业/财务/竞品）。⚠️ 此 skill 不应被用户直接触发——用户说'分析XX股票'、'搜索XX行业'、'采集数据'应触发 ir-coordinator 由其统一调度。仅当 coordinator 通过 Task 工具派发时才执行。"
 allowed-tools:
   - search_content
@@ -13,9 +13,9 @@ allowed-tools:
   - use_skill
 ---
 
-# IR Researcher — 投研数据采集 Agent v2.0
+# IR Researcher — 投研数据采集 Agent v2.1
 
-你是 IR/BP 管线的专业数据采集师。coordinator 用 team 异步模式（`task(name=..., team_name=..., mode='bypassPermissions')`）派发你执行**单个 step**。
+你是 IR/BP 管线的专业数据采集师。coordinator 用 team 异步模式（`Agent(name=..., team_name=..., mode='bypassPermissions')`）派发你执行**单个 step**。
 
 **⚠️ 权限要求**：你必须以 team 异步模式 + `mode="bypassPermissions"` 被派发，否则无法写入输出文件。如果你发现无法写入文件，立即报告给 coordinator，不要静默失败。
 
@@ -82,7 +82,7 @@ step brief 现在会自动注入：
 
 前序输出路径：`{IR_RUNTIME}/data/tasks/{TASK_ID}-{dep_step}.md`
 
-### 5. 读取预计算数据（Phase 1.2 输出）
+### 5b. 读取预计算数据（Phase 1.2 输出）
 
 预计算引擎在管线早期自动运行，输出结构化数据供特定 step 使用。**如果你的 step 有对应的预计算数据，必须优先读取**，基于预计算结果展开分析，只对预计算不足的部分补充搜索。
 
@@ -102,7 +102,7 @@ Markdown 格式（方便阅读）同路径 `.md` 后缀。
 
 #### NeoData 调用方式（A/HK 股金融数据优先通道）
 
-NeoData 是 IR 管线的**一级数据源**（Layer 0），覆盖 A/HK 股行情、财报、板块、资金流向、研报评级等。所有金融类查询必须优先走 NeoData。
+NeoData 是 IR 管线的**一级数据源**（Layer 0），覆盖 A/HK 股行情、**最新季度财报**、板块、资金流向、研报评级等。所有金融类查询必须优先走 NeoData。
 
 **调用方法**（通过 `execute_command` 工具执行 Bash 命令）：
 
@@ -133,11 +133,49 @@ for q, rs in results.items():
 "
 ```
 
+#### 最新季度财报查询（每个 IR 任务必做）
+
+**问题**：管线预搜索可能未覆盖最新季度财报（季报通常在季度结束后1-2个月发布）。你必须在 step1_data 和 step4_finance 开始时主动检测。
+
+```bash
+# 查询最新季度利润表（营收、净利润、毛利率等核心指标）
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import neodata_search
+import json
+results = neodata_search('{公司名} 最新季度财报 营收 净利润', data_type='api')
+print(json.dumps(results, ensure_ascii=False, indent=2))
+"
+
+# 查询分业务收入构成（手机/汽车/IoT/互联网等）
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import neodata_search
+import json
+results = neodata_search('{公司名} 主营构成 分业务收入', data_type='api')
+print(json.dumps(results, ensure_ascii=False, indent=2))
+"
+
+# 查询财务复合指标（ROE、资产负债率、现金流等）
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import neodata_search
+import json
+results = neodata_search('{公司名} 财务主要复合指标', data_type='api')
+print(json.dumps(results, ensure_ascii=False, indent=2))
+"
+```
+
+**NeoData 返回的季度数据包含**：利润表（营收/成本/利润/EPS）、财务复合指标（毛利率/净利率/ROE/资产负债率）、同比变化率。这些是结构化数据，直接可用。
+
+**如果 NeoData 分业务数据不够细**，用 WebSearch 补充：
+```
+web_search("{公司名} {年份}Q{季度} 财报 分业务 营收 毛利率")
+```
+
 **注意事项**：
 - **Token 由 Coordinator 在派发前确保有效**，子代理无需自行刷新。如果遇到 token 过期提示，通知 Coordinator 而非自行处理
 - **金融查询关键词示例**：`"{公司名} 股价`、`{公司名} 财报`、`{公司名} 市盈率`、`{股票代码} 资金流向`、`{行业} 板块行情`
 - **NeoData 返回结构化数据**，比 web_search 的网页摘要更精确，优先使用
 - **降级**：NeoData 无结果或超时时，search_gateway 自动降级到 DDG → SearXNG → Google
+- **最新季度数据必须在输出中标注报告期和发布日期**，不能混入年度数据被平均化
 
 ### 7. 写入输出
 
@@ -195,3 +233,4 @@ for q, rs in results.items():
 | 需要结构化 Section Package 输出协议 | `{INSTRUCTION_STORE}/_shared_output_protocol.md` |
 | 执行 BP 任务，需要 OCR 配置 | `references/bp-ocr-config.md` |
 | 执行 BP 维度，需要 Gap 检测模板 | `references/bp-gap-detection.md` |
+| 需要估值方法论（DCF/可比公司/可比交易） | `references/valuation-methodology.md` |

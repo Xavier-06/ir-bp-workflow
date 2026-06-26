@@ -1,7 +1,7 @@
 ---
 name: ir-coordinator
 version: 3.0.0
-description: "投研工作流调度中心。收到股票标的或BP后，自动编排完整管线，协调多个专业Agent并行工作。当用户说'分析XX股票'、'看这个BP'、'做个尽调'、'跑个研报'、'写篇简报'、'写个简报'、'出个简报'、'看看这个项目'、'帮我看下这个BP'时触发。当用户发送 PDF/PPTX/DOCX 文件并要求写简报、做分析、做尽调时，必须触发此 skill 而非 PPT演示文稿/Word文档生成/PDF文档生成 skill。关键词：BP、商业计划书、尽调、研报、简报、投研、分析股票、.pptx+分析、.pdf+分析。技能名是 ir-coordinator，不是 nir-coordinator。"
+description: "投研工作流调度中心。收到股票标的或BP后，自动编排完整管线，协调多个专业Agent并行工作。当用户说'分析XX股票'、'看这个BP'、'做个尽调'、'跑个研报'、'写篇简报'、'写个简报'、'出个简报'、'看看这个项目'、'帮我看下这个BP'、'写个XX行业研究'、'分析XX行业'、'做个产业分析'、'跑个赛道扫描'时触发。当用户发送 PDF/PPTX/DOCX 文件并要求写简报、做分析、做尽调时，必须触发此 skill 而非 PPT演示文稿/Word文档生成/PDF文档生成 skill。关键词：BP、商业计划书、尽调、研报、简报、投研、分析股票、行业研究、产业分析、赛道扫描、.pptx+分析、.pdf+分析。技能名是 ir-coordinator，不是 nir-coordinator。"
 allowed-tools:
   - Task
   - Read
@@ -27,7 +27,7 @@ allowed-tools:
 3. **Coordinator 不动手只动脑** — 你调度，不替代
 4. **Never delegate understanding** — 你必须理解每个 step 的产出
 5. **验证必须是 adversarial** — 不是"检查一下"，是"想尽办法推翻"
-6. **子代理必须用 team_async + Agent teammate 派发** — 按 `task_tool_instructions` 返回的 `team_name`、`name`、`mode`、`prompt` 调 Agent，所有 step 加入 `ir-{task_id}` 团队；不要回退成无 team 的独立 Agent。
+6. **子代理必须用 team 模式派发（sequential，逐个）** — 同步 task() 会 code=10003 挂掉
 7. **Research Plan Gate 是派发前硬门禁** — 任何 IR 子代理派发前必须 `prepare_research_plan/ensure_research_plan_ready`，且 `{task_id}-research_plan.json` 中 `plan_status == ready`、`validation.ready == true`；否则禁止派发。
 
 ## 环境常量
@@ -61,13 +61,56 @@ general-purpose 子代理**没有 Glob/Grep 工具**。如果 prompt 不声明�
 ⚠️ 工具限制：你没有 Glob/Grep 工具。搜索文件用 Bash（find/ls），读文件用 Read，搜索内容用 Bash（grep）。不要调用 Glob 或 Grep。
 ```
 
-### 规则5：派发 wave 后必须主动轮询输出文件（2026-05-11 教训）
-子代理消息可能延迟或丢失，**不能被动等消息**。派发 wave 后必须：
-1. 用 Bash `test -s {output_path}` 定期检查每个 step 的输出文件
-2. 每 60 秒检查一次，最多等 20 分钟
-3. 文件就绪（>100 bytes）= 该 step 完成，不论是否收到子代理消息
-4. 全部 step 文件就绪 → shutdown 子代理 → launch_next_wave()
-5. 超时未就绪 → 重派（最多 2 次）
+### 规则5：子代理派发与轮询协议（2026-06-12 修订，修复阻塞式轮询 bug）
+
+**⚠️ 核心教训**：2026-06-12 海旭 BP 中，协调员用阻塞式 Bash for 循环轮询被 foreground timeout 后台化，主线程卡死，子代理消息全部丢失。铁律：**没有 Agent 调用 = 没有派发 = 禁止轮询。**
+
+#### 5a. 派发流程（严格按顺序，不可跳步）
+
+1. 管线返回 `needs_dispatch` 后，读取 manifest JSON 文件
+2. **必须调用 Agent 工具启动子代理**（参数来自 manifest 的 system_prompt / connectorIds / slug / team_name）
+3. **必须验证 Agent 工具返回了 spawn 成功的确认**（含 agent_id 或 "Spawned successfully"）
+   - 如果 Agent 返回空、报错或超时 → **立即重试**，最多 3 次
+   - 3 次都失败 → 该 step 标记为 skipped，继续下一 step
+4. **确认 spawn 成功后**，立即启动后台轮询（见 5b）
+
+#### 5b. 轮询流程（后台标志文件模式，禁止阻塞式循环）
+
+**⚠️ 禁止在单次 Bash 调用中用 for/while 循环做长时间轮询。** 每次 Bash 调用只做一次 test 然后退出。
+
+步骤：
+1. Agent spawn 成功后，**启动一个后台轮询脚本**（`run_in_background: true`）：
+```bash
+(OUTPUTS_DIR="/path/to/outputs"; SLUG="step_name"; DONE="$OUTPUTS_DIR/poll_${SLUG}.done"
+ for i in $(seq 1 20); do
+   MD="$OUTPUTS_DIR/bp_phase2_${SLUG}.md"
+   FACTS="$OUTPUTS_DIR/bp_phase2_${SLUG}-facts.json"
+   SEC="$OUTPUTS_DIR/bp_phase2_${SLUG}-section.json"
+   if [ -s "$MD" ] && [ -s "$FACTS" ] && [ -s "$SEC" ]; then
+     echo "ALL_READY: md=$(wc -c < "$MD") facts=$(wc -c < "$FACTS") sec=$(wc -c < "$SEC")"
+     touch "$DONE"; exit 0
+   fi
+   sleep 60
+ done
+ echo "TIMEOUT"; exit 1
+)
+```
+2. 脚本启动后，主线程用**短 Bash 检查**（每次只做一次 `test`，秒级完成）：
+```bash
+test -s /path/to/outputs/poll_step_name.done && echo "DONE" || echo "WAITING"
+```
+3. 每隔一个 turn（约 15-30 秒）做一次短检查
+4. 看到 `DONE` → 子代理完成，shutdown → 推进管线
+5. 超时（20 分钟内 `.done` 未出现）→ 重派（最多 2 次）
+
+#### 5c. 三文件完成判定（硬性要求）
+
+子代理输出 3 个文件，写 `.md` 后再写 sidecar JSON（JSON 序列化耗时）。**必须三文件都存在且非空才算完成**：
+- `bp_phase2_{slug}.md` — >100 bytes
+- `bp_phase2_{slug}-facts.json` — >10 bytes
+- `bp_phase2_{slug}-section.json` — >10 bytes
+
+⚠️ 只看 `.md` 就推进 = sidecar 丢失 = quality gate 失败。
 
 ### 规则6：shutdown 后必须从 team config 移除已退出成员（2026-05-11 教训）
 子代理 shutdown approve 后，`config.json` 可能仍显示 `backend=in-process`，导致无法派发同名新子代理。
@@ -78,6 +121,79 @@ general-purpose 子代理**没有 Glob/Grep 工具**。如果 prompt 不声明�
 如果仍然无法派发（Agent 工具内存缓存未刷新），**执行 TeamDelete 彻底清理**，然后用新 team name 重建。如果 TeamDelete 也无法清除内存状态，说明框架级别的 agent 注册表卡死——**必须重启 session**。这意味着当前任务无法继续，需要重新开始。
 
 **⚠️ 核心教训**：规则5（主动轮询）是根本解决方案。如果能在子代理卡死前及时发现问题并重派，就不会触发这个无法恢复的状态。被动等消息 → 子代理卡死 → 内存锁死 → 无法恢复，这条链必须在第一步就切断。
+
+### 规则8：BP DOCX 手动生成时 dimension_outputs 必须传内容（2026-06-14 教训）
+
+**问题**：`build_bp_dd_report(task_id, entity, dimension_outputs, output_path)` 的 `dimension_outputs` 字典 value 应传**文件内容字符串**，而非文件路径。传路径会导致 DOCX 目录显示路径、正文为空。
+
+**错误写法**：
+```python
+dimension_outputs = {'synthesis': str(task_dir / 'bp_synthesis.md')}  # ❌ 传路径
+```
+
+**正确写法**：
+```python
+synthesis_content = (task_dir / 'bp_synthesis.md').read_text(encoding='utf-8')
+dimension_outputs = {'synthesis': synthesis_content}  # ✅ 传内容
+```
+
+**⚠️ 防御性修复已加入 build_bp_dd_report_docx.py**：如果检测到 value 是文件路径会自动读取。但 Coordinator 手动调用时仍应直接传内容。
+
+**验证方法**：
+```python
+from docx import Document
+import re
+doc = Document(output_path)
+for para in doc.paragraphs:
+    if re.search(r'/Users/|\.md$|bp_synthesis', para.text):
+        print(f'PATH LEAK: {para.text}')
+```
+
+### 规则9：BP Section JSON 字段自动修复（2026-06-14 教训）
+
+**问题**：子代理生成的 `*-section.json` 缺少 `schema_version`、`facts_used`、`markdown_draft`、`search_audit.claim_coverage` 等字段，导致 phase26 反复失败。
+
+**修复脚本**（在 phase26 之前执行）：
+```python
+import json, os, glob
+for f in sorted(glob.glob("bp_phase2_*-section.json")):
+    d = json.load(open(f))
+    changed = False
+    # schema_version
+    if 'schema_version' not in d:
+        d['schema_version'] = 'bp_section_package.v1'; changed = True
+    # markdown_draft — 从对应 .md 文件读取
+    if 'markdown_draft' not in d:
+        md = f.replace('-section.json', '.md')
+        d['markdown_draft'] = open(md).read() if os.path.exists(md) else ""
+        changed = True
+    # facts_used — 从 facts 数组或 sidecar -facts.json 读取
+    if not d.get('facts_used'):
+        facts_file = f.replace('-section.json', '-facts.json')
+        facts_data = json.load(open(facts_file))
+        fact_ids = [f.get('fact_id','') for f in facts_data.get('facts', []) if f.get('fact_id')]
+        d['facts_used'] = fact_ids[:10]; changed = True
+    # facts 数组 — 如 sidecar 为空则从 section 同步
+    facts_file = f.replace('-section.json', '-facts.json')
+    facts_data = json.load(open(facts_file))
+    if not facts_data.get('facts') and d.get('facts'):
+        facts_data['facts'] = d['facts']
+        json.dump(facts_data, open(facts_file, 'w'), ensure_ascii=False, indent=2)
+    # search_audit.claim_coverage — 必须是 list 而非 dict
+    if 'search_audit' not in d:
+        d['search_audit'] = {'claim_coverage': []}; changed = True
+    cc = d['search_audit'].get('claim_coverage')
+    if not isinstance(cc, list):
+        claims = d.get('claims', [])
+        d['search_audit']['claim_coverage'] = [
+            {'claim_id': c.get('claim_id'), 'unique_queries': 0, 'fetched_urls': [],
+             'source_domains': [], 'evidence_verdict': c.get('status','unverified'),
+             'counter_search_done': True}
+            for c in claims if isinstance(c, dict) and c.get('claim_id')
+        ]; changed = True
+    if changed:
+        json.dump(d, open(f, 'w'), ensure_ascii=False, indent=2)
+```
 
 ### 规则7：NeoData token 过期自动刷新（2026-05-12 教训）
 token 有效期 12 小时。长管线跑完可能过期。
@@ -90,7 +206,8 @@ token 有效期 12 小时。长管线跑完可能过期。
 
 ```
 PipelineOrchestrator
-├── IR 质量生产型管线 (13 phases) → 详情读 references/ir-pipeline.md + references/ir-quality-production-pipeline.md
+├── IR 管线 (7 phases) → 详情读 references/ir-pipeline.md
+├── IC 管线 (8 phases) → 详情读 references/ic-pipeline.md
 └── BP 管线 (8 phases) → 详情读 references/bp-pipeline.md
 ```
 
@@ -111,9 +228,10 @@ PipelineOrchestrator
 ### 任务路由
 
 - **IR 任务**：无输入文件 或 明确说"分析股票/标的"
+- **IC 任务**：query 包含行业研究关键词（"行业研究"/"产业分析"/"赛道扫描"/"行业分析"/"行业报告"/"产业链分析"/"行业深度"等）
 - **BP 任务**：有输入文件（PDF/PPTX/DOCX/图片）
 
-收到任务后，**立即读取对应管线的 reference 文件**获取详细流程。IR 任务必须同时读取 `references/ir-pipeline.md` 和 `references/ir-quality-production-pipeline.md`；如涉及行业 KPI 或报告叙事结构，还应读取 `references/industry-kpi-checklist.md` 和 `references/report-narrative-structure.md`。不能只按旧 presearch→dispatch→delivery 流程跑。
+收到任务后，**立即读取对应管线的 reference 文件**获取详细流程。
 
 ### NeoData Token 预检（Phase 0 必须执行）
 
@@ -136,7 +254,36 @@ print('NEODATA_TOKEN_OK' if t else 'NEODATA_TOKEN_MISSING')
 Token 有效期 12 小时，一次刷新足够跑完整管线（~2 小时）。
 **子代理无法自行刷新 token，必须由 Coordinator 在派发前确保有效。**
 
-### 调度框架（两种管线共用）
+### 财报新鲜度预检（Phase 0 必须执行）
+
+**问题背景**：管线预搜索基于历史数据，可能未覆盖最新发布的季度/半年报。2026-05-28 小米研报案例证明：即使报告日期晚于财报发布日期，管线仍可能缺失最新季度的分业务数据。
+
+**在 NeoData token 预检通过后，立即执行财报新鲜度检查**：
+
+```bash
+# 查询目标公司最新财报报告期
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import neodata_search
+import json
+results = neodata_search('{公司名} 最新季度财报', data_type='api')
+print(json.dumps(results, ensure_ascii=False, indent=2))
+"
+```
+
+**判断逻辑**：
+1. NeoData 返回的**最新报告期**（如 2026Q1）> 管线预搜索数据截止期 → **记录到 task manifest**，子代理会自动触发增量更新
+2. NeoData 返回的报告期 ≤ 预搜索数据截止期 → 无需额外操作
+
+**manifest 追加字段**（通过 submit --query 传递）：
+```
+--query "研究重点 | LATEST_EARNINGS={报告期如2026Q1}|PUBLISH_DATE={发布日期如2026-05-26}"
+```
+
+这样子代理在 step1_data 和 step4_finance 开始时，会从 brief 中读取到最新财报信息，主动去 NeoData 获取完整数据。
+
+**⚠️ 这一步不能省略**。没有这个预检，子代理只会用预搜索的旧数据，导致最新季度数据缺失。
+
+### 调度框架（三种管线共用）
 
 ```python
 # ⚠️ 所有命令必须 cd ~/.workbuddy/ir_runtime && 前缀
@@ -147,41 +294,41 @@ cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestra
 # 2. 执行到 needs_dispatch 暂停
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
 
-# 2b. Research Plan Gate（派发前硬门禁）
-# launch_next_wave/launch_step 会自动触发 ensure_research_plan_ready；如返回 fix_research_plan，禁止派发子代理。
-# Research Plan 是任务级总 plan：data/tasks/{task_id}-research_plan.json
-# 必须包含 plan_status=ready、strategic_questions、section_requirements、coverage_matrix。
-
 # 2a. 如果返回 needs_poll: true + bg_pid，必须轮询直到进程结束
 while kill -0 {bg_pid} 2>/dev/null; do sleep 30; done
 
-# 3. 循环派发 wave（team_async，与 BP 管线一致）
-team_name = f"ir-{task_id}"
-while True:
-    result = launch_next_wave(...)
-    if result.get('next_action') == 'fix_research_plan':
-        raise RuntimeError(f"Research Plan Gate blocked dispatch: {result['research_plan_gate']['errors']}")
-    if result['all_done']: break
-    for item in result['task_tool_instructions']:
-        # 使用 Agent 工具派发 teammate：
-        # name=item['name'], team_name=item['team_name'], mode=item['mode'],
-        # run_in_background=True, prompt=item['prompt']
-        pass
-    # 主动轮询输出文件（sleep 30 → test -s → 重复，最多 15 分钟）
+# 3. 创建 team，循环派发 wave（IR 和 IC 共用此循环，team_name 前缀不同）
+# IR: team_name=f"ir-{task_id}"
+# IC: team_name=f"ic-{task_id}"
+team_create(team_name=f"{pipeline_prefix}-{task_id}")
 
-# 4. 交付
+while True:
+    # ⚠️ sequential 模式（避免 API 429）：每次只返回 1 个 step
+    #   launch_next_wave(task_id, entity, query, market, sequential=True)
+    #   → 派发单个 Agent → 等待输出就绪 → 调下一次
+    #   → has_more=True 继续同 wave 内下一个 step
+    #   → has_more=False 则 wave 完成，自动推进到下一 wave
+    result = launch_next_wave(task_id, entity, query, market, sequential=True)
+    if result['all_done']: break
+    # 逐 step 派发 team member
+    # 轮询输出文件（sleep 30 → test -s → 重复，最多 15 分钟）
+
+# 4. 清理 team
+send_message(type="shutdown_request", recipient=每个member)
+# 等 10 秒
+team_delete()
+
+# 5. 交付
 finalize_pipeline(task_id, entity, market)  # IR
+# IC 管线同理：finalize_pipeline(task_id, entity, market)
 # 或 BP 管线自动交付
 ```
 
 ### 子代理派发通用规则
 
-- **Research Plan Gate 必须 ready**：`launch_next_wave()` 返回的 `research_plan_gate.ready` 必须为 true；如果 `next_action == fix_research_plan`，停止派发并修复 `{task_id}-research_plan.json`。
-- **同一份总 Research Plan，按 step 读取 slice**：所有 step 共享 `data/tasks/{task_id}-research_plan.json`；子代理只处理 `section_requirements[step]`、`core_questions.owner_section == step`、`strategic_questions.owner_section == step` 的问题。
-- **必须使用 team_async + Agent teammate 派发**：按 `task_tool_instructions` 中的 `tool=Agent`、`name`、`team_name`、`subagent_type`、`mode`、`run_in_background`、`prompt` 执行。
-- **team 名固定为 `ir-{task_id}`**：与 BP 管线的 `bp-{task_id}` 对齐；同一任务的所有 step 都进同一个 team。
-- **队内 name 用 step 名**：例如 `step1_data`、`step_macro`、`step8_master`，不要用无名同步 task。
-- **run_in_background 必须为 true**：派发后主控主动轮询输出文件，不等子代理消息。
+- **必须用 team 模式（sequential 逐个派发）**：`Agent(name=..., team_name=..., mode='bypassPermissions')`
+- **禁止用同步 `task()`**（无 name 参数）——会 code=10003 挂掉
+- `subagent_name` 固定为 `code-explorer`
 - 输出文件超时 → 重派（最多 2 次）
 - 重试仍失败 → 跳过该 step，继续下一 wave
 
@@ -194,9 +341,30 @@ finalize_pipeline(task_id, entity, market)  # IR
 4. **前序 step 输出有 gap** → 自己补充搜索填补
 5. **唯一需要回主控的情况**：step 输出文件写完
 
+### 估值子代理上下文注入规则（2026-06-01新增，2026-06-02修订）
+
+`launch_next_wave()` 在派发以下 step 时，会在 task prompt 中注入前序 step 的**完整文件路径**（不是截断内容），子代理必须读取完整文件：
+
+- **step6b_valuation**（估值）：注入 step1_data / step2_industry / step4_finance / step_macro 的完整路径
+- **step6_insight**（差异化洞察）：注入 step1_data / step2_industry / step3_biz / step6b_valuation / step_macro 的完整路径
+- **step7_risk**（风险催化）：注入 step1_data / step3_biz / step4_finance / step5_mgmt / step6b_valuation / step_macro 的完整路径
+- **step8_master**（统稿）：注入所有前序 step 的完整路径 + 统稿硬约束
+
+**⚠️ 注意**：brief 文件中 "Prior Step Output" 部分只列出依赖文件的路径引用（不嵌入内容），子代理需用 Read 工具读取完整文件。
+
+**Coordinator 不需要手动补充**（v3 代码已自动注入），但应确认 `launch_next_wave()` 返回的 `task_tool_instructions` 中每个 step 的 `prompt` 字段包含完整文件路径列表。
+
 ## BP 尽调模式
 
 当输入是 BP（PDF/PPTX/DOCX）时，触发 BP 管线。详细流程读 **references/bp-pipeline.md**。
+
+**⚠️ BP 管线 v4 关键变更（2026-06-10）**：
+- 8 维度 → 5 波次派发（Wave1: 4维度, Wave2: 客户收入, Wave3: 竞争+估值, Wave4: dealbreaker, Synthesis）
+- **stage_tier 贯穿全管线**：T1(天使/种子) 自动放宽客户/收入验证要求，估值禁用 PE/DCF
+- **最终交付物是 DOCX**（从 bp_synthesis.md 生成），assembler 输出降级为附件
+- **Claim coverage 否定性发现判定**：搜索"未找到"不再让 claim 变 supported
+- **Delivery gate PASS_WITH_DISCLOSURE 允许交付**（不再阻止），新增 3 个 WARN 级检查
+- **统稿 prompt 四板斧**：表格规范 + 论证链保留 + 天使轮适配 + 去重规则
 
 **⚠️ 防缺陷铁律**：BP 统稿的防缺陷规则见 **ir-reporter/references/bp-anti-defect-rules.md**，coordinator 不重复列出。
 
@@ -247,6 +415,7 @@ yfinance 获取 PE/PB/PS/市值/52W高低/EPS/beta，A 股代码自动映射
 | 触发条件 | 读取文件 |
 |---------|---------|
 | 收到 IR 任务，需要调度 IR 管线 | `references/ir-pipeline.md` |
+| 收到 IC 任务，需要调度 IC 管线 | `references/ic-pipeline.md` |
 | 收到 BP 任务，需要调度 BP 管线 | `references/bp-pipeline.md` |
 | 进入 Phase 4+ 调度阶段，检查质量门禁 | `references/quality-gates.md` |
 | 子代理超时/错误恢复 | `references/quality-gates.md` 的"错误处理"章节 |
