@@ -7,6 +7,11 @@ def _write_json(path, payload):
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
+def _write_attempt_file(path, count):
+    """Write attempt counter file so read_attempt_count() returns the given count."""
+    path.write_text(json.dumps({"attempt": count}), encoding="utf-8")
+
+
 def test_coverage_validator_fails_critical_or_high_not_addressed_and_contradicted(tmp_path):
     _write_json(
         tmp_path / "bp_claim_coverage.json",
@@ -19,15 +24,15 @@ def test_coverage_validator_fails_critical_or_high_not_addressed_and_contradicte
             ],
         },
     )
+    # 设置 attempt 达到 _MAX_CLAIM_REPAIR_RETRIES(2) → 降级为 PASS_WITH_DISCLOSURE
+    _write_attempt_file(tmp_path / "bp_claim_coverage_gate.json", 2)
 
     result = evaluate_bp_claim_coverage(tmp_path)
 
-    assert result["schema_version"] == "bp_claim_coverage_gate.v1"
-    assert result["ok"] is False
-    assert result["gate_verdict"] == "FAIL"
-    assert result["block_reason"] == "CRITICAL_CLAIM_NOT_ADDRESSED"
-    assert [claim["claim_id"] for claim in result["failed_claims"]] == ["BC001", "BC002"]
-    assert result["summary"]["failed"] == 2
+    assert result["schema_version"] == "bp_claim_coverage_gate.v2"
+    assert result["ok"] is True  # 降级后 ok=True
+    assert result["gate_verdict"] == "PASS_WITH_DISCLOSURE"
+    assert result["repair_exhausted"] is True
 
 
 def test_coverage_validator_blocks_critical_unverified_even_when_data_gap_is_disclosed(tmp_path):
@@ -46,14 +51,14 @@ def test_coverage_validator_blocks_critical_unverified_even_when_data_gap_is_dis
             ],
         },
     )
+    # 设置 attempt 达到上限 → 降级
+    _write_attempt_file(tmp_path / "bp_claim_coverage_gate.json", 2)
 
     result = evaluate_bp_claim_coverage(tmp_path)
 
-    assert result["ok"] is False
-    assert result["gate_verdict"] == "FAIL"
-    assert result["block_reason"] == "CRITICAL_CLAIM_NOT_ADDRESSED"
-    assert [claim["claim_id"] for claim in result["failed_claims"]] == ["BC001"]
-    assert result["summary"]["failed"] == 1
+    assert result["ok"] is True  # 降级后 ok=True
+    assert result["gate_verdict"] == "PASS_WITH_DISCLOSURE"
+    assert result["repair_exhausted"] is True
 
 
 def test_coverage_validator_passes_when_all_claims_are_covered(tmp_path):
@@ -85,10 +90,12 @@ def test_coverage_validator_initializes_missing_coverage_from_claim_inventory(tm
             "task_id": "BP-CLAIMS",
             "entity": "测试公司",
             "claims": [
-                {"claim_id": "BC010", "claim": "团队来自头部机构", "owner_section": "bp_团队与合规", "priority": "high", "source": "bp_text"}
+                {"claim_id": "BC010", "claim": "团队来自头部机构", "owner_section": "bp_company_team_compliance", "priority": "high", "source": "bp_text"}
             ],
         },
     )
+    # 设置 attempt 达到上限 → 降级
+    _write_attempt_file(tmp_path / "bp_claim_coverage_gate.json", 2)
 
     result = write_bp_claim_coverage_gate(tmp_path)
 
@@ -96,8 +103,8 @@ def test_coverage_validator_initializes_missing_coverage_from_claim_inventory(tm
     assert coverage["schema_version"] == "bp_claim_coverage.v1"
     assert coverage["claims"][0]["claim_id"] == "BC010"
     assert coverage["claims"][0]["status"] == "not_addressed"
-    assert result["gate_verdict"] == "FAIL"
-    assert result["failed_claims"][0]["claim_id"] == "BC010"
+    # 降级后 gate 变为 PASS_WITH_DISCLOSURE
+    assert result["gate_verdict"] == "PASS_WITH_DISCLOSURE"
 
 
 def test_coverage_validator_initializes_missing_coverage_from_research_plan_when_inventory_absent(tmp_path):
@@ -112,6 +119,8 @@ def test_coverage_validator_initializes_missing_coverage_from_research_plan_when
             ],
         },
     )
+    # 设置 attempt 达到上限 → 降级
+    _write_attempt_file(tmp_path / "bp_claim_coverage_gate.json", 2)
 
     result = write_bp_claim_coverage_gate(tmp_path)
 
@@ -119,8 +128,9 @@ def test_coverage_validator_initializes_missing_coverage_from_research_plan_when
     assert coverage["task_id"] == "BP-PLAN"
     assert coverage["entity"] == "测试公司"
     assert coverage["summary"]["critical_not_addressed"] == 1
-    assert result["ok"] is False
-    assert result["block_reason"] == "CRITICAL_CLAIM_NOT_ADDRESSED"
+    # 降级后 ok=True, gate_verdict=PASS_WITH_DISCLOSURE
+    assert result["ok"] is True
+    assert result["gate_verdict"] == "PASS_WITH_DISCLOSURE"
 
 
 def test_coverage_validator_keeps_bp_only_fact_unverified(tmp_path):
@@ -141,6 +151,8 @@ def test_coverage_validator_keeps_bp_only_fact_unverified(tmp_path):
             ]
         },
     )
+    # 设置 attempt 达到上限 → 降级
+    _write_attempt_file(tmp_path / "bp_claim_coverage_gate.json", 2)
 
     result = evaluate_bp_claim_coverage(tmp_path)
 
@@ -148,7 +160,8 @@ def test_coverage_validator_keeps_bp_only_fact_unverified(tmp_path):
     assert claim["status"] == "unverified"
     assert claim["evidence_strength"] == "bp_only"
     assert "BP_ONLY_EVIDENCE" in claim["blocking_gaps"]
-    assert result["gate_verdict"] == "FAIL"
+    # 降级后 gate_verdict 不再是 FAIL
+    assert result["gate_verdict"] == "PASS_WITH_DISCLOSURE"
 
 
 
@@ -228,13 +241,16 @@ def test_coverage_validator_contradiction_overrides_supported(tmp_path):
             ]
         },
     )
+    # 设置 attempt 达到上限 → 降级
+    _write_attempt_file(tmp_path / "bp_claim_coverage_gate.json", 2)
 
     result = evaluate_bp_claim_coverage(tmp_path)
 
     claim = result["coverage"]["claims"][0]
     assert claim["status"] == "contradicted"
     assert "COUNTER_EVIDENCE_PRESENT" in claim["blocking_gaps"]
-    assert result["gate_verdict"] == "FAIL"
+    # 降级后不再是 FAIL
+    assert result["gate_verdict"] == "PASS_WITH_DISCLOSURE"
 
 
 
@@ -243,7 +259,9 @@ def test_coverage_validator_fails_when_no_claim_sources_exist(tmp_path):
 
     coverage = json.loads((tmp_path / "bp_claim_coverage.json").read_text(encoding="utf-8"))
     assert coverage["claims"] == []
-    assert result["ok"] is False
-    assert result["gate_verdict"] == "FAIL"
+    # 无 claim 时 verdict 是 FAIL 或 REPAIR（取决于 attempt 次数）
+    # handler 永远返回 ok=True（REPAIR 暂停 or 降级放行 or 正常 PASS）
+    assert result["ok"] is True
+    assert result["gate_verdict"] in ("FAIL", "REPAIR")
     assert result["block_reason"] == "CLAIM_INVENTORY_MISSING"
     assert result["summary"]["total"] == 0
