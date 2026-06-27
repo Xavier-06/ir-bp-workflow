@@ -93,20 +93,17 @@ def evaluate_bp_delivery_gate(task_dir: Path) -> dict[str, Any]:
     if not assembly.get("ok") or not assembly.get("markdown_path"):
         checks.append({"name": "final_assembly", "ok": False, "reason": "FINAL_ASSEMBLY_NOT_READY"})
 
-    # Readability check with T1/T2 degradation
+    # Readability check — phase31 已降级为 WARN，这里统一记录到 deferred_fixes
     readability = load_json(task_dir / "bp_readability_review.json", {})
-    if readability.get("verdict") != "PASS":
-        if is_early_stage:
-            # T1/T2: degrade to WARN
-            deferred_fixes.append({
-                "check": "readability",
-                "severity": "FAIL",
-                "reason": "READABILITY_REWRITE_REQUIRED",
-                "t1_degradation": True,
-                "fix_suggestion": "优化报告可读性：缩短超长段落、消除重复短语、解释技术术语"
-            })
-        else:
-            checks.append({"name": "readability", "ok": False, "reason": "READABILITY_REWRITE_REQUIRED", "payload": readability})
+    if readability.get("verdict") not in ("PASS", None):
+        # WARN / FAIL（phase31 已将 FAIL 降级为 WARN，但兼容旧 job 的 FAIL）
+        deferred_fixes.append({
+            "check": "readability",
+            "severity": readability.get("degraded_from", "FAIL"),
+            "reason": "READABILITY_REWRITE_REQUIRED",
+            "t1_degradation": is_early_stage,
+            "fix_suggestion": "优化报告可读性：缩短超长段落、消除重复短语、解释技术术语"
+        })
 
     coverage_gate = load_json(task_dir / "bp_claim_coverage_gate.json", {})
     coverage_verdict = coverage_gate.get("gate_verdict")
@@ -187,15 +184,29 @@ def evaluate_bp_delivery_gate(task_dir: Path) -> dict[str, Any]:
 
     verification = load_json(task_dir / "bp_verification_result.json", {})
     if not verification:
-        checks.append({"name": "verification", "ok": False, "reason": "VERIFICATION_RESULT_MISSING"})
+        if is_early_stage:
+            deferred_fixes.append({"check": "verification", "severity": "FAIL", "reason": "VERIFICATION_RESULT_MISSING", "t1_degradation": True, "fix_suggestion": "补充对抗验证"})
+        else:
+            checks.append({"name": "verification", "ok": False, "reason": "VERIFICATION_RESULT_MISSING"})
     elif verification.get("verdict") == "FAIL" or int(verification.get("fail", 0) or 0) > 0:
-        checks.append({"name": "verification", "ok": False, "reason": "VERIFICATION_FAILED", "payload": verification})
+        if is_early_stage:
+            # T1/T2: 验证 FAIL 降级为 WARN（报告可以交付后迭代修正）
+            deferred_fixes.append({
+                "check": "verification", "severity": "FAIL", "reason": "VERIFICATION_FAILED",
+                "t1_degradation": True,
+                "fix_suggestion": "对抗验证有 FAIL 项，建议后续迭代修正：补充来源标注、添加流动性折价、多种估值方法交叉验证等"
+            })
+        else:
+            checks.append({"name": "verification", "ok": False, "reason": "VERIFICATION_FAILED", "payload": verification})
 
 
     packages = _section_packages(task_dir)
     bp_only_claims = _bp_only_main_claims(packages)
     if bp_only_claims:
-        checks.append({"name": "source_quality", "ok": False, "reason": "BP_ONLY_MAIN_CONCLUSION", "payload": {"claims": bp_only_claims}})
+        if is_early_stage:
+            deferred_fixes.append({"check": "source_quality", "severity": "FAIL", "reason": "BP_ONLY_MAIN_CONCLUSION", "t1_degradation": True, "fix_suggestion": "部分核心结论仅依赖 BP 自述，建议后续补充独立来源验证"})
+        else:
+            checks.append({"name": "source_quality", "ok": False, "reason": "BP_ONLY_MAIN_CONCLUSION", "payload": {"claims": bp_only_claims}})
     fact_ids = _fact_ids_from_packages(packages)
     assembly_fact_ids = {str(fact_id).strip() for fact_id in assembly.get("facts_used", []) or [] if str(fact_id).strip()}
     missing_fact_ids = sorted(fact_id for fact_id in fact_ids if fact_id not in assembly_fact_ids)

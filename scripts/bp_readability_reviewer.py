@@ -44,10 +44,27 @@ def _extract_tech_terms(text: str, task_dir: Path | None = None) -> tuple[str, .
     industry_terms.update(_TECH_TERMS_GENERIC)
 
     # 从文本中提取 2+ 大写字母的缩写，出现 2+ 次
-    abbr_pattern = re.compile(r'\b([A-Z][A-Z0-9/]{1,10})\b')
+    # 排除内部 ID（gap_id、evidence_id 等）、含 / 的复合缩写片段、纯数字后缀
+    _ABB_EXCLUDE = frozenset({
+        "BP", "CEO", "CFO", "CTO", "COO", "IPO", "PE", "PS", "VC", "TTM",
+        "CAGR", "ROI", "IRR", "MOIC", "USD", "RMB", "EBITDA", "ARR", "MRR",
+        "GMV", "DAU", "MAU", "NPS", "YoY", "QoQ",
+        # 内部 ID 前缀，不是技术术语
+        "DG", "CE", "BC", "BF", "ESQ", "G0", "G1", "P1",
+    })
+    abbr_pattern = re.compile(r'\b([A-Z][A-Z0-9]{1,10})\b')
     from collections import Counter
     abbrs = Counter(m.group(1) for m in abbr_pattern.finditer(text))
-    text_terms = {abbr for abbr, count in abbrs.items() if count >= 2 and abbr not in ("BP", "CEO", "CFO", "CTO", "COO", "IPO", "PE", "PS", "VC", "TTM", "CAGR", "ROI", "IRR", "MOIC", "USD", "RMB", "EBITDA", "ARR", "MRR", "GMV", "DAU", "MAU", "NPS", "YoY", "QoQ")}
+    text_terms = set()
+    for abbr, count in abbrs.items():
+        if count < 2:
+            continue
+        if abbr in _ABB_EXCLUDE:
+            continue
+        # 排除纯数字结尾的内部 ID（如 DG001, G008）
+        if re.match(r'^[A-Z]{1,3}\d{2,}$', abbr):
+            continue
+        text_terms.add(abbr)
 
     return tuple(sorted(industry_terms | text_terms))
 _FIRST_PAGE_REQUIRED_BLOCKS = ("当前建议", "置信度", "关键支持理由", "Deal Breakers", "下一步 DD")
@@ -111,6 +128,23 @@ def _markdown_table_count(text: str) -> int:
 def review_bp_readability(report_path: Path) -> dict[str, Any]:
     report_path = Path(report_path)
     text = report_path.read_text(encoding="utf-8") if report_path.exists() else ""
+
+    # 提取报告标题中的公司名，加入重复检测豁免列表（公司名在报告中高频出现是正常的）
+    _entity_name_cache: set[str] = set()
+    title_match = re.match(r'^#\s+(.+?)\s*(?:—|—|BP|尽调|投资)', text)
+    if title_match:
+        entity_name = title_match.group(1).strip()
+        if 3 <= len(entity_name) <= 20:
+            _entity_name_cache.add(entity_name)
+    # 也从 profile 提取
+    _task_dir = report_path.parent if report_path.parent.exists() else None
+    if _task_dir:
+        try:
+            _profile = json.loads((_task_dir / "bp_step0_profile.json").read_text(encoding="utf-8"))
+            _entity_name_cache.add(_profile.get("company_name", ""))
+        except Exception:
+            pass
+    _entity_name_cache.discard("")
     issues: list[dict[str, str]] = []
     first_800 = text[:800]
     if "投资结论" not in first_800 and "当前建议" not in first_800 and "建议" not in first_800:
@@ -196,6 +230,9 @@ def review_bp_readability(report_path: Path) -> dict[str, Any]:
         if any(exempt in phrase or phrase in exempt for exempt in _REPEAT_EXEMPT_PHRASES):
             continue
         if phrase.endswith("公司") or "成立于" in phrase or re.fullmatch(r"[A-Za-z0-9_]+", phrase):
+            continue
+        # 排除公司简称/全称（在标题或首段高频出现是正常的）
+        if phrase in _entity_name_cache:
             continue
         direct_count = text.count(phrase)
         consecutive_repeats = re.search(rf"(?:{re.escape(phrase)}){{3,}}", text) is not None

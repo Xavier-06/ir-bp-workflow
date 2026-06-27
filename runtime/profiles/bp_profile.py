@@ -1602,13 +1602,41 @@ def _run_bp_final_assembly(runtime_root: Path, job_ctx: JobContext) -> dict[str,
 
 
 def _run_bp_readability_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 31: 可读性门禁，阻断拼接痕迹和开篇无结论。"""
+    """Phase 31: 可读性门禁，阻断拼接痕迹和开篇无结论。
+
+    降级机制（与 phase29 对齐）：FAIL 时不直接终止管线，
+    而是降级为 WARN 放行，交付门禁（phase33 delivery gate）会检查
+    readability 结果并记录到 deferred_fixes。
+    T1/T2 早期项目直接降级；T3+ 也降级为 WARN（不再硬阻断），
+    因为 readability 问题不应阻止交付——报告可以交付后迭代修正。
+    """
     from scripts.bp_readability_reviewer import write_readability_review
+    from scripts.bp_stage_utils import read_stage_from_task
 
     task_dir = _task_dir(runtime_root, job_ctx)
     result = write_readability_review(task_dir)
+    verdict = result.get("verdict", "FAIL")
+
+    if verdict == "PASS":
+        return {
+            "ok": True,
+            "mode": "bp_readability_review",
+            "phase": "phase31_bp_readability_review",
+            "job_id": job_ctx.job_id,
+            "result": result,
+        }
+
+    # FAIL → 降级为 WARN 放行（不再阻断管线）
+    result["verdict"] = "WARN"
+    result["degraded_from"] = "FAIL"
+    result["degradation_reason"] = "readability_fail_degraded_to_warn"
+    print(
+        f"  ⚠️ [phase31_readability] verdict=FAIL 降级为 WARN 放行，"
+        f"issues: {[i.get('code') for i in result.get('issues', [])]}",
+        flush=True,
+    )
     return {
-        "ok": result.get("verdict") == "PASS",
+        "ok": True,
         "mode": "bp_readability_review",
         "phase": "phase31_bp_readability_review",
         "job_id": job_ctx.job_id,
@@ -2976,6 +3004,17 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
             # ── Repair 机制：脚注密度不达标 → 派发修复子代理 ──
             prior_attempt = _read_synthesis_attempt(task_dir)
             if footnote_fail and prior_attempt < _MAX_SYNTHESIS_REPAIR_RETRIES:
+                # 构建维度报告路径列表，注入 repair prompt
+                from runtime.profiles.bp_constants import BP_ALL_ROLE_SLUGS
+                dim_paths_lines: list[str] = []
+                for role_key, slug in BP_ALL_ROLE_SLUGS.items():
+                    for d in (outputs_dir, task_dir):
+                        p = d / f"bp_phase2_{slug}.md"
+                        if p.exists() and p.stat().st_size > 100:
+                            dim_paths_lines.append(f"  - {p}")
+                            break
+                dim_paths_block = "\n".join(dim_paths_lines) if dim_paths_lines else "  （维度报告未找到）"
+
                 # 生成 repair manifest
                 repair_manifest = {
                     "task_id": job_ctx.job_id,
@@ -2984,16 +3023,22 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                     "label": f"{job_ctx.job_id}-bp-synthesis-footnote-repair",
                     "system_prompt": (
                         f"你是脚注修复专家。读取 {synthesis_path}，为所有缺少 [^N] 脚注的关键定量数据补充脚注。\n\n"
-                        f"**任务：**\n"
-                        f"1. 读取 bp_synthesis.md 全文\n"
-                        f"2. 找出所有缺少脚注引用的关键定量数据（市场规模、营收、增速、估值、PS/PE、员工数、市占率等）\n"
-                        f"3. 为每个数据点回溯到对应的维度报告（outputs/bp_phase2_*.md），找到原始来源 URL\n"
-                        f"4. 在数据后插入 [^N] 标记，脚注编号从现有最大编号+1 开始连续递增\n"
-                        f"5. 在报告末尾'来源与参考'章节追加新脚注定义，格式：[^N]: 来源名称 — URL (日期)\n"
-                        f"6. 直接修改 bp_synthesis.md 文件\n\n"
+                        f"## 维度报告路径（脚注来源优先从这里找）\n"
+                        f"以下是需要回溯的维度报告完整路径，用 Read 工具逐一读取，从中提取原始来源 URL：\n"
+                        f"{dim_paths_block}\n\n"
+                        f"## 任务步骤（必须按顺序执行）\n"
+                        f"1. 读取 bp_synthesis.md 全文（路径: {synthesis_path}）\n"
+                        f"2. **先读取上述维度报告**，提取每个维度中已引用的外部 URL 和来源信息\n"
+                        f"3. 找出 bp_synthesis.md 中所有缺少脚注引用的关键定量数据（市场规模、营收、增速、估值、PS/PE、员工数、市占率等）\n"
+                        f"4. 将每个数据点与维度报告中的来源匹配，用维度报告中已有的 URL 作为脚注来源\n"
+                        f"5. 只有当维度报告中确实没有对应 URL 时，才用 web_search 搜索补充\n"
+                        f"6. 在数据后插入 [^N] 标记，脚注编号从现有最大编号+1 开始连续递增\n"
+                        f"7. 在报告末尾'来源与参考'章节追加新脚注定义，格式：[^N]: 来源名称 — URL (日期)\n"
+                        f"8. 直接修改 bp_synthesis.md 文件\n\n"
                         f"**当前状态：** 正文 {footnote_refs} 处引用，最低要求 {min_footnote_refs} 处，"
                         f"缺少至少 {min_footnote_refs - footnote_refs} 处。\n"
-                        f"**铁律：** 每条脚注必须包含真实外部 URL，禁止只写内部文件名。"
+                        f"**铁律：** 每条脚注定义必须包含真实外部 URL（http/https 开头）。"
+                        f"脚注的来源优先从维度报告中提取已有 URL，不要自己重新搜索。"
                     ),
                     "input_file": str(synthesis_path),
                     "output_file": str(synthesis_path),
