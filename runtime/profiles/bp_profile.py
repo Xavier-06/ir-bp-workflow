@@ -3007,13 +3007,21 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                 # 构建维度报告路径列表，注入 repair prompt
                 from runtime.profiles.bp_constants import BP_ALL_ROLE_SLUGS
                 dim_paths_lines: list[str] = []
+                facts_paths_lines: list[str] = []
                 for role_key, slug in BP_ALL_ROLE_SLUGS.items():
                     for d in (outputs_dir, task_dir):
                         p = d / f"bp_phase2_{slug}.md"
                         if p.exists() and p.stat().st_size > 100:
                             dim_paths_lines.append(f"  - {p}")
                             break
+                    # Also collect facts JSON paths
+                    for d in (outputs_dir, task_dir):
+                        fp = d / f"bp_phase2_{slug}-facts.json"
+                        if fp.exists() and fp.stat().st_size > 10:
+                            facts_paths_lines.append(f"  - {fp}")
+                            break
                 dim_paths_block = "\n".join(dim_paths_lines) if dim_paths_lines else "  （维度报告未找到）"
+                facts_paths_block = "\n".join(facts_paths_lines) if facts_paths_lines else "  （facts JSON 未找到）"
 
                 # 生成 repair manifest
                 repair_manifest = {
@@ -3026,19 +3034,26 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                         f"## 维度报告路径（脚注来源优先从这里找）\n"
                         f"以下是需要回溯的维度报告完整路径，用 Read 工具逐一读取，从中提取原始来源 URL：\n"
                         f"{dim_paths_block}\n\n"
+                        f"## Facts JSON 路径（维度报告无 URL 时的第二优先来源）\n"
+                        f"当维度 MD 中没有 URL 时，读取对应的 facts JSON 文件，提取 source_url 字段：\n"
+                        f"{facts_paths_block}\n\n"
                         f"## 任务步骤（必须按顺序执行）\n"
                         f"1. 读取 bp_synthesis.md 全文（路径: {synthesis_path}）\n"
                         f"2. **先读取上述维度报告**，提取每个维度中已引用的外部 URL 和来源信息\n"
-                        f"3. 找出 bp_synthesis.md 中所有缺少脚注引用的关键定量数据（市场规模、营收、增速、估值、PS/PE、员工数、市占率等）\n"
-                        f"4. 将每个数据点与维度报告中的来源匹配，用维度报告中已有的 URL 作为脚注来源\n"
-                        f"5. 只有当维度报告中确实没有对应 URL 时，才用 web_search 搜索补充\n"
-                        f"6. 在数据后插入 [^N] 标记，脚注编号从现有最大编号+1 开始连续递增\n"
-                        f"7. 在报告末尾'来源与参考'章节追加新脚注定义，格式：[^N]: 来源名称 — URL (日期)\n"
-                        f"8. 直接修改 bp_synthesis.md 文件\n\n"
+                        f"3. **读取上述 facts JSON 文件**，提取每条 fact 的 source_url 字段，构建 fact→URL 映射表\n"
+                        f"4. 找出 bp_synthesis.md 中所有缺少脚注引用的关键定量数据（市场规模、营收、增速、估值、PS/PE、员工数、市占率等）\n"
+                        f"5. 按优先级匹配脚注来源：\n"
+                        f"   - 优先：维度 MD 中已有的外部 URL\n"
+                        f"   - 其次：facts JSON 中的 source_url\n"
+                        f"   - 兜底：对 QCC 来源标注为'企查查结构化数据（企查查 MCP）'；BP 自述标注为'BP自述 — 无外部来源URL'\n"
+                        f"6. 只有当以上三个来源都没有 URL 时，才用 web_search 搜索补充\n"
+                        f"7. 在数据后插入 [^N] 标记，脚注编号从现有最大编号+1 开始连续递增\n"
+                        f"8. 在报告末尾'来源与参考'章节追加新脚注定义，格式：[^N]: 来源名称 — URL (日期)\n"
+                        f"9. 直接修改 bp_synthesis.md 文件\n\n"
                         f"**当前状态：** 正文 {footnote_refs} 处引用，最低要求 {min_footnote_refs} 处，"
                         f"缺少至少 {min_footnote_refs - footnote_refs} 处。\n"
-                        f"**铁律：** 每条脚注定义必须包含真实外部 URL（http/https 开头）。"
-                        f"脚注的来源优先从维度报告中提取已有 URL，不要自己重新搜索。"
+                        f"**铁律：** 脚注来源优先从维度报告和 facts JSON 中提取已有 URL，"
+                        f"不要跳过它们直接 web_search。"
                     ),
                     "input_file": str(synthesis_path),
                     "output_file": str(synthesis_path),
@@ -3373,6 +3388,30 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         pass  # python-docx 不可用时静默跳过
     except Exception as exc:
         print(f"  ⚠️ 维度 DOCX 批量生成异常: {exc}", flush=True)
+
+    # ── 统稿报告也放入维度分析文件夹（2026-06-28 新增） ──
+    # 将统稿 DOCX + 投资备忘录 MD + 审计底稿 MD 复制到 dim_docx_dir，
+    # 确保统稿和 8 个维度报告在同一个文件夹，方便一次性浏览
+    try:
+        dim_docx_dir.mkdir(parents=True, exist_ok=True)
+        # 统稿 DOCX
+        if docx_path and Path(docx_path).exists():
+            synthesis_docx_dest = dim_docx_dir / "00. 统稿投资备忘录.docx"
+            shutil.copy2(docx_path, synthesis_docx_dest)
+            print(f"  📄 统稿DOCX → 维度分析: {synthesis_docx_dest}", flush=True)
+        # 投资备忘录 MD
+        if use_synthesis and synthesis_path and synthesis_path.exists():
+            synthesis_md_dest = dim_docx_dir / "00. 统稿投资备忘录.md"
+            shutil.copy2(synthesis_path, synthesis_md_dest)
+            print(f"  📄 统稿MD → 维度分析: {synthesis_md_dest}", flush=True)
+        # 审计底稿 MD
+        audit_worksheet_for_dim = task_dir / "bp_final_report.md"
+        if audit_worksheet_for_dim.exists() and audit_worksheet_for_dim.stat().st_size > 100:
+            audit_md_dest = dim_docx_dir / "00. 审计底稿.md"
+            shutil.copy2(audit_worksheet_for_dim, audit_md_dest)
+            print(f"  📄 审计底稿MD → 维度分析: {audit_md_dest}", flush=True)
+    except Exception as exc:
+        print(f"  ⚠️ 统稿复制到维度分析失败: {exc}", flush=True)
 
     audit_path = delivery_dir / "bp_delivery_audit.json"
     audit_data = {

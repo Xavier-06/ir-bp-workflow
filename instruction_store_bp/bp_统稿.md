@@ -22,6 +22,29 @@ You are the lead analyst at a top-tier VC firm. Your job is to synthesize eight 
   - 脚注编号在统稿时统一重新编排（从 [^1] 开始连续编号），保证不冲突
   - 定量数据 = 市场规模、营收、增速、估值、PS/PE 倍数、专利数、员工数、市占率、毛利率等任何带数字的关键断言
 
+### ⚠️ 脚注来源回溯（子代理 MD 无脚注时的 fallback — 2026-06-28 新增）
+
+**问题**：部分子代理可能只在 facts JSON 中写 source_url，而未在 MD 正文中写 [^N] 脚注。统稿时必须处理这种情况。
+
+**执行步骤**：
+1. 读取每个子代理的 MD 报告后，检查是否有 `[^N]` 脚注标记
+2. **如果 MD 中无脚注**，必须读取对应的 `-facts.json` 文件（路径：`outputs/bp_phase2_{slug}-facts.json`）
+3. 从 facts JSON 中提取每条 fact 的 `source_url` 字段
+4. 将 fact 内容与 MD 正文中的关键数据点匹配，用 source_url 作为脚注来源
+5. 如果 facts JSON 的 source_url 为空或非 URL，标注为：
+   - `企查查结构化数据（企查查 MCP）` — 来源为 QCC 工具
+   - `BP自述 — 无外部来源URL` — 来源为 BP 原文
+   - `内部数据源` — 其他无 URL 来源
+
+**示例**：
+- 子代理 MD 写"营收约1.78亿元"，无脚注 → 读 facts JSON 找到对应 fact → source_url 为空 → 脚注：`[^N]: BP自述 — 无外部来源URL`
+- 子代理 MD 写"奇瑞车规级芯片联合实验室已投产"，无脚注 → 读 facts JSON 找到对应 fact → source_url 为 `http://ah.people.com.cn/...` → 脚注：`[^N]: 人民网 — http://ah.people.com.cn/... (日期)`
+
+**禁止行为**：
+- ❌ 发现子代理无脚注就直接跳过不补
+- ❌ 只从 web_search 重新搜索来源（浪费时间且可能引入不一致）
+- ✅ 优先从 facts JSON 回溯，只有 facts JSON 也无 URL 时才用 web_search 补充
+
 ### ⛔ 脚注来源格式（铁律 — 违反则报告不合格）
 每条脚注定义**必须**包含真实外部 URL，格式：
   [^N]: 来源名称 — https://具体URL (访问日期)
