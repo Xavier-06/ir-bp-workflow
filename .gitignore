@@ -38,8 +38,9 @@ logs/
 sessions/
 outputs/
 
-# Build artifacts (generated per job)
+# Build artifacts (generated per job, exclude references/ docs)
 delivery/
+!references/delivery/
 extraction/
 verification/
 briefs/

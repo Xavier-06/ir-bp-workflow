@@ -3360,9 +3360,8 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
     else:
         delivery_errors.append("无可用的维度输出或统稿输出")
 
-    # ── 维度 MD → DOCX 独立报告（2026-06-26 新增） ──
-    # 将子代理产出的原始维度 MD 逐一转为 DOCX，放入 delivery 子目录
-    dim_docx_dir = delivery_dir / "维度分析"
+    # ── 维度 MD → DOCX 独立报告（2026-06-26 新增，2026-06-29 平铺到 delivery 根目录） ──
+    # 所有交付物（统稿 + 8 维度 + 附件）统一放在 delivery/ 根目录，不再使用子目录
     dim_docx_paths: list[str] = []
     try:
         from scripts.build_bp_dd_report_docx import build_bp_dimension_docx, DIMENSION_TITLES as _DIM_TITLES
@@ -3372,7 +3371,7 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
             if not dim_md.exists():
                 dim_md = outputs_dir / f"bp_phase2_{slug}.md"
             if dim_md.exists() and dim_md.stat().st_size > 100:
-                dim_docx_path = dim_docx_dir / f"{dim_title}.docx"
+                dim_docx_path = delivery_dir / f"{dim_title}.docx"
                 try:
                     result = build_bp_dimension_docx(
                         entity=job_ctx.entity or entity,
@@ -3388,30 +3387,6 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         pass  # python-docx 不可用时静默跳过
     except Exception as exc:
         print(f"  ⚠️ 维度 DOCX 批量生成异常: {exc}", flush=True)
-
-    # ── 统稿报告也放入维度分析文件夹（2026-06-28 新增） ──
-    # 将统稿 DOCX + 投资备忘录 MD + 审计底稿 MD 复制到 dim_docx_dir，
-    # 确保统稿和 8 个维度报告在同一个文件夹，方便一次性浏览
-    try:
-        dim_docx_dir.mkdir(parents=True, exist_ok=True)
-        # 统稿 DOCX
-        if docx_path and Path(docx_path).exists():
-            synthesis_docx_dest = dim_docx_dir / "00. 统稿投资备忘录.docx"
-            shutil.copy2(docx_path, synthesis_docx_dest)
-            print(f"  📄 统稿DOCX → 维度分析: {synthesis_docx_dest}", flush=True)
-        # 投资备忘录 MD
-        if use_synthesis and synthesis_path and synthesis_path.exists():
-            synthesis_md_dest = dim_docx_dir / "00. 统稿投资备忘录.md"
-            shutil.copy2(synthesis_path, synthesis_md_dest)
-            print(f"  📄 统稿MD → 维度分析: {synthesis_md_dest}", flush=True)
-        # 审计底稿 MD
-        audit_worksheet_for_dim = task_dir / "bp_final_report.md"
-        if audit_worksheet_for_dim.exists() and audit_worksheet_for_dim.stat().st_size > 100:
-            audit_md_dest = dim_docx_dir / "00. 审计底稿.md"
-            shutil.copy2(audit_worksheet_for_dim, audit_md_dest)
-            print(f"  📄 审计底稿MD → 维度分析: {audit_md_dest}", flush=True)
-    except Exception as exc:
-        print(f"  ⚠️ 统稿复制到维度分析失败: {exc}", flush=True)
 
     audit_path = delivery_dir / "bp_delivery_audit.json"
     audit_data = {

@@ -321,7 +321,17 @@ team_delete()
 # 5. 交付
 finalize_pipeline(task_id, entity, market)  # IR
 # IC 管线同理：finalize_pipeline(task_id, entity, market)
-# 或 BP 管线自动交付
+
+# BP 管线交付（phase33 已自动生成全部文件，coordinator 负责 present_files）：
+# 所有文件平铺在 delivery/ 根目录（不再使用 维度分析/ 子目录）：
+# a. 读取 artifacts.json 获取完整产物清单
+#    artifacts = json.loads(Path(f"jobs/{task_id}/state/artifacts.json").read_text())
+# b. 收集所有待交付文件（全部在 delivery/ 根目录）：
+#    - 统稿 DOCX: artifacts["bp_dd_report"]["path"]
+#    - 维度 DOCX: artifacts["bp_dim_docx_0"] ~ artifacts["bp_dim_docx_7"] 的 path
+#    - 投资备忘录 MD + 审计底稿 MD: delivery/{entity}BP投资备忘录.md, delivery/{entity}BP审计底稿.md
+# c. 一次性 present_files(files=[统稿DOCX, 维度DOCX*8, 投资备忘录MD, 审计底稿MD])
+# ⚠️ 不要把 8 个维度 DOCX 单独 present_files——必须和统稿 DOCX 一起在一次调用中交付
 ```
 
 ### 子代理派发通用规则
