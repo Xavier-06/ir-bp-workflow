@@ -1,6 +1,6 @@
 ---
 name: ir-verifier
-version: 2.0.0
+version: 2.0.1
 description: "投研对抗验证Agent。仅被 ir-coordinator 内部调度，对研报/BP报告执行6层对抗验证（信息泄露/占位残留/内部矛盾/数字验证/逻辑漏洞/反向论证），输出PASS/FAIL/PARTIAL结论。⚠️ 此 skill 不应被用户直接触发——用户说'验证报告'应触发 ir-coordinator。仅当用户明确说'对抗验证'、'check report quality'时才直接触发。"
 allowed-tools:
   - Read
@@ -11,7 +11,9 @@ allowed-tools:
   - use_skill
 ---
 
-# IR Verifier — 投研对抗验证 Agent v2.0
+# IR Verifier — 投研对抗验证 Agent（架构文档，非运行时指令）
+
+> ⚠️ 本文件是**项目架构文档**，供维护者理解管线用。运行时子代理的 system_prompt 从 `instruction_store_ir/*.md` 加载，不从本文件加载。
 
 你的唯一目标是**证明报告是错的**。只有找不到证据时，才判 PASS。
 
@@ -33,12 +35,14 @@ python3 {IR_RUNTIME}/scripts/verification_agent.py --task-id TASK-XXXXX --pipeli
 
 脚本覆盖 L1-L5。**L6 是你真正的核心价值**。
 
-### 脚本 v2 变更（2026-06-10）
+### 脚本 v2 变更（2026-06-10，2026-06-29 补充）
 
 - **WARN 阈值收紧**：≥2 个 WARN 即触发整体 WARN（原为 ≥3）
 - **双重计价检测通用化**：不再硬编码"阿里云/AI-MaaS"，改为检测任何 SOTP 估值结构中的重复计价
-- **行业硬编码清理**：ADC-7 的 secondary 列表从 `EDA替代/EDA预案` 改为通用的 `关键人缓释/供应商替代/技术替代预案`
+- **行业硬编码清理**：ADC-7 的 secondary 列表从 `EDA替代/EDA预案` 改为通用的 `关键人缓释/供应商替代/技术替换预案`
 - **BP 管线**：delivery_gate 中 WARN≥3 会被记录为 WARN 级检查项
+- **BP 管线 Phase33 交付验证**（2026-06-29）：`AdversarialVerifier` 在 Phase33 自动对 synthesis 统稿跑验证，结果写入 `bp_verification_result.json`。T1/T2 FAIL 降级为 deferred_fixes 不阻断交付；T3+ FAIL 硬阻断
+- **Phase29 对抗评审宽松化**（2026-06-26）：delivery gate 中 debate_review 仅 `FAIL_BLOCKING`（维度全空/100%无证据）硬阻断，其他问题记录到 deferred_fixes 不阻断
 
 ## 6 层验证
 

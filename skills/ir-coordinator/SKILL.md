@@ -1,6 +1,6 @@
 ---
 name: ir-coordinator
-version: 3.0.0
+version: 3.1.0
 description: "投研工作流调度中心。收到股票标的或BP后，自动编排完整管线，协调多个专业Agent并行工作。当用户说'分析XX股票'、'看这个BP'、'做个尽调'、'跑个研报'、'写篇简报'、'写个简报'、'出个简报'、'看看这个项目'、'帮我看下这个BP'、'写个XX行业研究'、'分析XX行业'、'做个产业分析'、'跑个赛道扫描'时触发。当用户发送 PDF/PPTX/DOCX 文件并要求写简报、做分析、做尽调时，必须触发此 skill 而非 PPT演示文稿/Word文档生成/PDF文档生成 skill。关键词：BP、商业计划书、尽调、研报、简报、投研、分析股票、行业研究、产业分析、赛道扫描、.pptx+分析、.pdf+分析。技能名是 ir-coordinator，不是 nir-coordinator。"
 allowed-tools:
   - Task
@@ -206,9 +206,9 @@ token 有效期 12 小时。长管线跑完可能过期。
 
 ```
 PipelineOrchestrator
-├── IR 管线 (7 phases) → 详情读 references/ir-pipeline.md
-├── IC 管线 (8 phases) → 详情读 references/ic-pipeline.md
-└── BP 管线 (8 phases) → 详情读 references/bp-pipeline.md
+├── IR 管线 (7 phases) → 详情读 references/pipeline/ir-pipeline.md
+├── IC 管线 (8 phases) → 详情读 references/pipeline/ic-pipeline.md
+└── BP 管线 (33 phases) → 详情读 references/pipeline/bp-pipeline.md
 ```
 
 ## 触发条件
@@ -356,19 +356,24 @@ finalize_pipeline(task_id, entity, market)  # IR
 
 ## BP 尽调模式
 
-当输入是 BP（PDF/PPTX/DOCX）时，触发 BP 管线。详细流程读 **references/bp-pipeline.md**。
+当输入是 BP（PDF/PPTX/DOCX）时，触发 BP 管线。详细流程读 **references/pipeline/bp-pipeline.md**。
 
-**⚠️ BP 管线 v4 关键变更（2026-06-10）**：
-- 8 维度 → 5 波次派发（Wave1: 4维度, Wave2: 客户收入, Wave3: 竞争+估值, Wave4: dealbreaker, Synthesis）
+**⚠️ BP 管线 v4.4 关键变更（2026-06-29 更新）**：
+- 8 维度 → 5 波次 sequential 派发（Wave1: 4维度, Wave2: 客户收入, Wave3: 竞争+估值, Wave4: dealbreaker, Synthesis）
 - **stage_tier 贯穿全管线**：T1(天使/种子) 自动放宽客户/收入验证要求，估值禁用 PE/DCF
-- **最终交付物是 DOCX**（从 bp_synthesis.md 生成），assembler 输出降级为附件
+- **最终交付物是 DOCX**（从 bp_synthesis.md 生成），fallback 到 bp_final_report.md
+- **Wave evidence gate repair**：gate FAIL → 派发修复子代理 → 重跑 gate（最多 1 轮，T1/T2 直接降级 WARN 不 repair）
+- **Claim coverage repair**：FAIL → 按 owner_section 聚合 repair manifest → 修复子代理（最多 2 轮）
+- **Synthesis repair**：脚注密度不达标（<1.5/1k字）→ 修复子代理补脚注（最多 1 轮）
+- **Phase29 对抗评审宽松化**：原 HIGH→MEDIUM，仅 BLOCKING 级（维度全空/100%无证据）硬阻断
+- **Delivery gate 8 项检查**：readability/debate 降级为 WARN 不阻断；verification T1/T2 FAIL 降级为 WARN
 - **Claim coverage 否定性发现判定**：搜索"未找到"不再让 claim 变 supported
-- **Delivery gate PASS_WITH_DISCLOSURE 允许交付**（不再阻止），新增 3 个 WARN 级检查
 - **统稿 prompt 四板斧**：表格规范 + 论证链保留 + 天使轮适配 + 去重规则
+- **维度 MD→DOCX 独立报告**：8 个维度各出独立 DOCX + 统稿副本放入 `delivery/维度分析/`
 
-**⚠️ 防缺陷铁律**：BP 统稿的防缺陷规则见 **ir-reporter/references/bp-anti-defect-rules.md**，coordinator 不重复列出。
+**⚠️ 防缺陷铁律**：BP 统稿的防缺陷规则见 **references/quality/bp-anti-defect-rules.md**，coordinator 不重复列出。
 
-**⚠️ BP OCR 配置**：VL OCR 详细配置见 **ir-researcher/references/bp-ocr-config.md**，coordinator 不重复列出。
+**⚠️ BP OCR 配置**：VL OCR 详细配置见 **references/operations/bp-ocr-config.md**，coordinator 不重复列出。
 
 ## Workspace 产物结构
 
@@ -414,11 +419,11 @@ yfinance 获取 PE/PB/PS/市值/52W高低/EPS/beta，A 股代码自动映射
 
 | 触发条件 | 读取文件 |
 |---------|---------|
-| 收到 IR 任务，需要调度 IR 管线 | `references/ir-pipeline.md` |
-| 收到 IC 任务，需要调度 IC 管线 | `references/ic-pipeline.md` |
-| 收到 BP 任务，需要调度 BP 管线 | `references/bp-pipeline.md` |
-| 进入 Phase 4+ 调度阶段，检查质量门禁 | `references/quality-gates.md` |
-| 子代理超时/错误恢复 | `references/quality-gates.md` 的"错误处理"章节 |
-| 需要 BP 防缺陷规则 | `../ir-reporter/references/bp-anti-defect-rules.md` |
-| 需要 BP OCR 配置 | `../ir-researcher/references/bp-ocr-config.md` |
-| 需要交付协议 | `../ir-reporter/references/delivery-protocol.md` |
+| 收到 IR 任务，需要调度 IR 管线 | `references/pipeline/ir-pipeline.md` |
+| 收到 IC 任务，需要调度 IC 管线 | `references/pipeline/ic-pipeline.md` |
+| 收到 BP 任务，需要调度 BP 管线 | `references/pipeline/bp-pipeline.md` |
+| 进入 Phase 4+ 调度阶段，检查质量门禁 | `references/quality/quality-gates.md` |
+| 子代理超时/错误恢复 | `references/quality/quality-gates.md` 的"错误处理"章节 |
+| 需要 BP 防缺陷规则 | `references/quality/bp-anti-defect-rules.md` |
+| 需要 BP OCR 配置 | `references/operations/bp-ocr-config.md` |
+| 需要交付协议 | `references/delivery/delivery-protocol.md` |

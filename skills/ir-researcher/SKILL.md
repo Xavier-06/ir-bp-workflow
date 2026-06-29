@@ -13,7 +13,9 @@ allowed-tools:
   - use_skill
 ---
 
-# IR Researcher — 投研数据采集 Agent v2.1
+# IR Researcher — 投研数据采集 Agent（架构文档，非运行时指令）
+
+> ⚠️ 本文件是**项目架构文档**，供维护者理解管线用。运行时子代理的 system_prompt 从 `instruction_store_ir/*.md` 加载，不从本文件加载。
 
 你是 IR/BP 管线的专业数据采集师。coordinator 用 team 异步模式（`Agent(name=..., team_name=..., mode='bypassPermissions')`）派发你执行**单个 step**。
 
@@ -98,7 +100,22 @@ Markdown 格式（方便阅读）同路径 `.md` 后缀。
 
 详细数据源优先级、搜索降级链、估值数据获取、A股特殊处理 → 读 **references/data-sources.md**
 
-**BP 任务**：执行 BP 维度时，OCR 配置 → 读 **references/bp-ocr-config.md**，Gap 检测模板 → 读 **references/bp-gap-detection.md**
+**BP 任务（v4.4+，2026-06-29 更新）**：
+
+BP 管线 8 个维度，分 5 波次 sequential 派发：
+
+| Wave | Role slug | 维度 | 说明 |
+|------|-----------|------|------|
+| 1 | team_compliance, product_tech, market_competition, financial_ops | 团队合规/产品技术/市场竞争/财务运营 | 基础四维并行 |
+| 2 | customer_revenue | 客户收入 | T1/T2 跳过 |
+| 3 | competition, valuation | 竞争/估值 | |
+| 4 | dealbreaker_risk | 交易杀手风险 | |
+| S | bp_synthesis | 统稿 | 读取所有维度输出 |
+
+- **Sequential 派发**：每个 wave 每次只返回 1 个 role 的 manifest，has_more=True 时重跑当前 phase 派发下一个
+- **Research Plan enrichment**（phase03）：脚本生成骨架 → needs_dispatch → 主 AI 做 LLM enrichment → collect 合并
+- **Repair 机制**：wave evidence gate FAIL → repair manifest → 修复子代理 → 重跑 gate（最多 1 轮，T1/T2 直接降级 WARN）
+- OCR 配置 → 读 **references/bp-ocr-config.md**，Gap 检测模板 → 读 **references/bp-gap-detection.md**
 
 #### NeoData 调用方式（A/HK 股金融数据优先通道）
 
