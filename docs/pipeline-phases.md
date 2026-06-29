@@ -120,13 +120,61 @@
 统稿角色读取 4 个维度输出，按投研逻辑重组为完整研报：
 执行摘要 → 技术原理 → 痛点解决 → 方案对比 → 厂商情况 → 市场规模 → 民用拓展 → BP验证 → 风险 → 结论建议
 
-### 交付（Phase 3）
+### 交付（Phase 33，2026-06-29 更新）
 
-1. 优先使用统稿输出（投研逻辑结构），fallback 到 4 维度原文
-2. 调用 `build_bp_dd_report_docx.py` 生成 DOCX 报告
-3. 调用 `notify_plugin.notify_report()` 推送通知（可选）
-4. 记录产物到 StateStore
-5. 输出交付审计报告
+Phase33 由 `heavy_phase_bg` 子进程执行（不复用缓存，确保最新 gate 结果）。
+
+**Step 1: 对抗验证**（`AdversarialVerifier`）
+- 对 synthesis 统稿跑对抗检查，结果写入 `bp_verification_result.json`
+- 优先级：`bp_synthesis.md` > `bp_final_report.md` > 无可用文本时 FAIL
+
+**Step 2: Delivery Gate**（`bp_delivery_gate.py`，8 项检查）
+
+| 检查项 | 阻断规则 |
+|---|---|
+| final_assembly | 不存在或 ok=False → 硬阻断 |
+| readability | 非 PASS → deferred_fixes，不阻断 |
+| claim_coverage | PASS_WITH_DISCLOSURE → deferred；repair_exhausted → 降级 WARN；未 repair 的 FAIL → 硬阻断 |
+| wave evidence gates (1-4) | repair_exhausted / blocking_claims_degraded → deferred，不阻断 |
+| debate_review | FAIL_BLOCKING → 硬阻断；WARN → deferred，不阻断 |
+| cross_dimension | FAIL 或非 PASS → 硬阻断 |
+| verification | T1/T2 FAIL → deferred；T3+ FAIL → 硬阻断 |
+| sidecar JSON | 损坏 → 记录但不阻断 |
+
+- `checks` 有 FAIL → `ok=False`，管线终止
+- `deferred_fixes` → 写入 `delivery_deferred_fixes.json`，允许交付
+
+**Step 3: 产物生成**（gate 通过后）
+1. 主报告 DOCX：`build_bp_dd_report()` 用 synthesis 统稿（fallback 到 final_report）→ `delivery/{entity}BP投资备忘录.docx`
+2. 8 维度独立 DOCX：`build_bp_dimension_docx()` → `delivery/维度分析/{维度标题}.docx`
+3. 双模式 MD：`{entity}BP投资备忘录.md`（synthesis 叙事版）+ `{entity}BP审计底稿.md`（assembler 骨架）
+4. 维度分析文件夹副本：统稿 DOCX + 统稿 MD + 审计底稿 MD 复制到 `delivery/维度分析/00.*`
+5. 附件收集：xlsx 等文件复制到 delivery/
+6. StateStore 注册：所有产物注册 artifact
+7. 审计日志：`bp_delivery_audit.json`
+
+**Step 4: 交付链路**（管线外）
+- 管线只写文件 + 返回路径，不做"推送到用户"
+- kernel → orchestrator → 主 AI 拿到 result dict → 主 AI 用 `present_files` 呈现给用户
+- `deliver_to_user: True` 只是标记"可以交付"，实际交付动作在主 AI 层
+
+**交付产物清单（delivery/ 目录）**：
+```
+delivery/
+├── {entity}BP投资备忘录.docx          ← 主报告 (build_bp_dd_report)
+├── {entity}BP投资备忘录.md            ← 叙事版 (给决策者)
+├── {entity}BP审计底稿.md              ← assembler 骨架 (给尽调团队)
+├── bp_delivery_audit.json             ← 交付审计
+├── delivery_deferred_fixes.json       ← 降级放行项 (如有)
+├── {job_id}_*.xlsx                    ← Excel 附件 (数量不定)
+└── 维度分析/
+    ├── 00. 统稿投资备忘录.docx        ← 主报告副本
+    ├── 00. 统稿投资备忘录.md          ← 统稿 MD 副本
+    ├── 00. 审计底稿.md                ← 审计底稿副本
+    └── 1-8. {维度标题}.docx           ← 8 个维度独立 DOCX
+```
+
+**Gate 硬阻断时**：`deliver_to_user: False` + `block_reason` + `bp_delivery_audit.json`（mode: delivery_blocked_by_gate）
 
 ## 质量门禁
 
