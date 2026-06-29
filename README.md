@@ -358,11 +358,17 @@ ir-bp-workflow/
 │   ├── bp_dealbreaker_risk.md
 │   └── ...
 ├── instruction_store_ir/            # IR 角色指令库（11 个角色）
+├── references/                      # 项目级统一知识库（单一真实来源）
+│   ├── pipeline/                    # 管线流程文档
+│   ├── quality/                     # 质量门禁 + 验证策略
+│   ├── operations/                  # 数据源 + 搜索 + 估值方法论
+│   ├── delivery/                    # 交付协议
+│   └── coordinator/                 # coordinator 专用文档
 ├── skills/                          # AI Agent Skill 定义
-│   ├── ir-coordinator/SKILL.md
-│   ├── ir-researcher/SKILL.md
-│   ├── ir-reporter/SKILL.md
-│   └── ir-verifier/SKILL.md
+│   ├── ir-coordinator/SKILL.md      # 唯一活跃运行时 skill
+│   ├── ir-researcher/SKILL.md       # 架构文档
+│   ├── ir-reporter/SKILL.md         # 架构文档
+│   └── ir-verifier/SKILL.md         # 架构文档
 ├── search/adapters/                 # 搜索引擎适配器
 ├── tests/                           # 测试
 ├── setup.sh                         # 一键安装
