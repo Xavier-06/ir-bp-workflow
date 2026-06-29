@@ -1952,17 +1952,14 @@ def _quality_check(output_path: Path) -> dict[str, Any]:
     }
 
 
-# ── Collect 统一重试机制 ────────────────────────────
-
-_COLLECT_RETRY_COUNT = 10
-_COLLECT_RETRY_INTERVAL = 30
+# ── Collect 统一重试机制（参数来自 bp_constants，2026-06-29 统一） ──
 
 def _collect_with_retry(
     collect_name: str,
     collect_fn,
     *,
-    max_retries: int = _COLLECT_RETRY_COUNT,
-    retry_interval: int = _COLLECT_RETRY_INTERVAL,
+    max_retries: int = COLLECT_RETRY_COUNT,
+    retry_interval: int = COLLECT_RETRY_INTERVAL,
     job_id: str = "",
     outputs_dir: Path | None = None,
 ) -> dict[str, Any]:

@@ -65,5 +65,5 @@ BP_WAVE_ROLES: dict[int, list[str]] = {
 BP_ALL_SLUGS: list[str] = list(BP_ALL_ROLE_SLUGS.values())
 
 # Collect 统一重试机制参数 —— bp_profile._collect_with_retry 默认值
-COLLECT_RETRY_COUNT = 10
+COLLECT_RETRY_COUNT = 40
 COLLECT_RETRY_INTERVAL = 30

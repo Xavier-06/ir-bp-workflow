@@ -80,7 +80,7 @@ general-purpose 子代理**没有 Glob/Grep 工具**。如果 prompt 不声明�
 **管线内部已有 Python collect retry（5 分钟 = 10×30s）**，Coordinator 只需在 collect 返回 `needs_dispatch` 时做外部重派。
 
 **内部 collect 机制**（`_collect_with_retry`，Coordinator 无需干预）：
-- `COLLECT_RETRY_COUNT = 10`，`COLLECT_RETRY_INTERVAL = 30` 秒 → 总超时 **5 分钟**
+- `COLLECT_RETRY_COUNT = 40`，`COLLECT_RETRY_INTERVAL = 30` 秒 → 总超时 **20 分钟**
 - 进度检测：两轮无变化则提前退出
 - 三文件稳定性检查：`_file_stable(interval=3)` — 3 秒内大小不变
 
