@@ -46,7 +46,7 @@ IR 新管线优先使用质量生产型产物：Research Plan、Fact Store、Sec
 
 ### 3. 撰写统稿
 
-IR 写作规范和事故教训 → 读 **references/ir-writing-standards.md**
+IR 写作规范和事故教训 → 读 **../../references/quality/ir-writing-standards.md**
 
 ### 4. 交叉验证
 
@@ -91,13 +91,13 @@ FAIL → 修复 → 重验（最多 1 次）。
 
 ### 7. 交付
 
-交付协议、产物归档 → 读 **references/delivery-protocol.md**
+交付协议、产物归档 → 读 **../../references/delivery/delivery-protocol.md**
 
 ### 8. BP 尽调报告
 
-BP 防缺陷规则（17 条铁律）→ 读 **references/bp-anti-defect-rules.md**
+BP 防缺陷规则（17 条铁律）→ 读 **../../references/quality/bp-anti-defect-rules.md**
 
-VL OCR 配置 → 读 **`../ir-researcher/references/bp-ocr-config.md`**（不重复列出）
+VL OCR 配置 → 读 **`../../references/operations/bp-ocr-config.md`**（不重复列出）
 
 ### 9. BP Phase33 交付详细流程（2026-06-29 更新）
 
@@ -169,7 +169,7 @@ delivery/
 
 | 触发条件 | 读取文件 |
 |---------|---------|
-| IR 统稿写作规范/事故教训 | `references/ir-writing-standards.md` |
-| BP 统稿防缺陷规则 | `references/bp-anti-defect-rules.md` |
-| 交付协议/微信推送/产物归档 | `references/delivery-protocol.md` |
-| BP OCR 配置 | `../ir-researcher/references/bp-ocr-config.md` |
+| IR 统稿写作规范/事故教训 | `../../references/quality/ir-writing-standards.md` |
+| BP 统稿防缺陷规则 | `../../references/quality/bp-anti-defect-rules.md` |
+| 交付协议/微信推送/产物归档 | `../../references/delivery/delivery-protocol.md` |
+| BP OCR 配置 | `../../references/operations/bp-ocr-config.md` |

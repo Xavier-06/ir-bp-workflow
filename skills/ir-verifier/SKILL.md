@@ -57,9 +57,9 @@ python3 {IR_RUNTIME}/scripts/verification_agent.py --task-id TASK-XXXXX --pipeli
 
 ## L6 对抗策略
 
-IR 投研专用 6 维度策略 → 读 **references/ir-adversarial-strategies.md**
+IR 投研专用 6 维度策略 → 读 **../../references/quality/ir-adversarial-strategies.md**
 
-BP 尽调专用 12 维度策略 → 读 **references/bp-adversarial-strategies.md**
+BP 尽调专用 12 维度策略 → 读 **../../references/quality/bp-adversarial-strategies.md**
 
 根据管线类型（IR/BP）读取对应的策略文件。
 
@@ -103,5 +103,5 @@ BP 尽调专用 12 维度策略 → 读 **references/bp-adversarial-strategies.m
 
 | 触发条件 | 读取文件 |
 |---------|---------|
-| 验证 IR 研报 | `references/ir-adversarial-strategies.md` |
-| 验证 BP 尽调报告 | `references/bp-adversarial-strategies.md` |
+| 验证 IR 研报 | `../../references/quality/ir-adversarial-strategies.md` |
+| 验证 BP 尽调报告 | `../../references/quality/bp-adversarial-strategies.md` |

@@ -98,7 +98,7 @@ Markdown 格式（方便阅读）同路径 `.md` 后缀。
 
 ### 6. 数据采集
 
-详细数据源优先级、搜索降级链、估值数据获取、A股特殊处理 → 读 **references/data-sources.md**
+详细数据源优先级、搜索降级链、估值数据获取、A股特殊处理 → 读 **../../references/operations/data-sources.md**
 
 **BP 任务（v4.4+，2026-06-29 更新）**：
 
@@ -115,7 +115,7 @@ BP 管线 8 个维度，分 5 波次 sequential 派发：
 - **Sequential 派发**：每个 wave 每次只返回 1 个 role 的 manifest，has_more=True 时重跑当前 phase 派发下一个
 - **Research Plan enrichment**（phase03）：脚本生成骨架 → needs_dispatch → 主 AI 做 LLM enrichment → collect 合并
 - **Repair 机制**：wave evidence gate FAIL → repair manifest → 修复子代理 → 重跑 gate（最多 1 轮，T1/T2 直接降级 WARN）
-- OCR 配置 → 读 **references/bp-ocr-config.md**，Gap 检测模板 → 读 **references/bp-gap-detection.md**
+- OCR 配置 → 读 **../../references/operations/bp-ocr-config.md**，Gap 检测模板 → 读 **../../references/operations/bp-gap-detection.md**
 
 #### NeoData 调用方式（A/HK 股金融数据优先通道）
 
@@ -245,9 +245,9 @@ web_search("{公司名} {年份}Q{季度} 财报 分业务 营收 毛利率")
 
 | 触发条件 | 读取文件 |
 |---------|---------|
-| 需要查看数据源优先级/搜索降级链/A股处理 | `references/data-sources.md` |
-| 需要自主补搜规则/补搜纪律 | `references/autonomous-search-rules.md` |
+| 需要查看数据源优先级/搜索降级链/A股处理 | `../../references/operations/data-sources.md` |
+| 需要自主补搜规则/补搜纪律 | `../../references/operations/autonomous-search-rules.md` |
 | 需要结构化 Section Package 输出协议 | `{INSTRUCTION_STORE}/_shared_output_protocol.md` |
-| 执行 BP 任务，需要 OCR 配置 | `references/bp-ocr-config.md` |
-| 执行 BP 维度，需要 Gap 检测模板 | `references/bp-gap-detection.md` |
-| 需要估值方法论（DCF/可比公司/可比交易） | `references/valuation-methodology.md` |
+| 执行 BP 任务，需要 OCR 配置 | `../../references/operations/bp-ocr-config.md` |
+| 执行 BP 维度，需要 Gap 检测模板 | `../../references/operations/bp-gap-detection.md` |
+| 需要估值方法论（DCF/可比公司/可比交易） | `../../references/operations/valuation-methodology.md` |
