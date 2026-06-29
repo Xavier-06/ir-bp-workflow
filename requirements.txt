@@ -17,11 +17,15 @@ beautifulsoup4>=4.12.0     # HTML parsing fallback used by extract stage
 # scrapling>=0.3.0          # Advanced web scraping with TLS fingerprinting
 # lxml>=4.9.0               # XML/HTML processing
 
-# Document parsing (optional — for BP OCR input)
-# pdfminer.six>=20221105    # PDF text extraction
-# PyPDF2>=3.0.0             # PDF text extraction (alternative)
-# python-pptx>=0.6.21       # PPTX text + image extraction
-# pdf2image>=1.16.3         # PDF → PNG (requires poppler)
+# Document parsing (BP OCR input)
+pdfplumber>=0.9.0            # PDF text extraction (tables)
+python-pptx>=0.6.21          # PPTX text + image extraction
+pdf2image>=1.16.3            # PDF → PNG (requires poppler)
+PyMuPDF>=1.23.0              # PDF text extraction (fitz fallback chain)
+Pillow>=10.0.0               # Image processing (PPTX slide rendering)
+openai>=1.0.0                # qwen-vl OCR (OpenAI-compatible API)
+# pdfminer.six>=20221105    # PDF text extraction (unused, kept for reference)
+# PyPDF2>=3.0.0             # PDF text extraction (superseded by PyMuPDF)
 
 # Vector memory (optional — for ChromaDB embedding search)
 # chromadb>=0.4.0
