@@ -51,13 +51,13 @@
       "key": "bp_competition_positioning",
       "name": "竞争定位分析师",
       "file": "bp_competition_positioning.md",
-      "description": "Wave 2: 竞争格局、差异化定位、竞品能力验证、替代风险和可复制性判断"
+      "description": "Wave 3: 竞争格局、差异化定位、竞品能力验证、替代风险和可复制性判断"
     },
     {
       "key": "bp_valuation_return",
       "name": "融资估值与回报分析师",
       "file": "bp_valuation_return.md",
-      "description": "Wave 2: 融资估值、可比公司/交易、MOIC/IRR、退出路径和估值模型"
+      "description": "Wave 3: 融资估值、可比公司/交易、MOIC/IRR、退出路径和估值模型"
     },
     {
       "key": "bp_customer_revenue_validation",
@@ -69,7 +69,7 @@
       "key": "bp_dealbreaker_risk",
       "name": "Deal Breaker 红队分析师",
       "file": "bp_dealbreaker_risk.md",
-      "description": "Wave 2: Deal Breakers、反向论证、关键风险、尽调阻断项和缓释路径"
+      "description": "Wave 4: Deal Breakers、反向论证、关键风险、尽调阻断项和缓释路径"
     },
     {
       "key": "bp_团队与合规",
@@ -105,7 +105,7 @@
       "key": "bp_统稿",
       "name": "统稿分析师",
       "file": "bp_统稿.md",
-      "description": "Wave 3: 读取 Wave 1/2 维度输出，按投研逻辑重组为完整报告"
+      "description": "Synthesis: 读取 Wave 1-4 维度输出，按投研逻辑重组为完整报告"
     }
   ],
   "deprecated": [

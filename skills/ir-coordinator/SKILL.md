@@ -33,7 +33,8 @@ allowed-tools:
 ## 环境常量
 
 **IR_RUNTIME**: `~/.workbuddy/ir_runtime/`  (symlink → 实际管线目录)
-**INSTRUCTION_STORE**: `~/.workbuddy/ir_runtime/instruction_store_ir/`
+**INSTRUCTION_STORE_IR**: `~/.workbuddy/ir_runtime/instruction_store_ir/`
+**INSTRUCTION_STORE_BP**: `~/.workbuddy/ir_runtime/instruction_store_bp/`
 **PIPELINE_ORCHESTRATOR**: `python3 -m runtime.orchestrator.pipeline_orchestrator`
 
 ## ⚠️⚠️⚠️ 命令执行铁律（2026-05-09 教训）
@@ -74,34 +75,21 @@ general-purpose 子代理**没有 Glob/Grep 工具**。如果 prompt 不声明�
    - 3 次都失败 → 该 step 标记为 skipped，继续下一 step
 4. **确认 spawn 成功后**，立即启动后台轮询（见 5b）
 
-#### 5b. 轮询流程（后台标志文件模式，禁止阻塞式循环）
+#### 5b. 轮询流程（双层机制）
+
+**管线内部已有 Python collect retry（5 分钟 = 10×30s）**，Coordinator 只需在 collect 返回 `needs_dispatch` 时做外部重派。
+
+**内部 collect 机制**（`_collect_with_retry`，Coordinator 无需干预）：
+- `COLLECT_RETRY_COUNT = 10`，`COLLECT_RETRY_INTERVAL = 30` 秒 → 总超时 **5 分钟**
+- 进度检测：两轮无变化则提前退出
+- 三文件稳定性检查：`_file_stable(interval=3)` — 3 秒内大小不变
+
+**Coordinator 外部重派策略**（collect 返回 `needs_dispatch` 时触发）：
+1. 读取 collect 结果，确认 spawn receipt 存在但输出缺失
+2. 重派子代理（最多 2 次）
+3. 重派仍失败 → 跳过该 step，继续下一 wave
 
 **⚠️ 禁止在单次 Bash 调用中用 for/while 循环做长时间轮询。** 每次 Bash 调用只做一次 test 然后退出。
-
-步骤：
-1. Agent spawn 成功后，**启动一个后台轮询脚本**（`run_in_background: true`）：
-```bash
-(OUTPUTS_DIR="/path/to/outputs"; SLUG="step_name"; DONE="$OUTPUTS_DIR/poll_${SLUG}.done"
- for i in $(seq 1 20); do
-   MD="$OUTPUTS_DIR/bp_phase2_${SLUG}.md"
-   FACTS="$OUTPUTS_DIR/bp_phase2_${SLUG}-facts.json"
-   SEC="$OUTPUTS_DIR/bp_phase2_${SLUG}-section.json"
-   if [ -s "$MD" ] && [ -s "$FACTS" ] && [ -s "$SEC" ]; then
-     echo "ALL_READY: md=$(wc -c < "$MD") facts=$(wc -c < "$FACTS") sec=$(wc -c < "$SEC")"
-     touch "$DONE"; exit 0
-   fi
-   sleep 60
- done
- echo "TIMEOUT"; exit 1
-)
-```
-2. 脚本启动后，主线程用**短 Bash 检查**（每次只做一次 `test`，秒级完成）：
-```bash
-test -s /path/to/outputs/poll_step_name.done && echo "DONE" || echo "WAITING"
-```
-3. 每隔一个 turn（约 15-30 秒）做一次短检查
-4. 看到 `DONE` → 子代理完成，shutdown → 推进管线
-5. 超时（20 分钟内 `.done` 未出现）→ 重派（最多 2 次）
 
 #### 5c. 三文件完成判定（硬性要求）
 
@@ -287,12 +275,14 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 
 ```python
 # ⚠️ 所有命令必须 cd ~/.workbuddy/ir_runtime && 前缀
+
+# ── IR / IC 管线调度 ──
 # 1. 提交任务
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
   --entity "标的名称" --market cn [--input-file /path/to/bp.pdf]
 
 # 2. 执行到 needs_dispatch 暂停
-cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
+result = cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
 
 # 2a. 如果返回 needs_poll: true + bg_pid，必须轮询直到进程结束
 while kill -0 {bg_pid} 2>/dev/null; do sleep 30; done
@@ -317,6 +307,15 @@ while True:
 send_message(type="shutdown_request", recipient=每个member)
 # 等 10 秒
 team_delete()
+
+# ── BP 管线调度 ──
+# BP 管线不使用 launch_next_wave()，而是直接 execute + has_more 循环：
+# 1. submit → execute（同 IR/IC）
+# 2. 管线返回 needs_dispatch + has_more=True → 派发单个子代理
+# 3. 子代理完成后 execute --start-phase=当前phase（重跑 collect→gate→下一个 prepare）
+# 4. has_more=False → 管线自动推进到下一 wave
+# 5. 循环直到 phase33 delivery 完成（heavy_bg，轮询 bg_pid）
+```
 
 # 5. 交付
 finalize_pipeline(task_id, entity, market)  # IR
@@ -379,7 +378,7 @@ finalize_pipeline(task_id, entity, market)  # IR
 - **Delivery gate 8 项检查**：readability/debate 降级为 WARN 不阻断；verification T1/T2 FAIL 降级为 WARN
 - **Claim coverage 否定性发现判定**：搜索"未找到"不再让 claim 变 supported
 - **统稿 prompt 四板斧**：表格规范 + 论证链保留 + 天使轮适配 + 去重规则
-- **维度 MD→DOCX 独立报告**：8 个维度各出独立 DOCX + 统稿副本放入 `delivery/维度分析/`
+- **维度 MD→DOCX 独立报告**：8 个维度各出独立 DOCX，平铺在 `delivery/` 根目录（不再使用子目录）
 
 **⚠️ 防缺陷铁律**：BP 统稿的防缺陷规则见 **references/quality/bp-anti-defect-rules.md**，coordinator 不重复列出。
 

@@ -254,7 +254,7 @@ managed Python lxml 签名无效时自动 fallback 到系统 Python（`/opt/anac
 
 - `bp_synthesis.md` 是主报告（有完整推理链和脚注）
 - `bp_final_report.md`（assembler 输出）降级为快速浏览版附件
-- **维度 MD → DOCX 独立报告**（2026-06-26 新增）：8 个维度各自生成独立 DOCX，输出到 `delivery/维度分析/{维度标题}.docx`
+- **维度 MD → DOCX 独立报告**（2026-06-29 更新）：8 个维度各自生成独立 DOCX，平铺在 `delivery/` 根目录（不再使用 `维度分析/` 子目录）
 - DOCX 字体动态检测：macOS 优先 PingFang SC，Windows 用 Microsoft YaHei
 - DOCX 来源渲染：保留所有有名称的来源（不再强制要求 URL）
 - 报告路径：`{job_dir}/delivery/TASK-XXXX_bp_dd_report.docx`
