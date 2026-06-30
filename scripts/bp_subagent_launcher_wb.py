@@ -40,16 +40,43 @@ ROLE_TO_KEY = {
 ROLE_SYSTEM_PROMPTS: dict[str, str] = {}
 
 INSTRUCTION_STORE = ROOT / 'instruction_store_bp'
-CURRENT_BP_ROLES = {
-    'bp_company_team_compliance',
-    'bp_product_commercial',
-    'bp_tech_ip_moat',
-    'bp_market_supply_chain',
-    'bp_competition_positioning',
-    'bp_valuation_return',
-    'bp_customer_revenue_validation',
-    'bp_dealbreaker_risk',
+
+# ── Dynamic role loading from index.json ──────────────────────
+# Adding a new role only requires: (1) create .md file, (2) add to index.json roles array.
+# No Python code change needed. Legacy roles kept for backward compatibility.
+
+_LEGACY_ROLE_KEYS = {
+    'bp_团队与合规', 'bp_技术与产品', 'bp_行业与供应链',
+    'bp_估值', 'bp_竞争与结论',
 }
+
+
+def _load_active_role_keys() -> set[str]:
+    """Read active sub-agent role keys from index.json pipeline_bindings.
+
+    Uses pipeline_bindings (not the roles array) to determine which roles
+    are dispatchable sub-agents. This excludes coordinator-only roles like
+    bp_主管 and bp_统稿 which are listed in roles[] but not in bindings.
+
+    Adding a new role only requires:
+    1. Create the .md file in instruction_store_bp/
+    2. Add entry to index.json roles[] array
+    3. Add binding in index.json pipeline_bindings.bp
+    No Python code change needed.
+    """
+    index_path = INSTRUCTION_STORE / 'index.json'
+    if not index_path.exists():
+        return set()
+    try:
+        index = json.loads(index_path.read_text(encoding='utf-8'))
+    except Exception:
+        return set()
+    # pipeline_bindings.bp maps short slugs → full role keys
+    bindings = index.get('pipeline_bindings', {}).get('bp', {})
+    return set(bindings.values())
+
+
+CURRENT_BP_ROLES = _load_active_role_keys() | _LEGACY_ROLE_KEYS
 
 
 _INSTRUCTION_STORE_CACHE: dict[str, str] | None = None
