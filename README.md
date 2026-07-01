@@ -1,7 +1,12 @@
-# 🐲 IR/BP Workflow
+# 🐲 IR/BP/LIT Workflow
 
-> AI 驱动的投研（IR）+ 商业计划书尽调（BP）双管线工作流。
-> 从 BP 文件输入到 DOCX 报告交付，33 个 Phase 全自动闭环，零人工干预。
+> AI 驱动的投研（IR）+ 商业计划书尽调（BP）+ 文献综述（LIT）三管线工作流。
+> 全自动闭环，零人工干预。
+
+**三条管线，统一架构：**
+- **IR 管线**：股票/标的深度研报（9 步 + 5 波）
+- **BP 管线**：商业计划书尽调（33 Phase + 4 波 + 统稿）
+- **LIT 管线**：技术评估文献综述（20 Phase + 3 波 + per-sub_topic 并行深读）
 
 ---
 
@@ -95,6 +100,104 @@
                               │  桌面 + 聊天窗口   │
                               └─────────────────┘
 ```
+
+---
+
+## LIT 管线全景图（v4.0）
+
+**技术方向 + 查询 → 子代理预搜拆解 sub_topics → 三路采集（学术/行业/企业）→ per-sub_topic 并行深读全部论文 → 质量评估 + 技术战略分析 → 完整评估报告交付。**
+
+```
+                         ┌──────────────────────────────────────┐
+                         │     技术方向 + 查询（如"固态电池"）      │
+                         └──────────────┬───────────────────────┘
+                                        │
+                    ┌───────────────────▼────────────────────┐
+                    │  Phase 01-05: 准备阶段                   │
+                    │                                        │
+                    │  01 intake → 解析输入                    │
+                    │  02 tech_decomposition → 子代理预搜       │
+                    │     + 直接输出 research_plan.json         │
+                    │     （sub_topics + claim_matrix +         │
+                    │      search_keywords + search_matrix）    │
+                    │  03 research_plan → cached check + 兜底   │
+                    │  04 presearch → 方向可行性验证              │
+                    │  05 shared_state_init → 初始化骨架         │
+                    └───────────────────┬────────────────────┘
+                                        │
+                    ┌───────────────────▼────────────────────┐
+                    │  Wave 1: 三路采集（3 角色 sequential）     │
+                    │  06 prepare → 07 collect → 08 gate      │
+                    │                                        │
+                    │  academic_scout: S2/OpenAlex/arXiv/DBLP  │
+                    │  industry_scout: NeoData/研报/新闻         │
+                    │  enterprise_scout: QCC/SEC 企业尽调        │
+                    │  → Evidence Gate (PRISMA 完整性)           │
+                    │  → Fact Store Merge → Shared State Refresh│
+                    └───────────────────┬────────────────────┘
+                                        │
+                    ┌───────────────────▼────────────────────┐
+                    │  Wave 2: 深读 + 分析（per-sub_topic 并行） │
+                    │  11 prepare → 12 collect → 13 gate      │
+                    │                                        │
+                    │  deep_reader × N: 每个 sub_topic 独立     │
+                    │    agent，读全部论文（全文优先/摘要兜底）    │
+                    │    → sub_topic_N_reading_notes.json      │
+                    │    → quality_assessment (4维度+tier)       │
+                    │  tech_strategist: TRL/Gartner/路线/竞争    │
+                    │    （缺失时 report_writer 自动 fallback）  │
+                    │  → Evidence Gate (quality_tier 容错)       │
+                    │  → Shared State Refresh (+ quality_summary)│
+                    └───────────────────┬────────────────────┘
+                                        │
+                    ┌───────────────────▼────────────────────┐
+                    │  Wave 3: 报告产出 + 质量链 + 交付          │
+                    │  15 prepare → 16 collect                │
+                    │                                        │
+                    │  report_writer → 完整 9 章评估报告         │
+                    │  → Claim Coverage → Debate Review         │
+                    │  → Final Assembly → Delivery              │
+                    └───────────────────┬────────────────────┘
+                                        │
+                                        ▼
+                              ┌─────────────────┐
+                              │  report.md       │
+                              │  + fact_store    │
+                              └─────────────────┘
+```
+
+### LIT Phase 清单
+
+| # | Phase | 作用 | 输出 |
+|---|-------|------|------|
+| 01 | intake | 解析用户输入 | intake.json |
+| 02 | tech_decomposition | 子代理预搜 + 拆解 sub_topics | tech_decomposition.json + research_plan.json |
+| 03 | research_plan | cached check + 兜底生成 | research_plan.json |
+| 04 | presearch | 方向可行性验证 | presearch.json |
+| 05 | shared_state_init | 初始化共享状态 | shared_state.json |
+| 06 | wave1_dispatch_prepare | W1 调度（3 角色 sequential） | manifest |
+| 07 | wave1_dispatch_collect | W1 收集 + 4 层防御 | — |
+| 08 | wave1_evidence_gate | W1 质量门 + repair | wave1_gate.json |
+| 09 | wave1_fact_store_merge | W1 合并 → fact_store | fact_store.json |
+| 10 | wave1_shared_state_refresh | W1 刷新 → reading_tasks（含模糊匹配） | shared_state.json |
+| 11 | wave2_dispatch_prepare | W2 调度（per-sub_topic + tech_strategist） | manifest |
+| 12 | wave2_dispatch_collect | W2 收集 + quality_summary 合并 | — |
+| 13 | wave2_evidence_gate | W2 质量门（quality_tier 容错） | wave2_gate.json |
+| 14 | wave2_shared_state_refresh | W2 刷新 | shared_state.json |
+| 15 | wave3_dispatch_prepare | W3 调度（report_writer + fallback） | manifest |
+| 16 | wave3_dispatch_collect | W3 收集 | — |
+| 17 | claim_coverage | 全 claim 覆盖检查 | claim_coverage.json |
+| 18 | debate_review | 跨章节对抗审查 | debate_review.json |
+| 19 | final_assembly | 排版 + 引用格式化 | report.md |
+| 20 | delivery | 交付 | — |
+
+### LIT v4.0 关键设计
+
+- **per-sub_topic 并行**：deep_reader 拆分为 N 个独立 agent（每 sub_topic 一个），每个读全部论文，不再限 8 篇
+- **phase02 子代理化**：不再让 Coordinator 手写 JSON，子代理直接预搜 + 输出 research_plan.json
+- **quality_tier 容错**：gate 兼容 `quality_tier` / `overall_grade` / `grade` 字段名
+- **tech_strategist fallback**：缺失时 gate 降为 WARN，report_writer 自动降级模式
+- **模糊匹配兜底**：shared_state_refresh 对空 sub_topic 做关键词匹配补充
 
 ---
 
@@ -338,7 +441,9 @@ ir-bp-workflow/
 │   │   ├── ir_profile.py            # IR 管线（9步 + 5波）
 │   │   ├── bp_profile.py            # BP 管线（33 Phase + 4波 + 统稿）
 │   │   ├── bp_constants.py          # BP 共享常量
-│   │   └── ic_profile.py            # IC 管线（行业研究）
+│   │   ├── ic_profile.py            # IC 管线（行业研究）
+│   │   ├── lit_review_profile.py    # LIT 管线（20 Phase + 3波 + per-sub_topic 并行）
+│   │   └── lit_constants.py         # LIT 共享常量
 │   └── orchestrator/
 │       └── kernel.py                # Phase 执行引擎
 ├── scripts/                         # 功能脚本
@@ -350,7 +455,25 @@ ir-bp-workflow/
 │   ├── bp_delivery_gate.py          # 交付门禁
 │   ├── bp_claim_coverage_validator.py
 │   ├── bp_wave_evidence_gate.py     # Wave 证据门禁
-│   └── build_bp_dd_report_docx.py   # DOCX 生成
+│   ├── build_bp_dd_report_docx.py   # DOCX 生成
+│   ├── api_clients/                 # LIT 学术 API 客户端
+│   │   ├── openalex_client.py       # OpenAlex (全领域)
+│   │   ├── arxiv_client.py          # arXiv (预印本)
+│   │   ├── s2_client.py             # Semantic Scholar (引用图谱)
+│   │   ├── dblp_client.py           # DBLP (CS)
+│   │   ├── pmc_client.py            # PubMed Central (生物医学)
+│   │   ├── crossref_client.py       # Crossref (DOI)
+│   │   └── core_client.py           # CORE (OA)
+│   ├── fulltext/                    # LIT 全文获取 + 提取
+│   │   ├── pdf_downloader.py        # PDF 下载路由
+│   │   ├── pdfplumber_extractor.py  # pdfplumber 提取
+│   │   ├── marker_extractor.py      # Marker 提取
+│   │   └── web_scraper.py           # 网页抓取
+│   └── search/                      # LIT 搜索
+│       ├── unified_search.py        # 多源并行搜索 + 去重
+│       ├── neodata_search.py        # NeoData 研报搜索
+│       ├── dedup.py                 # DOI + title 去重
+│       └── rate_limiter.py          # API 限速
 ├── instruction_store_bp/            # BP 角色指令库（8 个维度）
 │   ├── _common_tool_guide.md        # 通用工具使用指南
 │   ├── bp_company_team_compliance.md
@@ -358,6 +481,16 @@ ir-bp-workflow/
 │   ├── bp_dealbreaker_risk.md
 │   └── ...
 ├── instruction_store_ir/            # IR 角色指令库（11 个角色）
+├── instruction_store_lit/           # LIT 角色指令库（7 个角色）
+│   ├── index.json                   # 角色 → 文件映射
+│   ├── _common_tool_guide.md        # LIT 通用工具指南
+│   ├── research_plan_enrichment.md  # tech_decomposition 子代理指令
+│   ├── academic_scout.md            # 学术搜索专家
+│   ├── industry_scout.md            # 行业情报搜索专家
+│   ├── enterprise_scout.md          # 企业侦察专家
+│   ├── deep_reader.md               # 深度阅读分析师（per-sub_topic）
+│   ├── tech_strategist.md           # 技术战略师
+│   └── report_writer.md             # 报告撰写专家
 ├── references/                      # 项目级统一知识库（单一真实来源）
 │   ├── pipeline/                    # 管线流程文档
 │   ├── quality/                     # 质量门禁 + 验证策略
@@ -415,6 +548,7 @@ PROXY_URL=http://127.0.0.1:7897
 **对话触发（推荐）：**
 - "分析比亚迪" → IR 管线
 - "帮我看下这个 BP" + 上传文件 → BP 管线
+- "做个固态电池的技术评估" / "文献综述" → LIT 管线
 
 **CLI：**
 ```bash
