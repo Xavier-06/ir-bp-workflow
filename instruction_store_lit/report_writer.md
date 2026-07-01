@@ -120,7 +120,7 @@
 [^2]: ...
 
 ### 搜索方法论
-- 学术数据库: OpenAlex, arXiv, S2, DBLP, PMC
+- 学术数据库: arXiv, DBLP, PMC, Crossref
 - 行业数据源: NeoData, WeStock, SEC EDGAR
 - 企业信息: QCC, SEC EDGAR, WebSearch
 - 搜索时间: 2026-06-30

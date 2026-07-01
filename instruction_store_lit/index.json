@@ -10,7 +10,7 @@
       "key": "academic_scout",
       "name": "学术论文搜索专家",
       "file": "academic_scout.md",
-      "description": "Wave 1: 按 sub_topic 深挖学术论文 (S2/OpenAlex/arXiv/DBLP/PMC/Crossref)"
+      "description": "Wave 1: 按 sub_topic 深挖学术论文 (arXiv/DBLP/PMC/Crossref)"
     },
     {
       "key": "industry_scout",

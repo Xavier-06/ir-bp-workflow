@@ -65,7 +65,8 @@ cd {RUNTIME_ROOT} && python3 scripts/fulltext/marker_extractor.py input.pdf --ou
 |---------|--------|------|
 | 标准学术论文 (双栏/有 section) | pdfplumber (兜底) | 基础，纯文本 |
 | 行业报告/白皮书 | Marker | 好，Markdown |
-| 扫描版 PDF | Nougat (需 GPU) | OCR → MMD |
+
+> ⚠️ GROBID 已确认不可用（Docker 未运行），不要尝试调用。
 
 ## 阅读笔记格式（6 维度，VC 视角）
 

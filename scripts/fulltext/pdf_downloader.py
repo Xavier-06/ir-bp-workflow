@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """按文档类型路由获取全文 — 5 条路径，非降级链。
 
-路径 A: 学术论文 → arXiv PDF / PMC XML / Unpaywall / OpenAlex OA / CORE
+路径 A: 学术论文 → arXiv PDF / PMC XML / Unpaywall / OA URL
 路径 B: 券商研报 → NeoData / WeStock / WebFetch
 路径 C: 行业报告 → WebFetch PDF/HTML
 路径 D: 公司披露 → SEC EDGAR / QCC

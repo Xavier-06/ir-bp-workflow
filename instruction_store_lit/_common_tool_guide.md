@@ -13,18 +13,21 @@
 
 ### A. 学术元数据 & 引用网络
 
+> ⚠️ 以下数据源已确认不可用，**禁止调用**：
+> - ~~OpenAlex~~ — 503 Service Unavailable（匿名限流，需 API Key）
+> - ~~Semantic Scholar~~ — 429 Rate Limit（无限挂起，需 API Key）
+> - ~~CORE~~ — 无 API Key，脚本直接跳过
+
 | 工具 | 调用方式 | 查什么 | 不可替代价值 |
 |------|---------|--------|------------|
-| S2 | `python3 scripts/api_clients/s2_client.py "query" --json` | 引用图谱+tldr+SPECTER2 | 引用链遍历 (references/citations) |
-| OpenAlex | `python3 scripts/api_clients/openalex_client.py "query" --json` | 四级领域分类+机构+趋势 | 领域分类体系 |
-| Crossref | `python3 scripts/api_clients/crossref_client.py "doi" --json` | DOI+参考文献+基金 | DOI 权威元数据 |
+| Crossref | `python3 scripts/api_clients/crossref_client.py "doi" --json` | DOI+参考文献+基金 | DOI 权威元数据 + 引用链 |
 | DBLP | `python3 scripts/api_clients/dblp_client.py "query" --json` | CS 论文补充 | CS 会议覆盖 |
 | PMC | `python3 scripts/api_clients/pmc_client.py "query" --json` | 生物医学论文 | 生物医学 OA 全文 |
 | arXiv | `python3 scripts/api_clients/arxiv_client.py "query" --json` | 预印本 | 预印本首发 + PDF 直下 |
 
 **统一搜索（多源并行 + 去重 + 排序）：**
 ```bash
-cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources openalex,arxiv,s2,dblp,pmc --max-results 30 --json
+cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources arxiv,dblp,pmc --max-results 30 --json
 ```
 
 ### B. 论文全文获取 (按文档类型路由)
@@ -32,7 +35,7 @@ cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sour
 **路径 A: 学术论文**
 ```bash
 cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py --fact-id DOC-001 --type paper --json
-# 路由: arXiv ID → arXiv PDF / PMC ID → PMC XML / DOI → Unpaywall / OpenAlex OA URL / CORE
+# 路由: arXiv ID → arXiv PDF / PMC ID → PMC XML / DOI → Unpaywall / OpenAlex OA URL
 ```
 
 **路径 B: 券商研报**
@@ -83,11 +86,12 @@ WebSearch → WebFetch 爬取
 
 ## PDF 提取器选择
 
+> ⚠️ GROBID 已确认不可用（Docker 未运行），不要尝试调用。
+
 | 优先级 | 提取器 | 适用 | 调用 |
 |-------|--------|------|------|
-| 1 | GROBID | 学术论文 (双栏) | Docker 8070 端口 |
-| 2 | Marker | 报告/白皮书 | `python3 scripts/fulltext/marker_extractor.py input.pdf` |
-| 3 | pdfplumber | 兜底 | `python3 scripts/fulltext/pdfplumber_extractor.py input.pdf` |
+| 1 | Marker | 报告/白皮书 | `python3 scripts/fulltext/marker_extractor.py input.pdf` |
+| 2 | pdfplumber | 兜底 | `python3 scripts/fulltext/pdfplumber_extractor.py input.pdf` |
 
 ## 搜索规范
 
@@ -100,7 +104,7 @@ WebSearch → WebFetch 爬取
 
 | 角色 | 可以做 | 禁止做 |
 |------|--------|--------|
-| academic_scout | 搜论文 (S2/OpenAlex/arXiv/DBLP/PMC) | 搜研报/新闻/企业信息/下载全文 |
+| academic_scout | 搜论文 (arXiv/DBLP/PMC/Crossref) | 搜研报/新闻/企业信息/下载全文 |
 | industry_scout | 搜研报/报告/新闻 (NeoData/WebSearch) | 搜论文/企业信息 |
 | enterprise_scout | 企业尽调 (QCC/SEC/WebSearch) | 搜论文/研报 |
 | deep_reader | 读全文+压缩笔记 | 搜新文档 |
@@ -119,7 +123,7 @@ WebSearch → WebFetch 爬取
 
 报告末尾展开:
 ```
-[^1]: OpenAlex 元数据 — https://api.openalex.org/works/...
+[^1]: arXiv 元数据 — https://arxiv.org/abs/...
 [^2]: NeoData 研报 — 中信证券行业深度报告 (2025-03)
 [^3]: BP自述 — 无外部来源URL
 ```

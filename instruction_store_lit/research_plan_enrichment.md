@@ -22,18 +22,17 @@
 
 ### 快速预搜 API
 
-```bash
-# 1. OpenAlex — 学术热度 + 领域分类 + 趋势
-cd {RUNTIME_ROOT} && python3 scripts/api_clients/openalex_client.py "搜索关键词" --max-results 20 --json
+> ⚠️ OpenAlex / Semantic Scholar / CORE 已确认为不可用（503/429/无Key），**不要调用**。
 
-# 2. arXiv — 预印本趋势
+```bash
+# 1. arXiv — 预印本趋势
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/arxiv_client.py "搜索关键词" --max-results 10 --json
 
-# 3. Semantic Scholar — 引用图谱 + 高引论文
-cd {RUNTIME_ROOT} && python3 scripts/api_clients/s2_client.py "搜索关键词" --max-results 10 --json
+# 2. DBLP — CS 领域补充
+cd {RUNTIME_ROOT} && python3 scripts/api_clients/dblp_client.py "搜索关键词" --max-results 10 --json
 
-# 4. 统一搜索（多源并行 + 去重）
-cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources openalex,arxiv,s2 --max-results 20 --json
+# 3. 统一搜索（多源并行 + 去重）
+cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources arxiv,dblp --max-results 20 --json
 ```
 
 ## 执行流程
@@ -43,8 +42,8 @@ cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sour
 ```
 1. 读取 intake.json 获取 tech_direction + query
 2. 用 tech_direction 做 2-3 次快速搜索:
-   a. OpenAlex: 整体论文数 + 趋势 + top cited papers
-   b. arXiv: 近 2 年预印本活跃度
+   a. arXiv: 近 2 年预印本活跃度 + top cited papers
+   b. DBLP: CS 领域会议论文补充
    c. WebSearch: 产业化进展 + 主要公司
 3. 从搜索结果中提取:
    - 高频出现的技术路线/材料体系 → 候选 sub_topics

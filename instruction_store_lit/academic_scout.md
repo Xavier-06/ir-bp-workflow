@@ -20,27 +20,23 @@
 
 ### 学术 API 调用方式
 
-```bash
-# 1. OpenAlex — 主力，全领域
-cd {RUNTIME_ROOT} && python3 scripts/api_clients/openalex_client.py "搜索关键词" --max-results 30 --json
+> ⚠️ OpenAlex / Semantic Scholar / CORE 已确认为不可用（503/429/无Key），**不要调用**。
 
-# 2. arXiv — CS/AI/Tech 预印本 (注意: 必须 --noproxy)
+```bash
+# 1. arXiv — CS/AI/Tech 预印本 (注意: 必须 --noproxy)
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/arxiv_client.py '"solid state battery"' --categories cs,cond-mat --max-results 20 --json
 
-# 3. Semantic Scholar — 引用图谱 + tldr
-cd {RUNTIME_ROOT} && python3 scripts/api_clients/s2_client.py "solid state electrolyte" --max-results 20 --expand-citations --json
-
-# 4. DBLP — CS 领域补充
+# 2. DBLP — CS 领域补充
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/dblp_client.py "solid state battery" --max-results 10 --json
 
-# 5. PubMed Central — 生物医学/材料科学
+# 3. PubMed Central — 生物医学/材料科学
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/pmc_client.py "solid state electrolyte" --max-results 10 --json
 
-# 6. Crossref — DOI 解析 + 引用验证
+# 4. Crossref — DOI 解析 + 引用验证
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/crossref_client.py "10.1016/j.cossms.2022.101002" --json
 
 # 统一搜索（多源并行 + 去重 + 排序）
-cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "搜索关键词" --sources openalex,arxiv,s2,dblp,pmc --max-results 30 --json
+cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "搜索关键词" --sources arxiv,dblp,pmc --max-results 30 --json
 ```
 
 ## 搜索策略
@@ -49,20 +45,19 @@ cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "搜索关键词" 
 
 ```
 FOR each sub_topic in research_plan.sub_topics:
-  1. OpenAlex: 关键词搜索 (top 30) + topic filter → 记录 identification_count
-  2. arXiv: 引号精确搜索 + 分类过滤 → top 20 → 记录 identification_count
-  3. S2: 关键词搜索 + 从 top 5 seed 扩展引用链 → top 20 → 记录 identification_count
-  4. DBLP: CS 领域补充 → top 10 → 记录 identification_count
-  5. PMC: 生物医学/材料科学补充 → top 10 → 记录 identification_count
-  6. 合并去重 (DOI + title fuzzy match) → 记录 duplicates_removed
-  7. 标题/摘要筛选: 排除明显不相关 (PICO population 外、非目标技术) → 记录 excluded_screening
-  8. 按 cited_by_count × recency × relevance 排序 → 保留 top 25 → 记录 included
-  9. 记录审计日志 + PRISMA funnel 数据
+  1. arXiv: 引号精确搜索 + 分类过滤 → top 20 → 记录 identification_count
+  2. DBLP: CS 领域补充 → top 10 → 记录 identification_count
+  3. PMC: 生物医学/材料科学补充 → top 10 → 记录 identification_count
+  4. Crossref: 对已知 DOI 的论文补充引用验证 → 记录 identification_count
+  5. 合并去重 (DOI + title fuzzy match) → 记录 duplicates_removed
+  6. 标题/摘要筛选: 排除明显不相关 (PICO population 外、非目标技术) → 记录 excluded_screening
+  7. 按 cited_by_count × recency × relevance 排序 → 保留 top 25 → 记录 included
+  8. 记录审计日志 + PRISMA funnel 数据
 ```
 
 **中英文双语搜索**：每个 sub_topic 用英文和中文各搜一次。
 **时间过滤**：优先近 3 年，seminal paper 不限年份。
-**引用链扩展**：对 top 5 高引论文，用 S2 查 references 和 citations 扩展。
+**引用链扩展**：对 top 5 高引论文，用 Crossref 查 references 扩展引用链。
 **PICO 约束**：如 research_plan 含 pico_framework，用 population.exclusion 排除范围外论文，用 outcome.primary 作为相关性过滤信号。
 
 ## 输出要求
@@ -76,7 +71,7 @@ FOR each sub_topic in research_plan.sub_topics:
 ## PRISMA Flow Summary
 | 阶段 | 数量 | 说明 |
 |------|------|------|
-| Identification (全部 API 命中) | N | OpenAlex + arXiv + S2 + DBLP + PMC 原始命中总和 |
+| Identification (全部 API 命中) | N | arXiv + DBLP + PMC + Crossref 原始命中总和 |
 | Duplicates removed | N | DOI + title fuzzy match 去重 |
 | Screening (标题/摘要筛选后) | N | 排除 PICO population 外、非目标技术 |
 | Excluded (排除原因) | N | 按排除类别分: out_of_scope / not_target_tech / language / other |
@@ -85,7 +80,7 @@ FOR each sub_topic in research_plan.sub_topics:
 ## sub_topic: {name}
 | 数据源 | 查询词 | 返回数 | 去重后 | 筛选后 | 纳入数 |
 |--------|--------|--------|--------|--------|--------|
-| OpenAlex | "..." | 30 | 25 | 18 | 15 |
+| arXiv | "..." | 20 | 18 | 15 | 12 |
 ...
 
 ## 总计
@@ -117,7 +112,7 @@ FOR each sub_topic in research_plan.sub_topics:
       "full_text_available": true,
       "topics": [{"domain": "...", "field": "..."}],
       "relevance_score": 0.95,
-      "discovery_source": "openalex",
+      "discovery_source": "arxiv",
       "discovery_method": "keyword_search"
     }
   ]
