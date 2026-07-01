@@ -18,6 +18,9 @@ Pipeline Orchestrator — 常驻主控 Agent
     # IC（行业研究）任务
     python3 pipeline_orchestrator.py submit --entity 半导体 --market cn --query "行业研究"
 
+    # LIT（文献综述/技术评估）任务
+    python3 pipeline_orchestrator.py submit --entity 固态电池 --market cn --query "技术评估"
+
     # 恢复未完成任务
     python3 pipeline_orchestrator.py recover
 
@@ -43,6 +46,7 @@ class JobType(str, Enum):
     IR = "ir"
     BP = "bp"
     IC = "ic"
+    LIT = "lit"
 
 
 class JobStatus(str, Enum):
@@ -102,15 +106,24 @@ class PipelineOrchestrator:
                      "行业报告", "产业链分析", "产业链", "行业深度", "行业概览",
                      "industry research", "sector analysis", "industry overview"}
 
+    # LIT（文献综述/技术评估）关键词
+    _LIT_KEYWORDS = {"技术评估", "文献综述", "技术尽调", "技术调研", "技术全景",
+                      "技术成熟度", "trl", "技术路线分析", "竞争格局分析",
+                      "tech assessment", "literature review", "tech due diligence",
+                      "technology landscape", "tech readiness"}
+
     def classify_job(self, input_file: str = "", query: str = "") -> JobType:
-        """判断是 IR / BP / IC 任务"""
+        """判断是 IR / BP / IC / LIT 任务"""
         if input_file:
             ext = Path(input_file).suffix.lower()
             if ext in (".pdf", ".pptx", ".ppt", ".docx", ".doc", ".png", ".jpg", ".jpeg"):
                 return JobType.BP
-        # 检查 query 是否包含行业研究关键词
         if query:
             query_lower = query.lower()
+            # LIT 优先于 IC（"技术评估" 比 "行业研究" 更具体）
+            for kw in self._LIT_KEYWORDS:
+                if kw in query_lower:
+                    return JobType.LIT
             for kw in self._IC_KEYWORDS:
                 if kw in query_lower:
                     return JobType.IC
@@ -205,6 +218,8 @@ class PipelineOrchestrator:
                 result = self._run_ic(record, start_phase=start_phase)
             elif record.job_type == JobType.IR:
                 result = self._run_ir(record, start_phase=start_phase)
+            elif record.job_type == JobType.LIT:
+                result = self._run_lit(record, start_phase=start_phase)
             else:
                 result = self._run_bp(record, start_phase=start_phase)
         except Exception as exc:
@@ -282,6 +297,24 @@ class PipelineOrchestrator:
                 metadata[key] = record.result[key]
 
         return run_ic_job(
+            job_id=record.job_id,
+            entity=record.entity,
+            query=record.query,
+            market=record.market,
+            start_phase=start_phase,
+            **metadata,
+        )
+
+    def _run_lit(self, record: JobRecord, start_phase: str | None = None) -> dict[str, Any]:
+        """通过 shared kernel 跑 LIT（文献综述/技术评估）管线"""
+        from runtime.entrypoints.run_lit_pipeline_entry import run_lit_job
+
+        metadata = {}
+        for key in ("focus_dimensions", "language"):
+            if key in record.result:
+                metadata[key] = record.result[key]
+
+        return run_lit_job(
             job_id=record.job_id,
             entity=record.entity,
             query=record.query,
