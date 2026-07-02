@@ -20,27 +20,42 @@
 
 ### 学术 API 调用方式
 
-> ⚠️ OpenAlex / Semantic Scholar / CORE 已确认为不可用（503/429/无Key），**不要调用**。
+> ⚠️ OpenAlex / Semantic Scholar / CORE 已确认为不可用(503/429/无Key),**不要调用**。
+
+**可用的 4 个学术数据源**(全部必须用上):
+
+| 数据源 | 脚本 | 用途 | 地位 |
+|--------|------|------|------|
+| **arXiv** | `arxiv_client.py` | CS/AI/Tech 预印本 | CS 领域 PRIMARY |
+| **PMC** | `pmc_client.py` | 生物医学 OA 全文 | 生物医学 PRIMARY |
+| **Crossref** | `crossref_client.py` | DOI 元数据 + **关键词搜索** + 引用链 | **搜索源 + 引用验证** |
+| **DBLP** | `dblp_client.py` | CS 会议论文 | CS 领域补充 |
 
 ```bash
 # 1. arXiv — CS/AI/Tech 预印本 (注意: 必须 --noproxy)
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/arxiv_client.py '"solid state battery"' --categories cs,cond-mat --max-results 20 --json
 
-# 2. DBLP — CS 领域补充
-cd {RUNTIME_ROOT} && python3 scripts/api_clients/dblp_client.py "solid state battery" --max-results 10 --json
-
-# 3. PubMed Central — 生物医学/材料科学
+# 2. PMC — 生物医学/材料科学
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/pmc_client.py "solid state electrolyte" --max-results 10 --json
 
-# 3b. PMC 全文 XML 获取 (EFetch — 生物医学核心)
+# 2b. PMC 全文 XML 获取 (EFetch — 生物医学核心)
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/pmc_client.py --pmc-id 12345678
 
-# 4. Crossref — DOI 解析 + 引用验证
+# 3. Crossref — DOI 解析 + 引用验证 + 关键词搜索
+# 3a. DOI 解析(已知 DOI)
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/crossref_client.py "10.1016/j.cossms.2022.101002" --json
 
-# 统一搜索（多源并行 + 去重 + 排序）
-cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "搜索关键词" --sources arxiv,dblp,pmc --max-results 30 --json
+# 3b. 关键词搜索(未知 DOI 时用 Crossref 搜索)
+cd {RUNTIME_ROOT} && python3 scripts/api_clients/crossref_client.py --query "solid state electrolyte" --max-results 10 --json
+
+# 4. DBLP — CS 领域补充
+cd {RUNTIME_ROOT} && python3 scripts/api_clients/dblp_client.py "solid state battery" --max-results 10 --json
+
+# 统一搜索(多源并行 + 去重 + 排序,4 个源全用上)
+cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources arxiv,dblp,pmc,crossref --max-results 30 --json
 ```
+
+> ⚠️ **unified_search 只用于学术搜索**,不要传 neodata/s2/openalex(已确认不可用或走其他路径)。
 
 ## ⚠️⚠️ 领域判定 & 数据源优先级
 
@@ -48,9 +63,9 @@ cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "搜索关键词" 
 
 | 领域信号 | PMC 地位 | 搜索顺序 |
 |---------|---------|---------|
-| **生物医学** (biomedical/clinical/pharma/oncology/immunology/genomics/drug/cell therapy/CRISPR/protein/antibody/neuro/cardio/diagnostic/vaccine/mRNA/lipid nanoparticle) | **🔴 PRIMARY — 必须排第一** | PMC → arXiv → Crossref → DBLP |
-| **CS/AI/Tech** (LLM/computer vision/robotics/semiconductor/battery/materials science/quantum computing) | SECONDARY — 补充 | arXiv → DBLP → PMC → Crossref |
-| **交叉领域** (biomedical AI/medical devices/biomaterials/digital health) | **🔴 PRIMARY — PMC 必须排第一** | PMC → arXiv → DBLP → Crossref |
+| **生物医学** (biomedical/clinical/pharma/oncology/immunology/genomics/drug/cell therapy/CRISPR/protein/antibody/neuro/cardio/diagnostic/vaccine/mRNA/lipid nanoparticle) | **🔴 PRIMARY — 必须排第一** | PMC → Crossref → arXiv → DBLP |
+| **CS/AI/Tech** (LLM/computer vision/robotics/semiconductor/battery/materials science/quantum computing) | SECONDARY — 补充 | arXiv → Crossref → DBLP → PMC |
+| **交叉领域** (biomedical AI/medical devices/biomaterials/digital health) | **🔴 PRIMARY — PMC 必须排第一** | PMC → Crossref → arXiv → DBLP |
 
 **判定规则**：
 1. 如果 research_plan 包含 `domain` 字段 → 直接使用
@@ -70,9 +85,10 @@ cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "搜索关键词" 
 ```
 FOR each sub_topic in research_plan.sub_topics:
   1. PMC: 主搜索源 (MeSH terms + free text) → top 20 → 记录 identification_count
-     ↳ 每篇记录 pmc_id，这是后续全文获取的关键
-  2. arXiv: CS/AI 交叉补充 → top 15 → 记录 identification_count
-  3. Crossref: DOI 解析 + 引用验证 → 记录 identification_count
+     ↳ 每篇记录 pmc_id,这是后续全文获取的关键
+  2. Crossref: 关键词搜索 (--query) → top 15 → 记录 identification_count
+     ↳ 出版商论文补充,与 PMC 形成 OA + 传统出版双覆盖
+  3. arXiv: CS/AI 交叉补充 → top 15 → 记录 identification_count
   4. DBLP: CS 会议补充 → top 10 → 记录 identification_count
   5. 合并去重 → 记录 duplicates_removed
   6. PICO screening → 记录 excluded_screening
@@ -84,9 +100,10 @@ FOR each sub_topic in research_plan.sub_topics:
 ```
 FOR each sub_topic in research_plan.sub_topics:
   1. arXiv: 引号精确搜索 + 分类过滤 → top 20 → 记录 identification_count
-  2. DBLP: CS 领域补充 → top 10 → 记录 identification_count
-  3. PMC: 生物医学/材料科学补充 → top 10 → 记录 identification_count
-  4. Crossref: 对已知 DOI 的论文补充引用验证 → 记录 identification_count
+  2. Crossref: 关键词搜索 (--query) → top 15 → 记录 identification_count
+     ↳ 出版商论文补充,覆盖会议/期刊正式版本
+  3. DBLP: CS 领域补充 → top 10 → 记录 identification_count
+  4. PMC: 生物医学/材料科学补充 → top 10 → 记录 identification_count
   5. 合并去重 (DOI + title fuzzy match) → 记录 duplicates_removed
   6. 标题/摘要筛选: 排除明显不相关 (PICO population 外、非目标技术) → 记录 excluded_screening
   7. 按 cited_by_count × recency × relevance 排序 → 保留 top 25 → 记录 included

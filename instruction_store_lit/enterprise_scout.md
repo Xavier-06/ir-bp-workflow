@@ -14,13 +14,13 @@
 
 | 工具 | 用途 |
 |------|------|
-| Bash | 调 QCC MCP 工具 |
+| Bash | 调 QCC MCP 工具 + 金融数据脚本 |
 | WebSearch | 搜公司最新动态/融资/产品/管理层 |
-| WebFetch | 抓取公司官网/产品页/团队页 |
+| WebFetch | 抓取公司官网/产品页/团队页/SEC EDGAR |
 | Read | 读 research_plan 中的公司列表 |
 | Write | 输出 3 个文件 |
 
-### QCC MCP 工具（你的核心武器）
+### QCC MCP 工具（中国企业核心武器）
 
 你有 `qcc-company`、`qcc-ipr`、`qcc-risk` 三个 MCP connector:
 
@@ -36,7 +36,34 @@
 | `get_software_copyright_info` | 软件著作权 |
 | `get_company_risk_scan` | 风险扫描 (诉讼/处罚/异常) |
 
-### SEC EDGAR (美股公司)
+### NeoData 金融数据（上市公司行情/研报/估值）
+
+```bash
+# 搜索公司相关研报和行业数据
+cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "QuantumScape 固态电池 行业研报" --data-type all --json
+
+# 搜索公司估值快照（A股/港股）
+cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "宁德时代 行情 估值" --data-type api --json
+```
+
+> NeoData 返回结构化行情数据（股价/PE/PB/市值）和券商研报摘要，比 WebSearch 精准得多。
+
+### yfinance 估值数据（美股公司）
+
+```bash
+# 美股公司估值快照 — 通过 search_gateway 调用
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import yfinance_summary
+result = yfinance_summary('QS')  # 传 ticker symbol
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+> yfinance 返回: price / market_cap / pe_trailing / pe_forward / ps / pb / ev_ebitda / revenue / profit_margin / sector / industry
+> **必须传 ticker symbol**（如 QS / TSLA / AAPL），不是公司名。从 WebSearch 先查到 ticker 再调。
+
+### SEC EDGAR (美股上市公司)
 
 ```bash
 # 查公司 CIK
@@ -46,23 +73,45 @@ WebFetch https://www.sec.gov/cgi-bin/browse-edgar?company=QuantumScape&type=10-K
 WebFetch https://data.sec.gov/submissions/CIK{cik}.json
 ```
 
+### 按公司类型选择工具组合
+
+| 公司类型 | 工具组合 | 优先级 |
+|---------|---------|--------|
+| **中国未上市** | QCC + WebSearch + WebFetch | QCC 为主 |
+| **中国 A 股上市** | QCC + NeoData + WebSearch | QCC + NeoData 双管齐下 |
+| **美股上市** | yfinance + SEC EDGAR + QCC + WebSearch | yfinance 先拿估值快照 |
+| **港股上市** | NeoData(行情) + QCC + WebSearch | NeoData 覆盖港股 |
+| **海外未上市** | WebSearch + WebFetch + yfinance(如已上市母公司) | WebSearch 为主 |
+
 ## 搜索策略
 
 从 research_plan.json 获取 target_companies 列表:
 
 ```
 FOR each company in target_companies:
-  1. QCC: get_company_by_query → 找到公司
-  2. QCC: get_company_registration_info → 工商基本信息
-  3. QCC: get_shareholder_info → 股东结构
-  4. QCC: get_key_personnel → 管理层
-  5. QCC: get_external_investments → 对外投资/融资
-  6. QCC: get_patent_info → 专利检索 (技术实力验证)
-  7. QCC: get_company_risk_scan → 风险扫描
-  8. SEC EDGAR: 如果是美股 → 10-K MD&A + Risk Factors
-  9. WebSearch: 公司名 + "funding" / "valuation" / "partnership"
-  10. WebFetch: 公司官网技术页 + 团队页
-  11. WebSearch: 公司名 + CEO/CTO → 管理层背景
+  1. 判定公司类型 (中国/美股/港股, 上市/未上市)
+  
+  ── 中国企业 (QCC 路径) ──
+  2. QCC: get_company_by_query → 找到公司
+  3. QCC: get_company_registration_info → 工商基本信息
+  4. QCC: get_shareholder_info → 股东结构
+  5. QCC: get_key_personnel → 管理层
+  6. QCC: get_external_investments → 对外投资/融资
+  7. QCC: get_patent_info → 专利检索 (技术实力验证)
+  8. QCC: get_company_risk_scan → 风险扫描
+  
+  ── 上市公司金融数据 (NeoData/yfinance) ──
+  9.  如 A 股/港股: NeoData 搜研报 + 行情估值
+  10. 如美股: 先 WebSearch 查 ticker → yfinance_summary 拿估值快照
+  11. 如美股: SEC EDGAR → 10-K MD&A + Risk Factors
+  
+  ── 通用补充 ──
+  12. WebSearch: 公司名 + "funding" / "valuation" / "partnership"
+  13. WebFetch: 公司官网技术页 + 团队页
+  14. WebSearch: 公司名 + CEO/CTO → 管理层背景
+  
+  ── 交叉验证 ──
+  15. QCC 融资数据 vs NeoData 研报估值 vs WebSearch 新闻 → 三方交叉验证
 ```
 
 ## ⚠️ 输出路径 — 硬性要求，不可覆盖
@@ -125,15 +174,16 @@ FOR each company in target_companies:
 
 ```json
 {
-  "schema_version": "lit_enterprise.v1",
+  "schema_version": "lit_enterprise.v2",
   "companies": [
     {
       "fact_id": "ENT-001",
       "type": "company_profile",
       "company_name": "QuantumScape",
+      "ticker": "NYSE: QS",
       "founded": 2010,
       "hq": "San Jose, CA",
-      "stage": "Public (NYSE: QS)",
+      "stage": "Public",
       "total_funding": "$1.5B+",
       "key_investors": ["VW Group", "Bill Gates"],
       "tech_route": "oxide solid electrolyte + Li metal anode",
@@ -141,13 +191,25 @@ FOR each company in target_companies:
       "key_patents": ["US11,xxx,xxx"],
       "partnerships": ["VW"],
       "management": {"CEO": "Siva Sivaram", "CTO": "Holger Wempe"},
+      "financial_data": {
+        "market_cap": "8.5B",
+        "pe_ratio": null,
+        "revenue": "0",
+        "profit_margin": "-350%",
+        "currency": "USD",
+        "source": "yfinance"
+      },
       "latest_milestone": "2025 Q4: Alpha-2 prototype",
       "risks": ["continuous losses", "mass production delay"],
-      "relevance": "oxide route solid battery leader"
+      "relevance": "oxide route solid battery leader",
+      "data_sources": ["qcc-company", "yfinance", "sec-edgar", "websearch"]
     }
   ]
 }
 ```
+
+> ⚠️ **financial_data 字段**：如果是上市公司，必须从 NeoData/yfinance 拿估值数据填入。非上市公司此字段可为 null。
+> ⚠️ **data_sources 字段**：记录每家公司实际用了哪些数据源，审计需要。
 
 > 提示：JSON 值中如果需要中文内容，可以写中文，但**引号、冒号、逗号、大括号、方括号必须用 ASCII 字符**。
 
