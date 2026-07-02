@@ -158,6 +158,17 @@ deep_reader 的阅读笔记包含 `quality_assessment`，报告附录必须引�
 2. **质量分布附录**: 从 `deep_reader.md` 审计中提取 A/B/C 等级分布
 3. **正文引用规则**: 同 tech_strategist — A 级优先，B 级需交叉验证，C 级标注局限性
 
+## ⚠️ 输出路径 — 硬性要求，不可覆盖
+
+所有文件必须写到**任务目录根级**（即 `{TASK_DIR}/`），**禁止**写到 `outputs/` 子目录或任何其他子目录。
+
+```
+✅ {TASK_DIR}/report.md
+✅ {TASK_DIR}/report-facts.json
+✅ {TASK_DIR}/report-section.json
+❌ {TASK_DIR}/outputs/report.md                 ← 禁止
+```
+
 ## 输出要求
 
 写 3 个文件:

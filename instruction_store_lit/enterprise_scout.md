@@ -65,12 +65,63 @@ FOR each company in target_companies:
   11. WebSearch: 公司名 + CEO/CTO → 管理层背景
 ```
 
+## ⚠️ 输出路径 — 硬性要求，不可覆盖
+
+所有文件必须写到**任务目录根级**（即 `{TASK_DIR}/`），**禁止**写到 `outputs/` 子目录或任何其他子目录。
+
+```
+✅ {TASK_DIR}/enterprise_scout.md
+✅ {TASK_DIR}/enterprise_scout-facts.json
+✅ {TASK_DIR}/enterprise_scout-section.json
+❌ {TASK_DIR}/outputs/enterprise_scout.md       ← 禁止
+❌ /tmp/enterprise_scout.md                      ← 禁止
+```
+
 ## 输出要求
 
 写 3 个文件:
 
 1. **enterprise_scout.md** — 搜索审计 (每家公司的查询和结果)
 2. **enterprise_scout-facts.json**:
+
+### ⚠️⚠️ JSON 格式硬性规范 — 写文件前必须自查
+
+你的 JSON 含 **dict 嵌套**（companies 数组内嵌 management 对象、数组、字符串），这是子代理最容易写坏的结构。
+
+**铁律（违反即 gate FAIL，管线卡死）**：
+
+1. **ASCII 直引号**：所有 JSON key 和 string value 必须用 ASCII `"` (U+0022)
+   - ❌ 禁止中文引号 `"…"` `"…"`
+   - ❌ 禁止单引号 `'...'`
+   - ✅ 只用英文双引号 `"..."`
+
+2. **dict 嵌套必须闭合**：每个 `{` 必须有对应的 `}`，每个 `[` 必须有对应的 `]`
+   - 写完 `management: {"CEO": "...", "CTO": "..."}` 后检查大括号是否配对
+   - 写完 `key_investors: ["A", "B"]` 后检查方括号是否配对
+
+3. **嵌套对象内不要插入换行或注释**：
+   ```json
+   ❌ "management": {
+     "CEO": "张三"  // 创始人
+   }
+   ✅ "management": {"CEO": "张三"}
+   ```
+
+4. **尾逗号禁止**：最后一个元素后面不能有逗号
+   ```json
+   ❌ "risks": ["亏损", "延期",]
+   ✅ "risks": ["亏损", "延期"]
+   ```
+
+5. **数值不要加引号**：
+   ```json
+   ❌ "founded": "2010"
+   ✅ "founded": 2010
+   ❌ "patent_count": "450"
+   ✅ "patent_count": 450
+   ```
+
+**写完后必须用 `python3 -c "import json; json.load(open('enterprise_scout-facts.json'))"` 验证**，报错就修。
 
 ```json
 {
@@ -85,18 +136,20 @@ FOR each company in target_companies:
       "stage": "Public (NYSE: QS)",
       "total_funding": "$1.5B+",
       "key_investors": ["VW Group", "Bill Gates"],
-      "tech_route": "氧化物固态电解质 + 锂金属负极",
+      "tech_route": "oxide solid electrolyte + Li metal anode",
       "patent_count": 450,
       "key_patents": ["US11,xxx,xxx"],
-      "partnerships": ["VW (量产合作)"],
-      "management": {"CEO": "Siva Sivaram", "CTO": "..."},
+      "partnerships": ["VW"],
+      "management": {"CEO": "Siva Sivaram", "CTO": "Holger Wempe"},
       "latest_milestone": "2025 Q4: Alpha-2 prototype",
-      "risks": ["连续亏损", "量产延期风险"],
-      "relevance": "固态电池氧化物路线领跑者"
+      "risks": ["continuous losses", "mass production delay"],
+      "relevance": "oxide route solid battery leader"
     }
   ]
 }
 ```
+
+> 提示：JSON 值中如果需要中文内容，可以写中文，但**引号、冒号、逗号、大括号、方括号必须用 ASCII 字符**。
 
 3. **enterprise_scout-section.json**
 

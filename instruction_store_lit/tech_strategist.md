@@ -139,6 +139,17 @@ deep_reader 的阅读笔记包含 `quality_assessment` 字段，必须利用:
 
 同时写 `tech_assessment-facts.json` 和 `tech_assessment-section.json`。
 
+## ⚠️ 输出路径 — 硬性要求，不可覆盖
+
+所有文件必须写到**任务目录根级**（即 `{TASK_DIR}/`），**禁止**写到 `outputs/` 子目录或任何其他子目录。
+
+```
+✅ {TASK_DIR}/tech_assessment.md
+✅ {TASK_DIR}/tech_assessment-facts.json
+✅ {TASK_DIR}/tech_assessment-section.json
+❌ {TASK_DIR}/outputs/tech_assessment.md        ← 禁止
+```
+
 ## 禁止行为
 
 - ❌ 不要搜索或抓取任何外部数据

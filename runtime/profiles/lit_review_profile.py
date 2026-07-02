@@ -270,6 +270,15 @@ def _safe_load_json_with_repair(path: Path) -> dict | list | None:
         i += 1
 
     fixed_text = ''.join(result)
+
+    # Strategy 2: Remove trailing commas before closing brackets/braces
+    import re
+    fixed_text = re.sub(r',(\s*[}\]])', r'\1', fixed_text)
+
+    # Strategy 3: Fix smart/curly quotes → ASCII straight quotes
+    fixed_text = fixed_text.replace('\u201c', '"').replace('\u201d', '"')
+    fixed_text = fixed_text.replace('\u2018', "'").replace('\u2019', "'")
+
     try:
         data = json.loads(fixed_text)
         from scripts.bp_file_lock import atomic_write
@@ -827,6 +836,20 @@ def _run_wave1_dispatch_prepare(runtime_root: Path, job_ctx: JobContext) -> dict
     # 构建 manifest (4-part prompt assembly: instruction + conclusion + tool_guide)
     system_prompt = _assemble_system_prompt(runtime_root, next_role)
     assert len(system_prompt) > MIN_PROMPT_LENGTH, f"system_prompt too short for {next_role}: {len(system_prompt)} chars"
+
+    # enterprise_scout: 追加 JSON 格式前置校验提示（dict 嵌套 + ASCII 直引号）
+    if next_role == "enterprise_scout":
+        system_prompt += (
+            "\n\n## ⚠️⚠️ JSON 格式前置校验（enterprise_scout 专用）\n\n"
+            "你的 enterprise_scout-facts.json 包含 **dict 嵌套**（companies 数组内嵌 management 对象），"
+            "这是管线中最容易出错的 JSON 结构。写文件前必须遵守：\n\n"
+            "1. **ASCII 直引号**：所有 key/value 用 `\"` (U+0022)，禁止中文引号 `\"…\"` `\"…\"`\n"
+            "2. **dict/array 闭合**：每个 `{` 配 `}`，每个 `[` 配 `]`，嵌套层级写完后自查\n"
+            "3. **尾逗号禁止**：最后一个元素后不能有逗号\n"
+            "4. **数值不加引号**：`\"founded\": 2010` 不是 `\"founded\": \"2010\"`\n"
+            "5. **写完后必须验证**：`python3 -c \"import json; json.load(open('enterprise_scout-facts.json'))\"`\n\n"
+            "违反以上规则 → JSON 解析失败 → gate FAIL → 管线卡死。\n"
+        )
 
     manifest = {
         "role": next_role,
@@ -2146,7 +2169,16 @@ def _run_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
 
 
 def _run_final_assembly(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 19: 排版 + md/docx/bib 输出。"""
+    """Phase 19: 排版 + md/docx/bib 输出。
+
+    v2: 增加引用脚注格式化 + DOCX 构建。
+    - 从 fact_store.json + 各 facts.json 构建引用映射
+    - 将 report.md 中的 [READ-XXX] / [IND-XXX] / [ENT-XXX] 转为 [^N] 脚注
+    - 调用 build_lit_report_docx.py 生成 DOCX
+    """
+    import subprocess
+    import re as _re
+
     task = _task_dir(runtime_root, job_ctx)
     report_path = task / "report.md"
 
@@ -2154,7 +2186,76 @@ def _run_final_assembly(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
         return {"ok": False, "phase": "phase19_final_assembly", "job_id": job_ctx.job_id,
                 "error": "report.md not found"}
 
-    # 复制最终报告到 workspace
+    # ── Step 1: 引用脚注格式化 ─────────────────────────────────
+    # 从 fact_store + 各 sidecar facts 构建 fact_id → 来源描述 映射
+    fact_id_to_source: dict[str, str] = {}
+
+    # 1a. fact_store.json
+    fs_path = task / "fact_store.json"
+    if fs_path.exists():
+        try:
+            fs_data = _safe_load_json_with_repair(fs_path) or {}
+            for f in fs_data.get("facts", []):
+                fid = f.get("fact_id", "")
+                if not fid:
+                    continue
+                title = f.get("title", "")
+                source = f.get("discovery_source", "")
+                url = f.get("open_access_pdf_url") or f.get("url", "")
+                fact_id_to_source[fid] = f"{source} — {title}" + (f" — {url}" if url else "")
+        except Exception:
+            pass
+
+    # 1b. 各 sidecar facts
+    for sidecar in task.glob(f"*{FACTS_SUFFIX}"):
+        try:
+            sd = _safe_load_json_with_repair(sidecar) or {}
+            items = sd.get("papers", sd.get("facts", sd.get("companies", [])))
+            for item in items:
+                fid = item.get("fact_id", "")
+                if not fid:
+                    continue
+                title = item.get("title") or item.get("company_name", "")
+                source = item.get("discovery_source") or item.get("source", "")
+                url = item.get("open_access_pdf_url") or item.get("url", "")
+                year = item.get("year", "")
+                if fid not in fact_id_to_source:
+                    desc = f"{source} — {title}"
+                    if year:
+                        desc += f" ({year})"
+                    if url:
+                        desc += f" — {url}"
+                    fact_id_to_source[fid] = desc
+        except Exception:
+            pass
+
+    # 1c. 将 report.md 中的 [READ-XXX] / [IND-XXX] / [ENT-XXX] 转为 [^N] 脚注
+    report_content = report_path.read_text(encoding="utf-8")
+    all_fact_refs = sorted(set(_re.findall(r"\[(READ-\d+|IND-\d+|ENT-\d+)\]", report_content)))
+
+    if all_fact_refs and fact_id_to_source:
+        # 建立 fact_id → footnote number 映射
+        fn_map: dict[str, int] = {}
+        for idx, fid in enumerate(all_fact_refs, 1):
+            fn_map[fid] = idx
+
+        # 替换正文中的 [READ-001] → [^1]
+        for fid, fn_num in fn_map.items():
+            report_content = report_content.replace(f"[{fid}]", f"[^{fn_num}]")
+
+        # 在报告末尾追加脚注定义
+        if "## 参考文献" not in report_content and "## References" not in report_content:
+            report_content += "\n\n## 参考文献\n\n"
+
+        for fid, fn_num in fn_map.items():
+            source_desc = fact_id_to_source.get(fid, fid)
+            report_content += f"[^{fn_num}]: {source_desc}\n"
+
+        # 回写格式化后的 report.md
+        report_path.write_text(report_content, encoding="utf-8")
+        print(f"  📝 Citation footnotes: {len(fn_map)} references formatted", flush=True)
+
+    # ── Step 2: 复制 report.md 到 delivery ──
     ws = job_ctx.workspace
     if ws is not None:
         try:
@@ -2162,17 +2263,66 @@ def _run_final_assembly(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
         except Exception:
             pass
 
+    # ── Step 3: 调用 DOCX 构建 ──────────────────────────────
+    docx_result: dict[str, Any] = {"success": False, "method": "skipped"}
+    docx_path = task / "report.docx"
+    academic_section_path = task / f"academic_scout{SECTION_SUFFIX}"
+
+    try:
+        build_script = runtime_root / "scripts" / "build_lit_report_docx.py"
+        if not build_script.exists():
+            build_script = runtime_root.parent / "scripts" / "build_lit_report_docx.py"
+
+        cmd = [
+            "python3", str(build_script), job_ctx.job_id,
+            "--input", str(report_path),
+            "--output", str(docx_path),
+            "--entity", job_ctx.entity or "",
+        ]
+        if academic_section_path.exists():
+            cmd.extend(["--academic-section", str(academic_section_path)])
+        if (task / "fact_store.json").exists():
+            cmd.extend(["--fact-store", str(task / "fact_store.json")])
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            try:
+                docx_result = json.loads(result.stdout)
+            except Exception:
+                docx_result = {"success": True, "output": str(docx_path), "raw": result.stdout[:200]}
+        else:
+            docx_result = {"success": False, "error": result.stderr[:500]}
+            print(f"  ⚠️ DOCX build failed: {result.stderr[:200]}", flush=True)
+    except FileNotFoundError:
+        print("  ⚠️ build_lit_report_docx.py not found, DOCX generation skipped", flush=True)
+    except Exception as e:
+        docx_result = {"success": False, "error": str(e)[:200]}
+        print(f"  ⚠️ DOCX build exception: {e}", flush=True)
+
+    # 复制 DOCX 到 delivery
+    if docx_result.get("success") and docx_path.exists():
+        if ws is not None:
+            try:
+                shutil.copy2(docx_path, ws.delivery_dir / "report.docx")
+            except Exception:
+                pass
+
     return {
         "ok": True,
         "mode": "assembly",
         "phase": "phase19_final_assembly",
         "job_id": job_ctx.job_id,
-        "result": {"report_path": str(report_path), "report_size": report_path.stat().st_size},
+        "result": {
+            "report_path": str(report_path),
+            "report_size": report_path.stat().st_size,
+            "docx": docx_result,
+            "citations_formatted": len(all_fact_refs) if all_fact_refs else 0,
+        },
     }
 
 
 def _run_delivery(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 20: 交付。"""
+    """Phase 20: 交付 — 含 DOCX。"""
     task = _task_dir(runtime_root, job_ctx)
     ws = job_ctx.workspace
 
@@ -2183,8 +2333,9 @@ def _run_delivery(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
         "artifacts": [],
     }
 
-    # 收集交付物
-    for artifact_name in ["report.md", "fact_store.json", "shared_state.json",
+    # 收集交付物 (含 DOCX)
+    for artifact_name in ["report.md", "report.docx",
+                          "fact_store.json", "shared_state.json",
                           "claim_coverage.json", "debate_review.json",
                           "wave1_gate.json", "wave2_gate.json"]:
         src = task / artifact_name
@@ -2195,6 +2346,12 @@ def _run_delivery(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
                     shutil.copy2(src, ws.delivery_dir / artifact_name)
                 except Exception:
                     pass
+
+    # 如果 DOCX 只在 delivery 目录（Phase 19 已复制过去），也列入
+    if ws is not None:
+        docx_delivery = ws.delivery_dir / "report.docx"
+        if docx_delivery.exists() and "report.docx" not in delivery_summary["artifacts"]:
+            delivery_summary["artifacts"].append("report.docx")
 
     return {
         "ok": True,
@@ -2302,8 +2459,8 @@ class LitReviewProfile(PipelineProfile):
             "phase16_wave3_dispatch_collect": ["report.md"],
             "phase17_claim_coverage": ["shared_state.json"],
             "phase18_debate_review": ["report.md"],
-            "phase19_final_assembly": ["report.md"],
-            "phase20_delivery": ["report.md", "fact_store.json"],
+            "phase19_final_assembly": ["report.md", "report.docx"],
+            "phase20_delivery": ["report.md", "report.docx", "fact_store.json"],
         }
 
     def phase_outputs(self) -> dict[str, list[str]]:
@@ -2330,7 +2487,7 @@ class LitReviewProfile(PipelineProfile):
             "phase16_wave3_dispatch_collect": [],
             "phase17_claim_coverage": ["claim_coverage.json"],
             "phase18_debate_review": ["debate_review.json"],
-            "phase19_final_assembly": ["report.md"],
+            "phase19_final_assembly": ["report.md", "report.docx"],
             "phase20_delivery": [],
         }
 

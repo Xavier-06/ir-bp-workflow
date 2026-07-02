@@ -72,6 +72,17 @@ print(json.dumps(results, ensure_ascii=False))
 
 每个维度至少搜 2 次。对搜到的报告 URL，用 WebFetch 尝试爬取全文。
 
+## ⚠️ 输出路径 — 硬性要求，不可覆盖
+
+所有文件必须写到**任务目录根级**（即 `{TASK_DIR}/`），**禁止**写到 `outputs/` 子目录或任何其他子目录。
+
+```
+✅ {TASK_DIR}/industry_scout.md
+✅ {TASK_DIR}/industry_scout-facts.json
+✅ {TASK_DIR}/industry_scout-section.json
+❌ {TASK_DIR}/outputs/industry_scout.md         ← 禁止
+```
+
 ## 输出要求
 
 写 3 个文件:

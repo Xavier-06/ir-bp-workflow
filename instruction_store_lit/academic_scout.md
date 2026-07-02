@@ -32,6 +32,9 @@ cd {RUNTIME_ROOT} && python3 scripts/api_clients/dblp_client.py "solid state bat
 # 3. PubMed Central — 生物医学/材料科学
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/pmc_client.py "solid state electrolyte" --max-results 10 --json
 
+# 3b. PMC 全文 XML 获取 (EFetch — 生物医学核心)
+cd {RUNTIME_ROOT} && python3 scripts/api_clients/pmc_client.py --pmc-id 12345678
+
 # 4. Crossref — DOI 解析 + 引用验证
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/crossref_client.py "10.1016/j.cossms.2022.101002" --json
 
@@ -39,10 +42,45 @@ cd {RUNTIME_ROOT} && python3 scripts/api_clients/crossref_client.py "10.1016/j.c
 cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "搜索关键词" --sources arxiv,dblp,pmc --max-results 30 --json
 ```
 
+## ⚠️⚠️ 领域判定 & 数据源优先级
+
+**搜索前必须先判定领域**：读取 `research_plan.json` 中的 `domain` 字段和 sub_topics 关键词。
+
+| 领域信号 | PMC 地位 | 搜索顺序 |
+|---------|---------|---------|
+| **生物医学** (biomedical/clinical/pharma/oncology/immunology/genomics/drug/cell therapy/CRISPR/protein/antibody/neuro/cardio/diagnostic/vaccine/mRNA/lipid nanoparticle) | **🔴 PRIMARY — 必须排第一** | PMC → arXiv → Crossref → DBLP |
+| **CS/AI/Tech** (LLM/computer vision/robotics/semiconductor/battery/materials science/quantum computing) | SECONDARY — 补充 | arXiv → DBLP → PMC → Crossref |
+| **交叉领域** (biomedical AI/medical devices/biomaterials/digital health) | **🔴 PRIMARY — PMC 必须排第一** | PMC → arXiv → DBLP → Crossref |
+
+**判定规则**：
+1. 如果 research_plan 包含 `domain` 字段 → 直接使用
+2. 如果 sub_topics 关键词命中上方生物医学信号词 ≥2 个 → 判定为生物医学领域
+3. 否则默认 CS/AI/Tech 领域
+
+**生物医学领域硬性要求**：
+- PMC 必须作为每个 sub_topic 的**第一个**搜索源
+- PMC 搜索结果数必须 ≥ arXiv 结果数，否则说明搜索词不够精准
+- 每篇 PMC 论文必须记录 `pmc_id`（后续 deep_reader 需要用来拿全文 XML）
+
 ## 搜索策略
 
 读取 `research_plan.json` 获取 sub_topics 和 **pico_framework** (如有)，然后:
 
+**生物医学领域:**
+```
+FOR each sub_topic in research_plan.sub_topics:
+  1. PMC: 主搜索源 (MeSH terms + free text) → top 20 → 记录 identification_count
+     ↳ 每篇记录 pmc_id，这是后续全文获取的关键
+  2. arXiv: CS/AI 交叉补充 → top 15 → 记录 identification_count
+  3. Crossref: DOI 解析 + 引用验证 → 记录 identification_count
+  4. DBLP: CS 会议补充 → top 10 → 记录 identification_count
+  5. 合并去重 → 记录 duplicates_removed
+  6. PICO screening → 记录 excluded_screening
+  7. 按 cited_by_count × recency × relevance 排序 → 保留 top 25 → 记录 included
+  8. 记录审计日志 + PRISMA funnel 数据
+```
+
+**CS/AI/Tech 领域:**
 ```
 FOR each sub_topic in research_plan.sub_topics:
   1. arXiv: 引号精确搜索 + 分类过滤 → top 20 → 记录 identification_count
@@ -59,6 +97,18 @@ FOR each sub_topic in research_plan.sub_topics:
 **时间过滤**：优先近 3 年，seminal paper 不限年份。
 **引用链扩展**：对 top 5 高引论文，用 Crossref 查 references 扩展引用链。
 **PICO 约束**：如 research_plan 含 pico_framework，用 population.exclusion 排除范围外论文，用 outcome.primary 作为相关性过滤信号。
+
+## ⚠️ 输出路径 — 硬性要求，不可覆盖
+
+所有文件必须写到**任务目录根级**（即 `{TASK_DIR}/`），**禁止**写到 `outputs/` 子目录或任何其他子目录。
+
+```
+✅ {TASK_DIR}/academic_scout.md
+✅ {TASK_DIR}/academic_scout-facts.json
+✅ {TASK_DIR}/academic_scout-section.json
+❌ {TASK_DIR}/outputs/academic_scout.md         ← 禁止
+❌ /tmp/academic_scout.md                        ← 禁止
+```
 
 ## 输出要求
 
@@ -94,6 +144,7 @@ FOR each sub_topic in research_plan.sub_topics:
 ```json
 {
   "schema_version": "lit_academic.v1",
+  "domain": "biomedical | cs_ai_tech | cross_domain",
   "sub_topics": ["..."],
   "papers": [
     {
@@ -108,11 +159,12 @@ FOR each sub_topic in research_plan.sub_topics:
       "abstract": "...",
       "doi": "...",
       "arxiv_id": "...",
+      "pmc_id": "12345678",
       "open_access_pdf_url": "...",
       "full_text_available": true,
       "topics": [{"domain": "...", "field": "..."}],
       "relevance_score": 0.95,
-      "discovery_source": "arxiv",
+      "discovery_source": "pmc",
       "discovery_method": "keyword_search"
     }
   ]

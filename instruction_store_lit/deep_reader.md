@@ -44,17 +44,59 @@
 
 ### 全文获取（按文档类型路由）
 
+> ⚠️⚠️ **`--metadata` 参数必须传** — pdf_downloader 的路由逻辑完全依赖 metadata 中的标识符字段。
+> 不传 metadata = 路由无法工作 = 拿不到全文。
+> **从 fact_store.json 读取每篇论文时，把 `arxiv_id`、`pmc_id`、`doi`、`open_access_pdf_url` 全部塞进 `--metadata`。**
+
+**学术论文 — 不同数据源不同下法：**
+
+| 数据源 | metadata 必需字段 | 路由行为 |
+|--------|------------------|---------|
+| arXiv | `arxiv_id` | 直下 `https://arxiv.org/pdf/{id}.pdf` |
+| PMC (生物医学) | `pmc_id` | 直下 PMC PDF 或用 EFetch 拿全文 XML |
+| DOI (出版商) | `doi` | Unpaywall API 查 OA 版本 |
+| OA URL | `open_access_pdf_url` | 直接下载 |
+| 多字段组合 | 全传 | 自动按优先级选最优路径 |
+
 ```bash
-# 学术论文
-cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py --fact-id DOC-001 --type paper --json
+# arXiv 论文
+cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py \
+  --fact-id DOC-001 --type paper \
+  --metadata '{"arxiv_id":"2108.10150"}' --json
+
+# PMC 论文 (生物医学) — pmc_id 是关键
+cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py \
+  --fact-id DOC-002 --type paper \
+  --metadata '{"pmc_id":"12345678"}' --json
+
+# 有 DOI 的论文 — Unpaywall OA 查找
+cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py \
+  --fact-id DOC-003 --type paper \
+  --metadata '{"doi":"10.1016/j.cossms.2022.101002"}' --json
+
+# 最佳实践：全字段传入，自动选最优
+cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py \
+  --fact-id DOC-005 --type paper \
+  --metadata '{"arxiv_id":"2108.10150","doi":"10.xxx","pmc_id":"12345","open_access_pdf_url":"..."}' --json
 
 # 券商研报
-cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py --fact-id IND-001 --type broker_report --json
+cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py \
+  --fact-id IND-001 --type broker_report \
+  --metadata '{"title":"固态电池行业深度报告"}' --json
 
-# 行业报告
-cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py --fact-id IND-010 --type industry_report --json
+# 行业报告 — 传 url
+cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdf_downloader.py \
+  --fact-id IND-010 --type industry_report \
+  --metadata '{"url":"https://example.com/report.pdf"}' --json
+```
 
-# PDF 提取
+**PMC 全文 XML（生物医学首选，比 PDF 提取质量高得多）：**
+```bash
+cd {RUNTIME_ROOT} && python3 scripts/api_clients/pmc_client.py --pmc-id 12345678
+```
+
+**PDF 提取：**
+```bash
 cd {RUNTIME_ROOT} && python3 scripts/fulltext/pdfplumber_extractor.py input.pdf --output text
 cd {RUNTIME_ROOT} && python3 scripts/fulltext/marker_extractor.py input.pdf --output markdown
 ```
@@ -142,6 +184,15 @@ gate 门禁代码检查 `quality_assessment.quality_tier` 字段。
 `quality_notes`: 一句话说明质量判断依据（方法论亮点或硬伤）
 
 **每个笔记压缩到 ~800 字**。不要写学术摘要，写成投资备忘录的技术附件。质量评估不占 800 字额度，是独立字段。
+
+## ⚠️ 输出路径 — 硬性要求，不可覆盖
+
+所有文件必须写到**任务目录根级**（即 `{TASK_DIR}/`），**禁止**写到 `outputs/` 子目录或任何其他子目录。
+
+```
+✅ {TASK_DIR}/sub_topic_{index}_reading_notes.json
+❌ {TASK_DIR}/outputs/sub_topic_{index}_reading_notes.json   ← 禁止
+```
 
 ## 输出要求
 
