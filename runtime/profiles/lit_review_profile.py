@@ -129,15 +129,29 @@ _CONCLUSION_APPENDIX = """
 """
 
 
-def _assemble_system_prompt(runtime_root: Path, role: str) -> str:
+def _assemble_system_prompt(runtime_root: Path, role: str, task_dir: Path | None = None) -> str:
     """Assemble full system prompt: instruction + conclusion + tool guide.
+
+    Replaces {RUNTIME_ROOT} and {TASK_DIR} placeholders with actual paths
+    so sub-agents can execute commands without guessing directories.
 
     Returns complete prompt text, or error marker if role is unknown.
     """
     prompts = _load_instruction_prompts(runtime_root)
     base = prompts.get(role, f"UNKNOWN ROLE: {role}. No instruction-store prompt is registered.")
     tool_guide = _load_tool_guide(runtime_root)
-    return base + _CONCLUSION_APPENDIX + tool_guide
+    full_prompt = base + _CONCLUSION_APPENDIX + tool_guide
+
+    # ── Placeholder substitution (critical for sub-agent command execution) ──
+    full_prompt = full_prompt.replace("{RUNTIME_ROOT}", str(runtime_root))
+    if task_dir is not None:
+        full_prompt = full_prompt.replace("{TASK_DIR}", str(task_dir))
+    else:
+        # Fallback: if task_dir not provided, still replace with runtime_root
+        # (some roles like tech_decomposition use runtime_root as task dir)
+        full_prompt = full_prompt.replace("{TASK_DIR}", str(runtime_root))
+
+    return full_prompt
 
 
 # ── Dispatch Instruction Template ──────────────────────────
@@ -427,7 +441,7 @@ def _build_lit_repair_manifest(
 
     返回 manifest 文件路径。
     """
-    system_prompt = _assemble_system_prompt(runtime_root, role)
+    system_prompt = _assemble_system_prompt(runtime_root, role, task_dir=task_dir)
 
     repair_prompt = (
         f"## 🔧 REPAIR TASK — Gate {gate_phase} FAIL\n\n"
@@ -540,7 +554,7 @@ def _run_tech_decomposition(runtime_root: Path, job_ctx: JobContext) -> dict[str
         intake = json.loads(intake_path.read_text(encoding="utf-8"))
 
     # 组装 system_prompt: instruction + conclusion + tool_guide
-    system_prompt = _assemble_system_prompt(runtime_root, "tech_decomposition")
+    system_prompt = _assemble_system_prompt(runtime_root, "tech_decomposition", task_dir=task)
     assert len(system_prompt) > MIN_PROMPT_LENGTH, f"system_prompt too short for tech_decomposition: {len(system_prompt)} chars"
 
     # 追加输入上下文
@@ -834,7 +848,7 @@ def _run_wave1_dispatch_prepare(runtime_root: Path, job_ctx: JobContext) -> dict
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
 
     # 构建 manifest (4-part prompt assembly: instruction + conclusion + tool_guide)
-    system_prompt = _assemble_system_prompt(runtime_root, next_role)
+    system_prompt = _assemble_system_prompt(runtime_root, next_role, task_dir=task)
     assert len(system_prompt) > MIN_PROMPT_LENGTH, f"system_prompt too short for {next_role}: {len(system_prompt)} chars"
 
     # enterprise_scout: 追加 JSON 格式前置校验提示（dict 嵌套 + ASCII 直引号）
@@ -1494,7 +1508,7 @@ def _run_wave2_dispatch_prepare(runtime_root: Path, job_ctx: JobContext) -> dict
             break
 
     # 4-part prompt assembly
-    system_prompt = _assemble_system_prompt(runtime_root, "deep_reader" if incomplete_sub else "tech_strategist")
+    system_prompt = _assemble_system_prompt(runtime_root, "deep_reader" if incomplete_sub else "tech_strategist", task_dir=task)
     assert len(system_prompt) > MIN_PROMPT_LENGTH, f"system_prompt too short: {len(system_prompt)} chars"
 
     if incomplete_sub:
@@ -1907,7 +1921,7 @@ def _run_wave3_dispatch_prepare(runtime_root: Path, job_ctx: JobContext) -> dict
         }
 
     # 4-part prompt assembly: instruction + conclusion + tool_guide
-    system_prompt = _assemble_system_prompt(runtime_root, "report_writer")
+    system_prompt = _assemble_system_prompt(runtime_root, "report_writer", task_dir=task)
     assert len(system_prompt) > MIN_PROMPT_LENGTH, f"system_prompt too short for report_writer: {len(system_prompt)} chars"
 
     # 检查 tech_assessment 是否存在 → 决定 fallback 模式
