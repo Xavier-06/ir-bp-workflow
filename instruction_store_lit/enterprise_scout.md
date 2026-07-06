@@ -14,15 +14,15 @@
 
 | 工具 | 用途 |
 |------|------|
-| Bash | 调 QCC MCP 工具 + 金融数据脚本 |
+| Bash | 调 TYC MCP 工具 + 金融数据脚本 |
 | WebSearch | 搜公司最新动态/融资/产品/管理层 |
 | WebFetch | 抓取公司官网/产品页/团队页/SEC EDGAR |
 | Read | 读 research_plan 中的公司列表 |
 | Write | 输出 3 个文件 |
 
-### QCC MCP 工具（中国企业核心武器）
+### TYC MCP 工具（中国企业核心武器）
 
-你有 `qcc-company`、`qcc-ipr`、`qcc-risk` 三个 MCP connector:
+你有 `tyc-mcp`、`tyc-mcp`、`tyc-mcp` 三个 MCP connector:
 
 | MCP 工具 | 用途 |
 |----------|------|
@@ -77,10 +77,10 @@ WebFetch https://data.sec.gov/submissions/CIK{cik}.json
 
 | 公司类型 | 工具组合 | 优先级 |
 |---------|---------|--------|
-| **中国未上市** | QCC + WebSearch + WebFetch | QCC 为主 |
-| **中国 A 股上市** | QCC + NeoData + WebSearch | QCC + NeoData 双管齐下 |
-| **美股上市** | yfinance + SEC EDGAR + QCC + WebSearch | yfinance 先拿估值快照 |
-| **港股上市** | NeoData(行情) + QCC + WebSearch | NeoData 覆盖港股 |
+| **中国未上市** | TYC + WebSearch + WebFetch | TYC 为主 |
+| **中国 A 股上市** | TYC + NeoData + WebSearch | TYC + NeoData 双管齐下 |
+| **美股上市** | yfinance + SEC EDGAR + TYC + WebSearch | yfinance 先拿估值快照 |
+| **港股上市** | NeoData(行情) + TYC + WebSearch | NeoData 覆盖港股 |
 | **海外未上市** | WebSearch + WebFetch + yfinance(如已上市母公司) | WebSearch 为主 |
 
 ## 搜索策略
@@ -91,14 +91,14 @@ WebFetch https://data.sec.gov/submissions/CIK{cik}.json
 FOR each company in target_companies:
   1. 判定公司类型 (中国/美股/港股, 上市/未上市)
   
-  ── 中国企业 (QCC 路径) ──
-  2. QCC: get_company_by_query → 找到公司
-  3. QCC: get_company_registration_info → 工商基本信息
-  4. QCC: get_shareholder_info → 股东结构
-  5. QCC: get_key_personnel → 管理层
-  6. QCC: get_external_investments → 对外投资/融资
-  7. QCC: get_patent_info → 专利检索 (技术实力验证)
-  8. QCC: get_company_risk_scan → 风险扫描
+  ── 中国企业 (TYC 路径) ──
+  2. TYC: get_company_by_query → 找到公司
+  3. TYC: get_company_registration_info → 工商基本信息
+  4. TYC: get_shareholder_info → 股东结构
+  5. TYC: get_key_personnel → 管理层
+  6. TYC: get_external_investments → 对外投资/融资
+  7. TYC: get_patent_info → 专利检索 (技术实力验证)
+  8. TYC: get_company_risk_scan → 风险扫描
   
   ── 上市公司金融数据 (NeoData/yfinance) ──
   9.  如 A 股/港股: NeoData 搜研报 + 行情估值
@@ -111,7 +111,7 @@ FOR each company in target_companies:
   14. WebSearch: 公司名 + CEO/CTO → 管理层背景
   
   ── 交叉验证 ──
-  15. QCC 融资数据 vs NeoData 研报估值 vs WebSearch 新闻 → 三方交叉验证
+  15. TYC 融资数据 vs NeoData 研报估值 vs WebSearch 新闻 → 三方交叉验证
 ```
 
 ## ⚠️ 输出路径 — 硬性要求，不可覆盖
@@ -202,7 +202,7 @@ FOR each company in target_companies:
       "latest_milestone": "2025 Q4: Alpha-2 prototype",
       "risks": ["continuous losses", "mass production delay"],
       "relevance": "oxide route solid battery leader",
-      "data_sources": ["qcc-company", "yfinance", "sec-edgar", "websearch"]
+      "data_sources": ["tyc-mcp", "yfinance", "sec-edgar", "websearch"]
     }
   ]
 }

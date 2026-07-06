@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""统一公司画像生成 — 合并 QCC + SEC + WebSearch 数据。
+"""统一公司画像生成 — 合并 TYC + SEC + WebSearch 数据。
 
 输出格式匹配设计文档中 enterprise_scout-facts.json 的 company_profile schema。
 
 用法:
-    python company_profile.py "QuantumScape" --sources qcc,sec,web --json
+    python company_profile.py "QuantumScape" --sources tyc,sec,web --json
 """
 from __future__ import annotations
 
@@ -18,14 +18,14 @@ from typing import Any, Optional
 def build_company_profile(
     company_name: str,
     sources: list[str],
-    qcc_data: dict | None = None,
+    tyc_data: dict | None = None,
     sec_data: dict | None = None,
     web_data: dict | None = None,
 ) -> dict:
     """合并多源数据生成统一公司画像。
 
-    sources: 启用的数据源列表 (qcc/sec/web)
-    qcc_data/sec_data/web_data: 预查询的数据 (子代理运行时传入)
+    sources: 启用的数据源列表 (tyc/sec/web)
+    tyc_data/sec_data/web_data: 预查询的数据 (子代理运行时传入)
     """
     profile = {
         "fact_id": f"ENT-{company_name[:3].upper()}",
@@ -48,14 +48,14 @@ def build_company_profile(
         "profiled_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
 
-    # 合并 QCC 数据
-    if qcc_data and "qcc" in sources:
-        profile["founded"] = qcc_data.get("founded")
-        profile["hq"] = qcc_data.get("hq", "")
-        profile["patent_count"] = qcc_data.get("patent_count", 0)
-        profile["key_patents"] = qcc_data.get("key_patents", [])
-        profile["management"] = qcc_data.get("management", {})
-        profile["risks"] = qcc_data.get("risks", [])
+    # 合并 TYC 数据
+    if tyc_data and "tyc" in sources:
+        profile["founded"] = tyc_data.get("founded")
+        profile["hq"] = tyc_data.get("hq", "")
+        profile["patent_count"] = tyc_data.get("patent_count", 0)
+        profile["key_patents"] = tyc_data.get("key_patents", [])
+        profile["management"] = tyc_data.get("management", {})
+        profile["risks"] = tyc_data.get("risks", [])
 
     # 合并 SEC 数据
     if sec_data and "sec" in sources:
@@ -77,8 +77,8 @@ def build_company_profile(
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="公司画像生成")
     ap.add_argument("company_name", help="公司名称")
-    ap.add_argument("--sources", default="qcc,sec,web", help="数据源 (逗号分隔)")
-    ap.add_argument("--qcc-data", default="{}", help="QCC 数据 JSON")
+    ap.add_argument("--sources", default="tyc,sec,web", help="数据源 (逗号分隔)")
+    ap.add_argument("--tyc-data", default="{}", help="TYC 数据 JSON")
     ap.add_argument("--sec-data", default="{}", help="SEC 数据 JSON")
     ap.add_argument("--web-data", default="{}", help="Web 数据 JSON")
     ap.add_argument("--json", action="store_true")
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     sources = [s.strip() for s in args.sources.split(",")]
     profile = build_company_profile(
         args.company_name, sources,
-        qcc_data=json.loads(args.qcc_data),
+        tyc_data=json.loads(args.tyc_data),
         sec_data=json.loads(args.sec_data),
         web_data=json.loads(args.web_data),
     )

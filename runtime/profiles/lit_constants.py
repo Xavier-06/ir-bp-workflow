@@ -1,7 +1,7 @@
 """Literature Review 管线共享常量模块。
 
 集中存放文献综述管线中多处重复使用的常量，包括:
-- QCC connector ID 列表 (企业侦察角色使用)
+- 企业数据 MCP connector ID 列表 (企业侦察角色使用，天眼查)
 - Wave 角色 slug 映射 (3 Wave 架构)
 - 收集重试参数
 - Evidence Gate 阈值
@@ -9,11 +9,12 @@
 """
 from __future__ import annotations
 
-# ── QCC Connector IDs ────────────────────────────────────────
+# ── 企业数据 MCP Connector IDs（天眼查） ──────────────────────
 # enterprise_scout 角色使用
-LIT_QCC_CONNECTOR_IDS = [
-    'qcc-company', 'qcc-ipr', 'qcc-risk',
-]
+LIT_TYC_CONNECTOR_IDS = ['tyc-mcp']
+
+# 向后兼容别名
+LIT_QCC_CONNECTOR_IDS = LIT_TYC_CONNECTOR_IDS
 
 # ── Wave 1: 三路采集 (数据独立, has_more 串行) ───────────────
 LIT_WAVE1_ROLE_SLUGS: dict[str, str] = {

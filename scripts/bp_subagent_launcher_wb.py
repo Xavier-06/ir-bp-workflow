@@ -388,7 +388,7 @@ def _build_brief(task_id: str, sub: dict, task_dir: Path | None = None) -> Path:
         '1. **第一轮：广度扫描** — search_gateway prefer=multi 或 search_many 多关键词并行',
         '2. **第二轮：深度验证** — 对第一轮发现的关键 claim，web_fetch 或 search_deep 读全文验证',
         '3. **第三轮：交叉验证/反证** — 搜竞品对比、负面信息、行业报告',
-        '4. **QCC 必查项**（中国大陆企业）：工商信息、司法诉讼、专利、资质、历史变更',
+        '4. **TYC 必查项**（中国大陆企业）：工商信息、司法诉讼、专利、资质、历史变更',
         '5. **金融数据必查**（如涉及上市公司/可比公司）：search_gateway 或 yfinance',
         '',
         '**禁止行为：**',
@@ -398,7 +398,7 @@ def _build_brief(task_id: str, sub: dict, task_dir: Path | None = None) -> Path:
         '',
         '## 执行要求',
         '- 先读 OCR / Step0 / 工商验证 / Presearch / BP Research Plan / BP Fact Store，再补搜索。',
-        '- **搜索时必须按 System Prompt 中的工具优先级选择工具**：金融数据用 search_gateway，企业工商/司法/专利用 QCC MCP，通用搜索用 web_search。',
+        '- **搜索时必须按 System Prompt 中的工具优先级选择工具**：金融数据用 search_gateway，企业工商/司法/专利用 TYC MCP，通用搜索用 web_search。',
         '- 补搜最多 3 轮，但 3 轮是上限不是目标——每轮必须有效产出新事实。',
         '- 仍搜不到的标注"经 X 次搜索未找到独立来源"，写入 data_gaps。',
         '- 直接把最终 Markdown 写到指定 output file。',
@@ -562,7 +562,7 @@ def _spawn_one(task_id: str, sub: dict, task_dir: Path | None = None) -> dict:
 
     system_prompt = system_prompt + _CONCLUSION_APPENDIX + _TOOL_USAGE_GUIDE + _stage_block
     # ── 企业数据 MCP connector IDs（天眼查） ──
-    _QCC_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS
+    
     manifest_data = {
         'task_id': task_id,
         'role': sub['role_name'],
@@ -581,7 +581,7 @@ def _spawn_one(task_id: str, sub: dict, task_dir: Path | None = None) -> dict:
         'mode': 'bypassPermissions',
         'subagent_type': 'general-purpose',
         'team_name_template': 'bp-{task_id}',
-        'connectorIds': _QCC_CONNECTOR_IDS,
+        'connectorIds': BP_TYC_CONNECTOR_IDS,
         'created_at': datetime.now().isoformat(timespec='seconds'),
         'status': 'pending',
     }

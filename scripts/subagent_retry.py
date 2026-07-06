@@ -88,7 +88,7 @@ def spawn_team_verification(company, founder):
     queries = [
         f"{founder} {company} 创始人",
         f"{founder} 中山大学 教授",
-        f"{company} 工商信息 天眼查 企查查",
+        f"{company} 工商信息 天眼查",
     ]
     
     all_results = {}

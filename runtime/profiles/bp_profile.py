@@ -550,7 +550,7 @@ def _extract_company_verify_facts(task_dir: Path) -> list[dict[str, Any]]:
                     "value": str(val),
                     "unit": "",
                     "period": "工商登记",
-                    "source_url": "企查查工商登记信息",
+                    "source_url": "天眼查工商登记信息",
                     "source_tier": "official",
                     "source_quote": f"{label}: {val}",
                     "question_id": "company_verify",
@@ -572,7 +572,7 @@ def _extract_company_verify_facts(task_dir: Path) -> list[dict[str, Any]]:
                         "value": str(ratio),
                         "unit": "%",
                         "period": "工商登记",
-                        "source_url": "企查查股东信息",
+                        "source_url": "天眼查股东信息",
                         "source_tier": "official",
                         "source_quote": f"{name} {ratio}",
                         "question_id": "company_verify",
@@ -592,7 +592,7 @@ def _extract_company_verify_facts(task_dir: Path) -> list[dict[str, Any]]:
                     "value": risk_desc[:200],
                     "unit": "",
                     "period": risk.get("date", "待验证"),
-                    "source_url": "企查查风险信息",
+                    "source_url": "天眼查风险信息",
                     "source_tier": "official",
                     "source_quote": risk_desc[:150],
                     "question_id": "company_verify",
@@ -2022,12 +2022,12 @@ def _dispatch_completion_instruction(roles: list[str], role_slugs: dict[str, str
     return (
         "MANDATORY: Read each manifest JSON file. Use the Agent tool with these EXACT parameters:\n"
         "1. prompt = manifest's 'system_prompt' field (the FULL text, do NOT summarize or rewrite)\n"
-        "2. connectorIds = manifest's 'connectorIds' field (enables QCC MCP tools for the sub-agent)\n"
+        "2. connectorIds = manifest's 'connectorIds' field (enables TYC MCP tools for the sub-agent)\n"
         "3. name = manifest's 'slug' field\n"
         "4. team_name = 'bp-{task_id}'\n"
         "5. mode = 'bypassPermissions'\n"
         "Do NOT write your own simplified prompt — the manifest system_prompt contains critical tool usage guides "
-        "(NeoData search_gateway, QCC MCP, yfinance) that the sub-agent MUST receive.\n"
+        "(NeoData search_gateway, TYC MCP, yfinance) that the sub-agent MUST receive.\n"
         "\n"
         "## ⚠️ CRITICAL: 子代理必须使用 NeoData 查上市公司金融数据\n"
         "manifest system_prompt 中已包含 NeoData 和 search_gateway 的调用示例。\n"
@@ -2858,7 +2858,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
     brief_path.write_text("\n".join(brief_lines) + "\n", encoding="utf-8")
 
     # ── 企业数据 MCP connector IDs（天眼查，与 wave 子代理对齐）──
-    _QCC_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS
+    
 
     brief_content = brief_path.read_text(encoding="utf-8")
 
@@ -2880,7 +2880,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
         "mode": "bypassPermissions",
         "subagent_type": "general-purpose",
         "team_name_template": "bp-{task_id}",
-        "connectorIds": _QCC_CONNECTOR_IDS,
+        "connectorIds": BP_TYC_CONNECTOR_IDS,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "status": "pending",
     }
@@ -3041,7 +3041,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                         f"5. 按优先级匹配脚注来源：\n"
                         f"   - 优先：维度 MD 中已有的外部 URL\n"
                         f"   - 其次：facts JSON 中的 source_url\n"
-                        f"   - 兜底：对 QCC 来源标注为'企查查结构化数据（企查查 MCP）'；BP 自述标注为'BP自述 — 无外部来源URL'\n"
+                        f"   - 兜底：对 TYC 来源标注为'天眼查结构化数据（天眼查 MCP）'；BP 自述标注为'BP自述 — 无外部来源URL'\n"
                         f"6. 只有当以上三个来源都没有 URL 时，才用 web_search 搜索补充\n"
                         f"7. 在数据后插入 [^N] 标记，脚注编号从现有最大编号+1 开始连续递增\n"
                         f"8. 在报告末尾'来源与参考'章节追加新脚注定义，格式：[^N]: 来源名称 — URL (日期)\n"

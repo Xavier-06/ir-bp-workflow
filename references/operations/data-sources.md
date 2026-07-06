@@ -7,7 +7,7 @@
 | 1 | NeoData 金融搜索 | A/HK 股行情、**最新季度财报**、板块、券商研报（search_gateway Layer 0 自动调用） |
 | 2 | yfinance (Python) | 估值指标、美股主力、A/HK 股交叉验证（PE/PS/市值/财报/key statistics） |
 | 3 | web_search | 实时搜索（东财/雪球/同花顺 行情、公告、行业报告、**财报新闻稿**） |
-| 4 | 企查查 MCP | 国内公司工商信息、融资轮、诉讼、知产 |
+| 4 | 天眼查 MCP | 国内公司工商信息、融资轮、诉讼、知产 |
 | 5 | RAG_search | 向量记忆知识库 |
 | 6 | tushare / yahoo skill | 补充金融数据 |
 

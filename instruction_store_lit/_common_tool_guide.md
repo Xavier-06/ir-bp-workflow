@@ -115,7 +115,7 @@ WebFetch → 已知网页 URL 爬取正文
 **路径 D: 公司披露**
 ```
 WebFetch → SEC EDGAR 10-K/S-1
-QCC MCP → 中国企业工商
+TYC MCP → 中国企业工商
 ```
 
 **路径 E: 新闻**
@@ -135,9 +135,9 @@ WebSearch → WebFetch 爬取
 
 | 工具 | 调用方式 | 查什么 |
 |------|---------|--------|
-| **QCC** | qcc-company MCP | 工商/融资/股东/高管 (中国企业) |
-| **QCC** | qcc-ipr MCP | 专利/软著 |
-| **QCC** | qcc-risk MCP | 诉讼/处罚/异常 |
+| **TYC** | tyc-mcp | 工商/融资/股东/高管 (中国企业) |
+| **TYC** | tyc-mcp | 专利/软著 |
+| **TYC** | tyc-mcp | 诉讼/处罚/异常 |
 | **NeoData** | `python3 scripts/search/neodata_search.py "公司名" --data-type all --json` | A股/港股研报+行情估值 |
 | **yfinance** | `python3 -c "from scripts.search_gateway import yfinance_summary; yfinance_summary('AAPL')"` | 美股估值快照 (price/PE/PB/market_cap) |
 | **SEC EDGAR** | WebFetch | 美股上市公司 10-K/S-1 |
@@ -171,7 +171,7 @@ WebSearch → WebFetch 爬取
 |------|--------|--------|
 | academic_scout | 搜论文 (arXiv/DBLP/PMC/Crossref, 4源必用) | 搜研报/新闻/企业信息/下载全文 |
 | industry_scout | 搜研报/报告/新闻 (NeoData/WebSearch) | 搜论文/企业信息 |
-| enterprise_scout | 企业尽调 (QCC + NeoData/yfinance + SEC/WebSearch) | 搜论文/研报 |
+| enterprise_scout | 企业尽调 (TYC + NeoData/yfinance + SEC/WebSearch) | 搜论文/研报 |
 | deep_reader | 读全文+压缩笔记 | 搜新文档 |
 | tech_decomposition | 快速预搜+拆解方向 | 下载全文/深度阅读 |
 | tech_strategist | 读笔记+分析 | 搜任何外部数据 |

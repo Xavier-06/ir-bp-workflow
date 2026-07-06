@@ -21,7 +21,7 @@ result = run_ic_job(job_id=..., entity="半导体", query="行业研究", market
 | Phase | 名称 | 说明 | 执行模式 |
 |-------|------|------|---------|
 | phase0 | scope_definition | 行业边界定义 + 关键词扩展 + 关键公司名单 | Python 自动 |
-| phase0.5 | multi_company_verify | 批量公司工商验证（企查查MCP） | Python 自动 |
+| phase0.5 | multi_company_verify | 批量公司工商验证（天眼查MCP） | Python 自动 |
 | phase1 | industry_presearch | 行业数据预搜索（NeoData + SearchGateway） | 后台子进程 |
 | phase1.5 | content_extraction | URL 抓取提取 | Python 自动 |
 | phase1.2 | industry_precompute | 行业规模预计算 + 财务基准 | Python 自动 |

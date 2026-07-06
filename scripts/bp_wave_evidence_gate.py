@@ -138,7 +138,7 @@ _REPAIR_SYSTEM_PROMPT_TEMPLATE = """\
    ```
 4. 新增的事实必须有外部来源 URL 支撑，禁止编造。
 5. section sidecar 中的 `claim_ids_covered` 字段必须包含本次修复覆盖的所有 claim ID。
-6. 搜索工具使用指南与正常维度子代理相同（search_gateway / QCC MCP / yfinance）。
+6. 搜索工具使用指南与正常维度子代理相同（search_gateway / TYC MCP / yfinance）。
 7. 修复完成后，确保 facts JSON 和 section JSON 都是合法 JSON，能被管线直接读取。
 """
 

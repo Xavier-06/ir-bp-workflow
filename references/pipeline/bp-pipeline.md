@@ -12,7 +12,7 @@
 
 ```
 01 phase01_document_intake                    — VL OCR + Step0 结构化抽取（含 financing_stage）
-02 phase02_company_verify                     — 企查查工商验证（输出 stage_tier）[heavy_bg]
+02 phase02_company_verify                     — 天眼查工商验证（输出 stage_tier）[heavy_bg]
 03 phase03_research_plan                      — 研究计划骨架 → needs_dispatch（LLM enrichment）
 03c phase03_research_plan_collect             — 合并 enrichment delta 到骨架计划
 04 phase04_presearch                          — BP 预搜索 + URL 内容提取 [heavy_bg]

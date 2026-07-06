@@ -676,18 +676,18 @@ class AdversarialVerifier:
                 detail='如果质疑数据可靠性，估值中必须标注"据BP披露，未经第三方审计"；如果用于计算则不应同时质疑'
             ))
 
-        # ADC-4: 企查查IP数据局限性检查
+        # ADC-4: 天眼查IP数据局限性检查
         # 检测"知识产权存疑""无法完全验证"等误导性结论
         ipr_doubt_patterns = ['知识产权.*存疑', '无法完全验证.*知识产权', 'IPR.*无法验证']
         has_ipr_doubt = any(re.search(p, text) for p in ipr_doubt_patterns)
-        has_layout_design_note = '布图设计' in text and ('国家知识产权局' in text or 'CNIPA' in text or '企查查未收录' in text)
+        has_layout_design_note = '布图设计' in text and ('国家知识产权局' in text or 'CNIPA' in text or '天眼查未收录' in text)
         if has_ipr_doubt and not has_layout_design_note:
             self.checks.append(VerificationCheck(
                 name='BP Anti-Defect: 知识产权验证不完整',
-                verification='检测知识产权存疑结论是否考虑了企查查不含布图设计的局限性',
-                output='知识产权存疑结论未说明企查查不含集成电路布图设计，可能误导',
+                verification='检测知识产权存疑结论是否考虑了天眼查不含布图设计的局限性',
+                output='知识产权存疑结论未说明天眼查不含集成电路布图设计，可能误导',
                 result='FAIL',
-                detail='企查查专利数据库不收录集成电路布图设计，"查不到"≠"不存在"，必须说明数据源局限性'
+                detail='天眼查专利数据库不收录集成电路布图设计，"查不到"≠"不存在"，必须说明数据源局限性'
             ))
 
         # ADC-5: 市场规模推算参数检查

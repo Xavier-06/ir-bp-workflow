@@ -217,7 +217,7 @@ result = finalize_pipeline(task_id, entity, market)
 ## 子代理自主闭环规则
 
 子代理在执行过程中必须自主闭环，不要回主控等待指示：
-1. **检测到数据缺口** → 自己补搜（NeoData/yfinance/web_search/企查查MCP），继续推进
+1. **检测到数据缺口** → 自己补搜（NeoData/yfinance/web_search/天眼查MCP），继续推进
 2. **来源不足** → 自己搜更多来源，补充到输出中
 3. **数据矛盾** → 自己判断哪个更可靠，标注矛盾来源
 4. **前序 step 输出有 gap** → 自己补充搜索填补

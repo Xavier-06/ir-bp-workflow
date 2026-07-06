@@ -64,7 +64,7 @@ OFFICIAL_DOMAINS = [
     'gov.cn', 'cnipa.gov.cn', 'caac.gov.cn', 'miit.gov.cn',
     'hkexnews.hk', 'sec.gov', 'sme.gov.cn',
     'cninfo.com.cn', 'sse.com.cn', 'szse.cn',
-    'qcc.com', 'tianyancha.com', 'qixin.com',
+    'tianyancha.com', 'qixin.com',
     'wenshu.court.gov.cn', 'zxgk.court.gov.cn',
 ]
 

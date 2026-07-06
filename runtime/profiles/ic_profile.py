@@ -127,7 +127,7 @@ def _run_scope_definition(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 # ═══════════════════════════════════════════════════════════
 
 def _run_multi_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 0.5: 对 query 中提到的公司做批量工商验证（企查查MCP）。
+    """Phase 0.5: 对 query 中提到的公司做批量工商验证（天眼查MCP）。
 
     如果没有提供具体公司名，则跳过。
     """

@@ -522,7 +522,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             '1. COMPARABLE COMPANY STATUS VERIFICATION (CRITICAL): For EVERY comparable company in the '
             'comps table, search-verify their CURRENT status: (a) If currently listed: use yfinance to '
             'verify ticker is active, pull latest market cap/PE/PS. (b) If currently private: search '
-            'IT桔子/36氪/企查查 for latest round and date. CRITICAL: check whether they have IPO\'d '
+            'IT桔子/36氪/天眼查 for latest round and date. CRITICAL: check whether they have IPO\'d '
             'SINCE the last private valuation you found. (c) If delisted/privatized: note date and last '
             'available valuation. (d) If acquired: note acquisition price — this IS a valuation data point. '
             'Status column format: "上市公司(代码) 市值X亿" or "未上市 X轮 金额(日期)" or '

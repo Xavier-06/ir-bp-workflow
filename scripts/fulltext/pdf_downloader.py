@@ -4,7 +4,7 @@
 路径 A: 学术论文 → arXiv PDF / PMC XML / Unpaywall / OA URL
 路径 B: 券商研报 → NeoData / WeStock / WebFetch
 路径 C: 行业报告 → WebFetch PDF/HTML
-路径 D: 公司披露 → SEC EDGAR / QCC
+路径 D: 公司披露 → SEC EDGAR / TYC
 路径 E: 新闻 → WebSearch + WebFetch
 
 用法:
