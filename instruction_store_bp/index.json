@@ -1,6 +1,6 @@
 {
   "meta": {
-    "version": 8,
+    "version": 9,
     "created_at": "2026-03-31T16:37:00",
     "updated_at": "2026-06-13T20:40:00",
     "task_type": "bp_尽调类",
@@ -13,7 +13,8 @@
       "v5 (2026-06-06): 对齐当前 BP Phase 2 八角色。新增并绑定 bp_company_team_compliance、bp_product_commercial、bp_tech_ip_moat、bp_market_supply_chain、bp_competition_positioning、bp_valuation_return、bp_customer_revenue_validation、bp_dealbreaker_risk 独立指令，避免旧角色 prompt 复用串活。",
       "v6 (2026-06-12): 7 个 v5 角色 prompt 新增'角色专属工具映射'章节。解决 v5 升级时角色级工具选型指导丢失的问题：子代理知道有什么工具可用（通用 Tool Usage Guide），但不知道自己维度该用哪个工具查什么。补回 QCC MCP/NeoData/yfinance/web_search 的角色级映射。涉及金融数据的角色（market_supply_chain、competition_positioning）补充完整 NeoData bash 调用命令和 yfinance 股票代码格式。bp_valuation_return 不改（PR3 已有完整估值数据源章节）。",
       "v7 (2026-06-12): 修正所有角色工具映射中的 QCC 工具名为精确 API 函数名。v6 只写了 connector 名（如 mcp__qcc-company），LLM 不知道该调哪个 API。修正为实际函数名（如 get_shareholder_info / get_actual_controller / get_company_registration_info / get_company_risk_scan / get_patent_info 等）。同时 qcc-company connector 之前 SSE 握手失败导致工具列表为空，已在 UI 重新连接恢复。",
-      "v8 (2026-06-13): bp_company_team_compliance prompt 新增'OCR 提取人物专项调查'硬性要求。问题：子代理 prompt 虽然写了'逐人验证'但过于泛泛，brief 中 key_inputs 只 dump 了 founders JSON 没有强调必须逐一独立搜索。新增指令明确要求：读取 step0_profile 的 team_highlights + founders 合并去重，每人至少 2 次独立 web_search + 企查查 executive 验证 + web_fetch 深读，搜不到必须标注而非忽略。同时修复 bp_presearch.py 只搜 first_founder 的 bug，改为对所有提取出的创始人（最多5人）都发起搜索。"
+      "v8 (2026-06-13): bp_company_team_compliance prompt 新增'OCR 提取人物专项调查'硬性要求。问题：子代理 prompt 虽然写了'逐人验证'但过于泛泛，brief 中 key_inputs 只 dump 了 founders JSON 没有强调必须逐一独立搜索。新增指令明确要求：读取 step0_profile 的 team_highlights + founders 合并去重，每人至少 2 次独立 web_search + 企查查 executive 验证 + web_fetch 深读，搜不到必须标注而非忽略。同时修复 bp_presearch.py 只搜 first_founder 的 bug，改为对所有提取出的创始人（最多5人）都发起搜索。",
+      "v9 (2026-07-06): 企业数据 MCP 从企查查（6 connector）全面替换为天眼查（tyc-mcp 单 connector 聚合网关）。1) bp_constants.py: BP_QCC_CONNECTOR_IDS → BP_TYC_CONNECTOR_IDS=['tyc-mcp']，保留旧名别名向后兼容。2) bp_profile.py: synthesis/repair manifest 的 connectorIds 改引用常量。3) bp_subagent_launcher_wb.py: wave 子代理 connectorIds 改引用常量。4) _common_tool_guide.md: QCC 工具段全面重写为 TYC 两阶段调用模式（search_companies → get_company_capabilities → call_tool），更新工具优先级表和脚注来源。5) 7 个维度 prompt 中所有 mcp__qcc-* 工具映射替换为 TYC 等效工具。6) bp_统稿.md 脚注示例和来源标注替换。天眼查聚合网关模式只需 1 个 connector 覆盖企查查原来 6 个 connector 的全部能力。"
     ]
   },
   "roles": [

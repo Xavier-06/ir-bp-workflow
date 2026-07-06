@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.profiles.bp_constants import BP_WAVE_ROLES as WAVE_ROLES
-from runtime.profiles.bp_constants import BP_QCC_CONNECTOR_IDS
+from runtime.profiles.bp_constants import BP_TYC_CONNECTOR_IDS
 from scripts.bp_utils import load_json, read_attempt_count
 
 # blocking_claims 最大硬卡次数；超过后降级为 WARN 放行
@@ -287,7 +287,7 @@ def build_repair_manifests(
             "wave": wave,
             "label": f"{task_dir.name}-repair-w{wave}-{slug}",
             "system_prompt": system_prompt,
-            "connectorIds": BP_QCC_CONNECTOR_IDS,
+            "connectorIds": BP_TYC_CONNECTOR_IDS,
             "claim_ids": claim_ids,
             "output_path": str(paths["markdown"]),
             "sidecar_paths": {

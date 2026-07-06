@@ -35,10 +35,10 @@
    - ⚠️ 部分一致 → 标注差异点
    - ❌ 搜不到 → 写"该人员信息经搜索未找到独立来源验证"
 
-### 企查查补充（中国大陆企业）
+### 天眼查补充（中国大陆企业）
 对识别出的创始人/高管，额外调用：
-- `mcp__qcc-executive__get_executive_positions`（传 personName + searchKey）验证任职企业
-- `mcp__qcc-executive__get_executive_risk_scan`（传 personName）做个人风险扫描
+- `get_person_profile(company_name="...", person_name="...")`（含任职+控制企业）（传 personName + searchKey）验证任职企业
+- `get_person_risk_profile(company_name="...", person_name="...")`（传 personName）做个人风险扫描
 
 ### 禁止行为
 - ❌ 不能只搜公司名，然后在正文中一笔带过创始人
@@ -50,21 +50,21 @@
 
 | 调查问题 | 首选工具 | 说明 |
 |---------|---------|------|
-| 公司工商登记基本信息 | `mcp__qcc-company__get_company_registration_info` | 法定代表人、注册资本、成立日期、登记状态、注册地址 |
-| 股权结构、股东、持股比例 | `mcp__qcc-company__get_shareholder_info` | 一层直接股东构成、持股比例、认缴出资额、出资时间 |
-| 实际控制人穿透 | `mcp__qcc-company__get_actual_controller` | 已完成股权穿透的最终控制人 |
-| 受益所有人（持股≥25%自然人） | `mcp__qcc-company__get_beneficial_owners` | AML 合规口径 |
-| 工商变更记录 | `mcp__qcc-company__get_change_records` | 聚合入口，一次覆盖名称/地址/资本/股东/法代等变更 |
-| 分支机构 | `mcp__qcc-company__get_branches` | 分公司名称、负责人、地区、登记状态 |
-| 核心团队任职 | `mcp__qcc-executive__get_executive_positions` | 高管在外任职企业列表（需传 searchKey + personName） |
-| 实控人关联企业 | `mcp__qcc-executive__get_executive_controlled_companies` | 实控人名下全部关联企业 |
-| 高管个人风险扫描 | `mcp__qcc-executive__get_executive_risk_scan` | 18 项个人风险维度前置预筛 |
-| 企业风险全面扫描（35项） | `mcp__qcc-risk__get_company_risk_scan` | 前置预筛，定位需下钻维度 |
+| 公司工商登记基本信息 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 法定代表人、注册资本、成立日期、登记状态、注册地址 |
+| 股权结构、股东、持股比例 | TYC `call_tool`（先 `get_company_capabilities` 取「股东信息」真实 tool_name，再 `call_tool(tool_name="...", company_name="...", arguments={page: 1, page_size: 20})`） | 一层直接股东构成、持股比例、认缴出资额、出资时间 |
+| 实际控制人穿透 | TYC `call_tool`（先 `get_company_capabilities` 取「实际控制人」真实 tool_name） | 已完成股权穿透的最终控制人 |
+| 受益所有人（持股≥25%自然人） | TYC `call_tool`（先 `get_company_capabilities` 取「受益所有人」真实 tool_name） | AML 合规口径 |
+| 工商变更记录 | TYC `call_tool`（先 `get_company_capabilities` 取「变更记录」真实 tool_name） | 聚合入口，一次覆盖名称/地址/资本/股东/法代等变更 |
+| 分支机构 | TYC `call_tool`（先 `get_company_capabilities` 取「分支机构」真实 tool_name） | 分公司名称、负责人、地区、登记状态 |
+| 核心团队任职 | `get_person_profile(company_name="...", person_name="...")`（含任职+控制企业） | 高管在外任职企业列表（需传 searchKey + personName） |
+| 实控人关联企业 | `get_person_profile(company_name="...", person_name="...")`（含控制企业列表） | 实控人名下全部关联企业 |
+| 高管个人风险扫描 | `get_person_risk_profile(company_name="...", person_name="...")` | 18 项个人风险维度前置预筛 |
+| 企业风险全面扫描（35项） | TYC `call_tool`（先 `get_company_capabilities` 取风险扫描类 tool_name，组合多个维度扫描） | 前置预筛，定位需下钻维度 |
 | 诉讼/失信/处罚/经营异常明细 | `get_judicial_documents` / `get_dishonest_info` / `get_administrative_penalty` / `get_business_exception` | 按风险扫描结果下钻对应原子工具 |
-| 资质许可 | `mcp__qcc-operation__get_qualifications` | 资质证书类型、等级、有效期、状态 |
-| 招投标 | `mcp__qcc-operation__get_bidding_info` | 招投标记录 |
-| 历史股东变更 | `mcp__qcc-history__get_historical_shareholders` | 已退出股东、历史股权结构 |
-| 历史投资 | `mcp__qcc-history__get_historical_investments` | 历史对外投资 |
+| 资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期、状态 |
+| 招投标 | `search_bids(query="公司名 招投标")` 或 TYC `call_tool`（取「招投标」tool_name） | 招投标记录 |
+| 历史股东变更 | TYC `call_tool`（先 `get_company_capabilities` 取「历史股东」真实 tool_name） | 已退出股东、历史股权结构 |
+| 历史投资 | TYC `call_tool`（先 `get_company_capabilities` 取「历史投资」真实 tool_name） | 历史对外投资 |
 | 团队履历外部验证、负面舆情 | `web_search` + `web_fetch` | 搜索高管公开信息、媒体报道 |
 | 上市战略股东财务数据（市值/PE/PS） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证战略股东体量和持股价值 |
 
@@ -79,8 +79,8 @@ print(neodata_search('{股东公司名} 市值 市盈率 市销率', data_type='
 - `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
 - 用途：验证战略投资方（如产业基金、上市公司）的财务体量，判断其投资行为的合理性
 
-⚠️ 企查查是**结构性数据的首选**——不要只用 `web_search` 搜工商信息。`web_search` 搜到的是新闻报道，不是结构化股东列表。
-⚠️ 企查查 IP 数据不含集成电路布图设计，需到国家知识产权局布图设计系统单独核实。
+⚠️ 天眼查是**结构性数据的首选**——不要只用 `web_search` 搜工商信息。`web_search` 搜到的是新闻报道，不是结构化股东列表。
+⚠️ 天眼查 IP 数据不含集成电路布图设计，需到国家知识产权局布图设计系统单独核实。
 
 ## 输出结构
 1. 公司主体与股权架构

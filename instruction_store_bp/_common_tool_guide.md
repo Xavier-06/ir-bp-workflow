@@ -16,7 +16,7 @@
 
 **报告末尾"来源与参考"章节**：展开完整脚注
 ```
-[^1]: 企查查工商信息 — 企查查结构化数据（企查查 MCP）
+[^1]: 天眼查工商信息 — 天眼查结构化数据（天眼查 MCP）
 [^2]: Yole Intelligence — https://www.yole.com/reports/laser-market-2025 (2025-12)
 [^3]: BP自述 — 无外部来源URL
 [^4]: 人民网 — https://ah.people.com.cn/n2/2024/0603/c374164-40866555.html (2024-06)
@@ -24,7 +24,7 @@
 
 ### 脚注来源优先级
 1. **外部 URL**（web_search / search_gateway 返回的 URL）→ 写完整 URL
-2. **企查查结构化数据** → 写 `企查查结构化数据（企查查 MCP）`
+2. **天眼查结构化数据** → 写 `天眼查结构化数据（天眼查 MCP）`
 3. **BP 自述数据**（无外部来源）→ 写 `BP自述 — 无外部来源URL`
 4. **NeoData 金融数据** → 写 `NeoData 金融数据 — neodata_search`
 
@@ -119,25 +119,40 @@ print(v)
 
 ### 3. 非上市企业工商/司法/专利/资质（BP 尽调核心）
 
-**企查查 QCC MCP 工具 — 结构化企业数据**
+**天眼查 TYC MCP 工具 — 结构化企业数据（两阶段调用）**
 
-直接用 MCP 工具调用（不需要 Bash），常用工具：
-- `mcp__qcc-company__get_company_info` — 企业基本信息（注册、股东、高管）
-- `mcp__qcc-executive__get_executive_positions` — 高管任职
-- `mcp__qcc-executive__get_executive_controlled_companies` — 实控人关联企业
-- `mcp__qcc-risk__get_judicial_documents` — 司法文书
-- `mcp__qcc-risk__get_dishonest_info` — 失信信息
-- `mcp__qcc-risk__get_case_filing_info` — 立案信息
-- `mcp__qcc-risk__get_administrative_penalty` — 行政处罚
-- `mcp__qcc-ipr__get_patent_info` — 专利信息
-- `mcp__qcc-ipr__get_trademark_info` — 商标信息
-- `mcp__qcc-ipr__get_software_copyright_info` — 软件著作权
-- `mcp__qcc-operation__get_qualifications` — 企业资质
-- `mcp__qcc-operation__get_bidding_info` — 招投标信息
-- `mcp__qcc-history__get_historical_shareholders` — 历史股东变更
-- `mcp__qcc-history__get_historical_investments` — 历史对外投资
+天眼查 MCP 采用聚合网关模式，只有一个 connector `tyc-mcp`。工作流程：
+1. **锁定企业**：`search_companies(query="公司名")` → 返回候选表，取精确企业名
+2. **查可用工具**：`get_company_capabilities(company_id=..., company_name=...)` → 返回该企业可调用的 tool_name 列表
+3. **调数据**：`call_tool(tool_name="精确工具名", company_name="...", arguments={...})` → 获取维度数据
 
-**什么时候用 QCC：**
+**直接画像工具（无需 call_tool，直接调用）：**
+- `get_company_basic_profile(company_name="...")` — 基础画像：工商登记、简介、联系方式、标签、规模、曾用名、地址、Logo
+- `get_company_people(company_name="...")` — 人员列表：高管、董监高、核心团队
+- `get_person_profile(company_name="...", person_name="...")` — 个人画像：任职 + 控制企业
+- `get_person_risk_profile(company_name="...", person_name="...")` — 个人风险画像
+- `get_company_group_profile(company_name="...")` — 集团画像：成员、对外投资、投资方
+- `get_group_info(company_name="...")` — 集团基本信息 + 实控人
+
+**跨公司搜索工具（直接调用）：**
+- `search_patents(query="...", applicant="公司名")` — 专利搜索
+- `search_trademarks(query="...", applicant="公司名")` — 商标搜索
+- `search_bids(query="公司名 招投标")` — 招投标搜索
+- `search_listed_companies(query="公司名")` — 上市公司搜索
+- `search_companies_by_tag(query="标签名")` — 按标签搜索公司
+- `search_companies_by_industry_region(query="...", industry="行业代码", region="地区代码")` — 按行业+地区搜索
+
+**call_tool 常用维度（必须先从 get_company_capabilities 取真实 tool_name）：**
+- 股东信息 / 实际控制人 / 受益所有人
+- 变更记录 / 分支机构
+- 对外投资
+- 财务数据 / 上市信息
+- 司法文书 / 失信信息 / 行政处罚 / 经营异常 / 股权冻结
+- 企业资质 / 招投标
+- 专利信息 / 商标信息 / 软件著作权
+- 历史股东 / 历史投资 / 历史失信 / 历史司法文书
+
+**什么时候用 TYC：**
 - 查公司工商信息（注册资本、股东、高管、实控人）
 - 查司法诉讼、失信、行政处罚（风险维度必查）
 - 查专利、商标、软著（技术维度必查）
@@ -145,14 +160,17 @@ print(v)
 - 查历史变更（股权变更、法人变更）
 - 查对外投资、关联企业（估值/竞争维度）
 
-**注意：QCC 查的是中国大陆注册企业。如果标的是境外注册，QCC 可能无数据，用 web_search 兜底。**
+**注意：TYC 查的是中国大陆注册企业。如果标的是境外注册，TYC 可能无数据，用 web_search 兜底。**
+
+**⚠️ 关键纪律：call_tool 的 tool_name 必须逐字复制 get_company_capabilities 返回表格中的真实名称，不能按中文含义猜测或翻译。**
+
 
 ### 4. 通用网络搜索（新闻、行业报告、通用信息）
 
 **web_search（WorkBuddy 内置工具）**
 - 直接用，不需要 Bash
 - 适合：搜新闻、行业趋势、媒体报道、通用信息
-- 不适合：结构化金融数据（用 search_gateway）、结构化企业数据（用 QCC）
+- 不适合：结构化金融数据（用 search_gateway）、结构化企业数据（用 TYC 天眼查）
 - 作为所有搜索的兜底手段
 
 ### 5. 网页正文深度阅读
@@ -173,15 +191,15 @@ print(v)
 | A/HK 股行情/财报/板块 | search_gateway (prefer=auto/neodata) | web_search |
 | 美股估值/可比公司 | /opt/anaconda3/bin/python3 + yfinance | search_gateway |
 | A/HK 可比公司估值 | NeoData neodata_search 或 enrich_valuation | yfinance |
-| 企业工商/股东/高管 | QCC MCP (qcc-company) | web_search |
-| 司法诉讼/风险/处罚 | QCC MCP (qcc-risk) | web_search |
-| 专利/商标/软著 | QCC MCP (qcc-ipr) | web_search |
-| 企业资质/招投标 | QCC MCP (qcc-operation) | web_search |
+| 企业工商/股东/高管 | TYC search_companies → call_tool | web_search |
+| 司法诉讼/风险/处罚 | TYC call_tool（先 get_company_capabilities 取 tool_name） | web_search |
+| 专利/商标/软著 | TYC search_patents / search_trademarks / call_tool | web_search |
+| 企业资质/招投标 | TYC call_tool（先 get_company_capabilities 取 tool_name） | web_search |
 | 新闻/行业报告/通用 | search_gateway (prefer=multi) | web_search |
 | 读某个 URL 的正文 | web_fetch | — |
 | 搜索+读正文一步到位 | search_gateway search_deep | — |
 
 ### ⚠️ 禁止行为
-- 禁止只用 web_search 做所有搜索——web_search 没有 NeoData 金融数据，没有 QCC 结构化数据
-- 禁止在能用 QCC 直接查到结构化数据时用 web_search 去搜（如查股东信息，QCC 直接返回结构列表，web_search 只能搜到新闻）
+- 禁止只用 web_search 做所有搜索——web_search 没有 NeoData 金融数据，没有 TYC（天眼查）结构化数据
+- 禁止在能用 TYC 直接查到结构化数据时用 web_search 去搜（如查股东信息，TYC 直接返回结构列表，web_search 只能搜到新闻）
 - 禁止在需要精确估值数字时只用 web_search（用 yfinance 或 search_gateway）

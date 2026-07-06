@@ -42,11 +42,11 @@
 
 | 调查问题 | 首选工具 | 说明 |
 |---------|---------|------|
-| 专利核验 | `mcp__qcc-ipr__get_patent_info` | 专利数量、类型、申请日期、授权状态 |
-| 商标核验 | `mcp__qcc-ipr__get_trademark_info` | 商标注册信息 |
-| 软著核验 | `mcp__qcc-ipr__get_software_copyright_info` | 软件著作权信息 |
-| 公司工商基础信息 | `mcp__qcc-company__get_company_registration_info` | 注册资本、存续状态 |
-| 集成电路布图设计 | `web_search` → 国家知识产权局布图设计系统 | ⚠️ QCC 不覆盖，必须单独查 |
+| 专利核验 | `search_patents(query="专利名", applicant="公司名")` 或 TYC `call_tool`（取「专利信息」tool_name） | 专利数量、类型、申请日期、授权状态 |
+| 商标核验 | `search_trademarks(query="商标名", applicant="公司名")` 或 TYC `call_tool`（取「商标信息」tool_name） | 商标注册信息 |
+| 软著核验 | TYC `call_tool`（先 `get_company_capabilities` 取「软件著作权」真实 tool_name） | 软件著作权信息 |
+| 公司工商基础信息 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 注册资本、存续状态 |
+| 集成电路布图设计 | `web_search` → 国家知识产权局布图设计系统 | ⚠️ TYC 不覆盖，必须单独查 |
 | 技术路线/学术论文/行业方案 | `web_search` + `web_fetch` | 搜学术论文、第三方测试报告、行业标准 |
 | 竞品技术能力验证 | `web_search` | 否定性结论（"竞品没有X能力"）必须搜索验证 |
 | 上市竞品研发投入/财务数据 | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证竞品研发费用和营收规模 |
@@ -62,7 +62,7 @@ print(neodata_search('{竞品公司名} 研发费用 营收 净利润', data_typ
 - `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
 - 用途：验证上市竞品的研发投入规模和营收体量，判断标的公司技术壁垒是否可持续
 
-⚠️ 专利验证是**本维度核心**——必须用 `mcp__qcc-ipr` 查结构化专利数据，不能只用 `web_search` 搜"XX公司 专利"。
+⚠️ 专利验证是**本维度核心**——必须用 TYC `search_patents` / `search_trademarks` / `call_tool` 查结构化专利数据，不能只用 `web_search` 搜"XX公司 专利"。
 ⚠️ 单一数据库有覆盖缺口，查不到某类 IP 不得直接判定"IP 不存在"。
 
 ## 输出结构

@@ -14,7 +14,7 @@ from runtime.profiles.base import JobContext, PipelineProfile
 from runtime.profiles.bp_constants import (
     BP_ALL_ROLE_SLUGS,
     BP_LEGACY_ROLE_SLUGS,
-    BP_QCC_CONNECTOR_IDS,
+    BP_TYC_CONNECTOR_IDS,
     BP_WAVE1_ROLE_SLUGS,
     BP_WAVE2_ROLE_SLUGS,
     BP_WAVE3_ROLE_SLUGS,
@@ -2857,11 +2857,8 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
     ])
     brief_path.write_text("\n".join(brief_lines) + "\n", encoding="utf-8")
 
-    # ── QCC MCP connector IDs（与 wave 子代理对齐）──
-    _QCC_CONNECTOR_IDS = [
-        'qcc-company', 'qcc-executive', 'qcc-risk',
-        'qcc-ipr', 'qcc-operation', 'qcc-history',
-    ]
+    # ── 企业数据 MCP connector IDs（天眼查，与 wave 子代理对齐）──
+    _QCC_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS
 
     brief_content = brief_path.read_text(encoding="utf-8")
 
@@ -3061,10 +3058,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                     "dispatch_mode": "team_async",
                     "mode": "bypassPermissions",
                     "subagent_type": "general-purpose",
-                    "connectorIds": [
-                        'qcc-company', 'qcc-executive', 'qcc-risk',
-                        'qcc-ipr', 'qcc-operation', 'qcc-history',
-                    ],
+                    "connectorIds": BP_TYC_CONNECTOR_IDS,
                     "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                 }
                 repair_manifest_path = task_dir / "bp_synthesis_repair_manifest.json"

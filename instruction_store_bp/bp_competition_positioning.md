@@ -40,11 +40,11 @@
 
 | 调查问题 | 首选工具 | 说明 |
 |---------|---------|------|
-| 竞品工商登记 | `mcp__qcc-company__get_company_registration_info` | 注册资本、成立日期、登记状态 |
-| 竞品股东/融资 | `mcp__qcc-company__get_shareholder_info` | 一层股东构成、持股比例 |
-| 竞品融资记录 | `mcp__qcc-operation__get_financing_records` | 创投融资、上市融资、增发融资 |
-| 竞品招投标（判断市场地位） | `mcp__qcc-operation__get_bidding_info` | 招投标记录 |
-| 竞品资质许可 | `mcp__qcc-operation__get_qualifications` | 资质证书类型、等级、有效期 |
+| 竞品工商登记 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 注册资本、成立日期、登记状态 |
+| 竞品股东/融资 | TYC `call_tool`（先 `get_company_capabilities` 取「股东信息」真实 tool_name，再 `call_tool(tool_name="...", company_name="...", arguments={page: 1, page_size: 20})`） | 一层股东构成、持股比例 |
+| 竞品融资记录 | TYC `call_tool`（先 `get_company_capabilities` 取「融资记录」真实 tool_name） | 创投融资、上市融资、增发融资 |
+| 竞品招投标（判断市场地位） | `search_bids(query="公司名 招投标")` 或 TYC `call_tool`（取「招投标」tool_name） | 招投标记录 |
+| 竞品资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期 |
 | 上市竞品财务数据（市值/PE/PS） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData |
 | 美股竞品估值交叉验证 | `yfinance` | A股代码: `{代码}.SS`/`.SZ`，港股: `{代码}.HK` |
 | 竞品产品/客户/新闻 | `web_search` + `web_fetch` | 搜竞品官网、媒体报道、行业排名 |

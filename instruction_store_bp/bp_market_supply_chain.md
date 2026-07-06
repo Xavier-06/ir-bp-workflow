@@ -41,11 +41,11 @@ Professional research report chapter on market sizing, industry landscape, and s
 | 调查问题 | 首选工具 | 说明 |
 |---------|---------|------|
 | 上市竞对/行业板块财务数据 | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，含行情/财报/板块数据 |
-| 供应商/客户工商信息 | `mcp__qcc-company__get_company_registration_info` | 法定代表人、注册资本、成立日期、登记状态 |
-| 供应商/客户股东 | `mcp__qcc-company__get_shareholder_info` | 一层股东构成、持股比例（判断产业链位置） |
-| 供应商/客户对外投资 | `mcp__qcc-company__get_external_investments` | 被投资企业、持股比例（判断产业链延伸） |
-| 供应链招投标 | `mcp__qcc-operation__get_bidding_info` | 招投标记录 |
-| 供应商资质许可 | `mcp__qcc-operation__get_qualifications` | 资质证书类型、等级、有效期 |
+| 供应商/客户工商信息 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 法定代表人、注册资本、成立日期、登记状态 |
+| 供应商/客户股东 | TYC `call_tool`（先 `get_company_capabilities` 取「股东信息」真实 tool_name，再 `call_tool(tool_name="...", company_name="...", arguments={page: 1, page_size: 20})`） | 一层股东构成、持股比例（判断产业链位置） |
+| 供应商/客户对外投资 | TYC `call_tool`（先 `get_company_capabilities` 取「对外投资」真实 tool_name） | 被投资企业、持股比例（判断产业链延伸） |
+| 供应链招投标 | `search_bids(query="公司名 招投标")` 或 TYC `call_tool`（取「招投标」tool_name） | 招投标记录 |
+| 供应商资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期 |
 | 市场规模/行业报告/政策 | `web_search` | 中英文行业报告、政府/协会统计数据 |
 | 美股竞对财务数据 | `yfinance` | 美股行情、财报、估值交叉验证 |
 
@@ -74,7 +74,7 @@ print(info.get('marketCap'), info.get('trailingPE'), info.get('priceToSalesTrail
 - 美股直接写 ticker（如 `NVDA`）
 
 ⚠️ 市场规模推算必须多源交叉验证——不能只用 `web_search` 搜一个报告就采信。
-⚠️ 供应链实体和关键供应商当前经营状态必须用 `mcp__qcc-company` 验证存续状态。
+⚠️ 供应链实体和关键供应商当前经营状态必须用 TYC `get_company_basic_profile` / `call_tool` 验证存续状态。
 
 ## 输出结构
 1. 市场定义与 TAM/SAM/SOM 口径

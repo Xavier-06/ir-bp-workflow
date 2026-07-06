@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from runtime.profiles.bp_constants import BP_QCC_CONNECTOR_IDS
+from runtime.profiles.bp_constants import BP_TYC_CONNECTOR_IDS
 from scripts.bp_utils import load_json, read_attempt_count
 
 
@@ -635,7 +635,7 @@ def build_claim_repair_manifests(
             "claims_count": len(claim_ids),
             "label": f"{task_dir.name}-claim-repair-{slug}",
             "system_prompt": system_prompt,
-            "connectorIds": BP_QCC_CONNECTOR_IDS,  # L8
+            "connectorIds": BP_TYC_CONNECTOR_IDS,
             "sidecar_paths": {"facts": str(paths["facts"]), "section": str(paths["section"])},
             "fact_store_path": str(task_dir / "bp_fact_store.json"),
             "timeout": 600 * len(claim_ids),

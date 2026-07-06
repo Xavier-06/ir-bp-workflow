@@ -23,12 +23,12 @@
 
 | 调查问题 | 首选工具 | 说明 |
 |---------|---------|------|
-| 客户公司真实性/存续 | `mcp__qcc-company__get_company_registration_info` | 法定代表人、注册资本、成立日期、登记状态 |
-| 客户股东（关联交易判断） | `mcp__qcc-company__get_shareholder_info` | 一层股东构成、持股比例（判断是否关联方） |
-| 客户实际控制人 | `mcp__qcc-company__get_actual_controller` | 股权穿透最终控制人（识别隐性关联交易） |
-| 客户招投标（合同真实性） | `mcp__qcc-operation__get_bidding_info` | 招投标记录 |
-| 客户资质许可 | `mcp__qcc-operation__get_qualifications` | 资质证书类型、等级、有效期 |
-| 客户风险全面扫描 | `mcp__qcc-risk__get_company_risk_scan` | 35 项风险因子前置预筛 |
+| 客户公司真实性/存续 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 法定代表人、注册资本、成立日期、登记状态 |
+| 客户股东（关联交易判断） | TYC `call_tool`（先 `get_company_capabilities` 取「股东信息」真实 tool_name，再 `call_tool(tool_name="...", company_name="...", arguments={page: 1, page_size: 20})`） | 一层股东构成、持股比例（判断是否关联方） |
+| 客户实际控制人 | TYC `call_tool`（先 `get_company_capabilities` 取「实际控制人」真实 tool_name） | 股权穿透最终控制人（识别隐性关联交易） |
+| 客户招投标（合同真实性） | `search_bids(query="公司名 招投标")` 或 TYC `call_tool`（取「招投标」tool_name） | 招投标记录 |
+| 客户资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期 |
+| 客户风险全面扫描 | TYC `call_tool`（先 `get_company_capabilities` 取风险扫描类 tool_name，组合多个维度扫描） | 35 项风险因子前置预筛 |
 | 客户经营异常/行政处罚/失信 | `get_business_exception` / `get_administrative_penalty` / `get_dishonest_info` | 按扫描结果下钻（判断客户是否还能回款） |
 | 收入/订单外部报道 | `web_search` + `web_fetch` | 搜新闻、行业媒体、客户公告 |
 | 上市客户财务验证（市值/营收/利润） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证客户体量和采购能力 |

@@ -14,6 +14,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from runtime.profiles.bp_constants import BP_TYC_CONNECTOR_IDS
+
 ROOT = Path(__file__).resolve().parent.parent
 TASKS_DIR = ROOT / 'tasks'
 
@@ -559,11 +561,8 @@ def _spawn_one(task_id: str, sub: dict, task_dir: Path | None = None) -> dict:
         pass
 
     system_prompt = system_prompt + _CONCLUSION_APPENDIX + _TOOL_USAGE_GUIDE + _stage_block
-    # ── FIX: QCC MCP connector IDs so sub-agents can use mcp__qcc-* tools ──
-    _QCC_CONNECTOR_IDS = [
-        'qcc-company', 'qcc-executive', 'qcc-risk',
-        'qcc-ipr', 'qcc-operation', 'qcc-history',
-    ]
+    # ── 企业数据 MCP connector IDs（天眼查） ──
+    _QCC_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS
     manifest_data = {
         'task_id': task_id,
         'role': sub['role_name'],

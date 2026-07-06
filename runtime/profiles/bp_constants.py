@@ -1,16 +1,16 @@
 """BP 管线共享常量模块。
 
-集中存放 BP 管线中多处重复使用的常量，包括 QCC connector ID 列表、
+集中存放 BP 管线中多处重复使用的常量，包括企业数据 MCP connector ID 列表、
 Wave 角色 slug 映射、Wave 角色分组、8 维度 slug 列表，以及收集重试参数。
 其他模块应优先引用此处常量，避免硬编码重复。
 """
 from __future__ import annotations
 
-# QCC MCP connector ID 列表 —— BP 管线中 3+ 处硬编码重复，统一抽取至此
-BP_QCC_CONNECTOR_IDS = [
-    'qcc-company', 'qcc-executive', 'qcc-risk',
-    'qcc-ipr', 'qcc-operation', 'qcc-history',
-]
+# 企业数据 MCP connector ID 列表 —— 天眼查（替代原企查查 6 connector）
+BP_TYC_CONNECTOR_IDS = ['tyc-mcp']
+
+# 向后兼容别名 —— 旧代码引用 BP_QCC_CONNECTOR_IDS 不会报错
+BP_QCC_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS
 
 # Wave 1: 公司团队合规 / 产品商业化 / 技术IP护城河 / 市场供应链（4 维度并行）
 BP_WAVE1_ROLE_SLUGS: dict[str, str] = {
