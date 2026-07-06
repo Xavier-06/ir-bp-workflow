@@ -82,6 +82,256 @@ print(neodata_search('{股东公司名} 市值 市盈率 市销率', data_type='
 ⚠️ 天眼查是**结构性数据的首选**——不要只用 `web_search` 搜工商信息。`web_search` 搜到的是新闻报道，不是结构化股东列表。
 ⚠️ 天眼查 IP 数据不含集成电路布图设计，需到国家知识产权局布图设计系统单独核实。
 
+## ⚠️ 工具限制
+
+- 你没有 Glob/Grep 工具。搜索文件 → `Bash: find {path} -name "*.json"`，读取文件 → `Read`，搜索内容 → `Bash: grep -r "keyword" {path}`。
+
+## 工具箱（你能用的）
+
+| 工具 | 调用方式 | 查什么 | 备注 |
+|------|---------|--------|------|
+| **TYC 两阶段** | 见下方 bash | 工商/股东/高管/实控人/风险/资质/融资 | 结构化数据首选 |
+| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | 上市战略股东行情/财报 | 仅用于上市股东验证 |
+| **WebSearch** | WorkBuddy 内置 | 创始人履历/背景/负面新闻 | 非结构化，搜公开报道 |
+| **WebFetch** | WorkBuddy 内置 | 深读搜索结果页/公司官网/媒体报道 | 配合 WebSearch 使用 |
+
+### TYC 两阶段调用（本维度核心，8 个 bash 覆盖全部场景）
+
+**Step 1: 定位公司**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+result = gw.search_companies('{公司名称}')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+**Step 2: 基础画像（工商登记+简介+标签+规模）**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+profile = gw.get_company_basic_profile(company_name='{公司名称}')
+print(json.dumps(profile, ensure_ascii=False, indent=2))
+"
+```
+
+**Step 3: 查可用工具列表**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+caps = gw.get_company_capabilities(company_id='{companyId}', company_name='{公司名称}')
+print(json.dumps(caps, ensure_ascii=False, indent=2))
+"
+```
+> ⚠️ 从返回的 tool_name 列表中选取需要的工具，**逐字复制 tool_name**，不能猜测或翻译。
+
+**Step 4: 股东信息**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+result = gw.call_tool(tool_name='{从capabilities获取的股东信息tool_name}', company_name='{公司名称}', arguments={'page': 1, 'page_size': 20})
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+**Step 5: 实际控制人 + 受益所有人**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+# 实际控制人
+controller = gw.call_tool(tool_name='{实际控制人tool_name}', company_name='{公司名称}')
+# 受益所有人（持股≥25%自然人）
+beneficial = gw.call_tool(tool_name='{受益所有人tool_name}', company_name='{公司名称}')
+print(json.dumps({'controller': controller, 'beneficial_owners': beneficial}, ensure_ascii=False, indent=2))
+"
+```
+
+**Step 6: 高管画像（任职+控制企业）**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+person = gw.get_person_profile(company_name='{公司名称}', person_name='{姓名}')
+print(json.dumps(person, ensure_ascii=False, indent=2))
+"
+```
+
+**Step 7: 高管个人风险扫描（18 项维度）**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+risk = gw.get_person_risk_profile(company_name='{公司名称}', person_name='{姓名}')
+print(json.dumps(risk, ensure_ascii=False, indent=2))
+"
+```
+
+**Step 8: 企业风险全面扫描（35 项）**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+risk = gw.call_tool(tool_name='{风险扫描类tool_name}', company_name='{公司名称}')
+print(json.dumps(risk, ensure_ascii=False, indent=2))
+"
+```
+> 根据扫描结果，下钻到具体原子工具：`get_judicial_documents` / `get_dishonest_info` / `get_administrative_penalty` / `get_business_exception`
+
+### NeoData 调用（上市战略股东验证）
+```bash
+# 行情/财报（验证上市股东财务体量）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{股东公司名} 市值 市盈率 市销率 营收', data_type='api')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+```bash
+# 研报（搜股东公司相关的行业研报/深度分析，了解其投资逻辑和产业链布局）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{股东公司名} 产业链布局 投资 战略', data_type='doc')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+- `data_type`: `api`(行情/财报) / `doc`(研报/券商深度报告) / `all`(两者)
+
+### WebSearch 搜索模板（创始人/高管履历验证）
+```
+# 中文搜索
+web_search: "{姓名}" 履历 背景 工作经历 前公司
+web_search: "{姓名}" {公司名} 持股 任职 创始人
+
+# 英文搜索（如有海外背景）
+web_search: "{Name English}" {company} background experience
+
+# 搜到有结果后，用 web_fetch 深读最相关的 2-3 个 URL
+web_fetch: {搜索结果中的URL}
+```
+
+## 数据源路由决策表
+
+| 我要查什么 | 走哪个工具 | 为什么 |
+|-----------|-----------|--------|
+| 公司工商登记（法人/注册资本/成立日期/状态） | TYC `get_company_basic_profile` | 结构化、权威 |
+| 股东列表/持股比例/出资时间 | TYC `call_tool` (股东信息) | 结构化、权威，WebSearch 只能搜到新闻 |
+| 实际控制人穿透 | TYC `call_tool` (实际控制人) | 已完成股权穿透的最终控制人 |
+| 受益所有人（AML 合规） | TYC `call_tool` (受益所有人) | 持股≥25%自然人 |
+| 核心团队任职/在外企业 | TYC `get_person_profile` | 结构化任职+控制企业 |
+| 高管个人风险（失信/限高/涉案） | TYC `get_person_risk_profile` | 18 项个人风险维度 |
+| 企业全面风险扫描 | TYC `call_tool` (风险扫描类) | 35 项一次扫完 |
+| 诉讼/失信/处罚/异常明细 | TYC 原子工具 (按扫描结果下钻) | 结构化、权威 |
+| 变更记录（名称/地址/资本/股东/法人） | TYC `call_tool` (变更记录) | 聚合入口 |
+| 分支机构 | TYC `call_tool` (分支机构) | 分公司信息 |
+| 融资历史/历史投资 | TYC `call_tool` (历史投资/历史股东) | 结构化 |
+| 资质许可 | TYC `call_tool` (企业资质) | 结构化 |
+| 招投标记录 | TYC `search_bids` 或 `call_tool` | 结构化 |
+| 创始人/高管公开履历 | WebSearch (中英文) → WebFetch 深读 | 非结构化，TYC 不覆盖个人背景报道 |
+| 上市战略股东财务体量 | NeoData | 行情/财报结构化 |
+
+## 搜索策略（分步流程）
+
+**Step 1: TYC 结构化数据全量拉取**
+- 执行 TYC 两阶段: search_companies → get_company_basic_profile → get_company_capabilities
+- 按需调用: 股东信息 → 实际控制人 → 受益所有人 → 变更记录 → 分支机构 → 风险扫描
+- 全部结果写入 facts sidecar
+
+**Step 2: 创始人/高管逐一验证**
+- 从 `bp_step0_profile.json` 的 `team_highlights` + `founders` 合并去重
+- **每人**至少 2 次独立 WebSearch（中英文各一次）
+- 搜到结果后用 WebFetch 深读至少 1 个 URL
+- TYC `get_person_profile` + `get_person_risk_profile` 验证任职和风险
+- ⚠️ 搜不到必须标注 "该人员信息经搜索未找到独立来源验证"
+
+**Step 3: 交叉验证**
+- TYC 数据与 WebSearch 数据交叉比对（如 TYC 显示法人=张三，WebSearch 应能验证）
+- BP 自述 vs 外部证据逐条对比
+- 矛盾之处标注 ⚠️ 并在 .md 中说明
+
+**Step 4: 缺口补搜**
+- 检查 facts sidecar，对空字段做针对性补搜
+- 补搜结果追加，不覆盖已有内容
+
+## 错误处理
+
+| 情况 | 处理方式 |
+|------|---------|
+| TYC search_companies 返回空 | 换公司简称/全称再试 1 次，仍空则 WebSearch 兜底工商信息 |
+| TYC API 超时/连接失败 | 重试 1 次，仍失败则标注 "TYC 不可用" + WebSearch 替代 |
+| get_company_capabilities 返回的 tool_name 列表为空 | 该企业可能无此维度数据，标注并跳过 |
+| WebSearch 创始人搜不到结果 | 换关键词（加公司名/职务/行业），仍无则标注 "未找到公开信息" |
+| NeoData 上市股东无数据 | 标注 "NeoData 无数据"，可用 WebSearch 搜公开财报兜底 |
+| 搜到创始人信息但与 BP 不一致 | 标注差异点，不做判断，留给后续分析 |
+
+## 输出 JSON schema
+
+### facts sidecar 格式
+```json
+{
+  "schema_version": "bp_company_team.v1",
+  "company": {
+    "company_name": "公司全称",
+    "tyc_company_id": "TYC 公司 ID",
+    "registration": {
+      "legal_representative": "法人姓名",
+      "registered_capital": "注册资本",
+      "established_date": "成立日期",
+      "company_status": "存续/注销/吊销",
+      "registration_address": "注册地址",
+      "business_scope": "经营范围"
+    },
+    "actual_controller": {"name": "实控人", "penetration_path": "穿透路径"},
+    "beneficial_owners": [{"name": "姓名", "ratio": "持股比例"}]
+  },
+  "shareholders": [
+    {"name": "股东名", "ratio": "持股比例", "capital_contribution": "认缴出资额", "type": "自然人/机构", "verified": true}
+  ],
+  "key_personnel": [
+    {
+      "name": "姓名",
+      "position": "职位",
+      "bp_claimed_background": "BP自述背景",
+      "external_verified_background": "外部验证背景",
+      "background_verified": true,
+      "person_risk_scan": "风险扫描结果摘要",
+      "control_enterprises": ["关联企业列表"]
+    }
+  ],
+  "financing_history": [
+    {"round": "轮次", "amount": "金额", "investors": ["投资方"], "date": "日期", "source": "TYC/WebSearch"}
+  ],
+  "risk_signals": [
+    {"type": "诉讼/处罚/异常/失信/冻结", "description": "描述", "severity": "高/中/低", "date": "日期"}
+  ],
+  "qualifications": [
+    {"type": "资质类型", "level": "等级", "status": "有效/过期/未验证", "expiry_date": "有效期"}
+  ],
+  "data_gaps": ["列出未找到的字段及原因"]
+}
+```
+
+### quality_gate
+- `shareholders`: 至少列出前 5 大股东（或全部，如少于 5 个）
+- `key_personnel`: 每个 OCR 提取的创始人必须有 `background_verified` 字段（true/false）
+- `risk_signals`: 必须执行 TYC 风险扫描，空也要写 `"risk_signals": []`（表示查了没有）
+- `qualifications`: 每个资质必须有 `status` 字段
+- `data_gaps`: 搜不到的字段必须列出，不能静默跳过
+
 ## 输出结构
 1. 公司主体与股权架构
 2. 核心团队与关键人风险

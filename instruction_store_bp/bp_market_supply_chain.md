@@ -60,21 +60,262 @@ print(neodata_search('{公司名} 市值 营收 行业板块', data_type='all'))
 - `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
 - A/HK 股数据最全，自动聚合多源
 
-**yfinance 调用**（美股竞对估值交叉验证，⚠️ 必须用 /opt/anaconda3/bin/python3）：
+**yfinance 调用**（美股竞对估值交叉验证）：
 ```bash
-/opt/anaconda3/bin/python3 -c "
-import yfinance as yf
-t = yf.Ticker('{股票代码}')
-info = t.info
-print(info.get('marketCap'), info.get('trailingPE'), info.get('priceToSalesTrailing12Months'))
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import yfinance_summary
+result = yfinance_summary('{ticker}')
+print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
 - A股代码格式：`{6位代码}.SS`（沪市）/ `{6位代码}.SZ`（深市）
 - 港股代码格式：`{5位代码}.HK`（如 `02283.HK`）
 - 美股直接写 ticker（如 `NVDA`）
+- 返回：price / market_cap / pe_trailing / pe_forward / ps / pb / ev_ebitda / revenue / profit_margin / sector / industry
 
 ⚠️ 市场规模推算必须多源交叉验证——不能只用 `web_search` 搜一个报告就采信。
 ⚠️ 供应链实体和关键供应商当前经营状态必须用 TYC `get_company_basic_profile` / `call_tool` 验证存续状态。
+
+## ⚠️ 工具限制
+
+- 你没有 Glob/Grep 工具。搜索文件 → `Bash: find {path} -name "*.json"`，读取文件 → `Read`，搜索内容 → `Bash: grep -r "keyword" {path}`。
+
+## 工具箱（你能用的）
+
+| 工具 | 调用方式 | 查什么 | 备注 |
+|------|---------|--------|------|
+| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | A/HK 竞对行情/财报/板块/研报 | **本维度主力数据源** |
+| **yfinance** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import yfinance_summary; ..."` | 美股竞对估值快照 | 交叉验证用 |
+| **TYC 两阶段** | 见下方 bash | 供应商/客户工商/股东/招投标/资质 | 供应链验证 |
+| **WebSearch** | WorkBuddy 内置 | 行业报告/政策/市场规模/白皮书 | 中英文双语 |
+| **WebFetch** | WorkBuddy 内置 | 深读行业报告/政策文件/统计数据 | 配合 WebSearch |
+
+### NeoData 调用（A/HK 竞对行情/财报/板块，本维度主力）
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{公司名} 市值 营收 净利润 行业板块', data_type='all')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+- `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
+- A/HK 股数据最全，自动聚合多源
+
+```bash
+# 研报：行业深度报告（市场规模/增速/格局/政策）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{行业名} 行业深度报告 市场规模 TAM 增速', data_type='doc')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+```bash
+# 研报：供应链/上游材料/产能格局
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{上游材料/设备名} 产能 供应 格局 价格', data_type='doc')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+```bash
+# 研报：政策/补贴/国产替代
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{行业名} 政策 补贴 国产替代 自主可控', data_type='doc')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+### yfinance 调用（美股竞对估值交叉验证）
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import yfinance_summary
+result = yfinance_summary('{ticker}')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+- 返回：price / market_cap / pe / ps / pb / revenue / profit_margin / sector / industry
+
+### TYC 调用（供应链验证核心）
+```bash
+# 供应商/客户基础画像
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+profile = gw.get_company_basic_profile(company_name='{供应商/客户名称}')
+print(json.dumps(profile, ensure_ascii=False, indent=2))
+"
+```
+
+```bash
+# 供应商股东（判断产业链位置）
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+caps = gw.get_company_capabilities(company_id='{supplierId}', company_name='{供应商名称}')
+holders = gw.call_tool(tool_name='{股东信息tool_name}', company_name='{供应商名称}', arguments={'page': 1, 'page_size': 20})
+print(json.dumps(holders, ensure_ascii=False, indent=2))
+"
+```
+
+```bash
+# 供应商对外投资（判断产业链延伸）
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+investments = gw.call_tool(tool_name='{对外投资tool_name}', company_name='{供应商名称}')
+print(json.dumps(investments, ensure_ascii=False, indent=2))
+"
+```
+
+```bash
+# 招投标记录
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+bids = gw.search_bids(query='{公司名} 招投标')
+print(json.dumps(bids, ensure_ascii=False, indent=2))
+"
+```
+
+### WebSearch 搜索模板（行业/政策/市场规模）
+```
+# 市场规模
+web_search: "{行业名}" 市场规模 TAM SAM 2024 2025
+web_search: "{行业名}" market size forecast 2025 2030
+web_search: "{产品名}" 市场规模 渗透率 增速
+
+# 行业报告/白皮书
+web_search: "{行业名}" 行业报告 深度分析 白皮书
+web_search: "{行业名}" industry report market analysis
+
+# 政策/标准
+web_search: "{行业名}" 政策 补贴 扶持 国家标准
+web_search: "{行业名}" policy regulation subsidy
+
+# 供应链/产能
+web_search: "{上游材料/设备}" 产能 供应 价格 格局
+web_search: "{供应商名}" 产能 扩产 市占率
+
+# 搜到后深读
+web_fetch: {搜索结果中的URL}
+```
+
+## 数据源路由决策表
+
+| 我要查什么 | 走哪个工具 | 为什么 |
+|-----------|-----------|--------|
+| A/HK 竞对行情/财报/板块 | NeoData (`neodata_search` data_type=api) | 结构化金融数据，多源聚合 |
+| A/HK 行业研报 | NeoData (`neodata_search` data_type=doc) | 券商行业深度报告 |
+| 美股竞对估值/财务 | yfinance (`yfinance_summary`) | 美股精确估值数字 |
+| 供应商存续/注册/状态 | TYC `get_company_basic_profile` | 结构化、权威 |
+| 供应商股东（产业链位置） | TYC `call_tool` (股东信息) | 判断产业链关系 |
+| 供应商对外投资 | TYC `call_tool` (对外投资) | 判断产业链延伸 |
+| 招投标记录 | TYC `search_bids` | 验证供应关系 |
+| 供应商资质 | TYC `call_tool` (企业资质) | 结构化 |
+| 市场规模/增速/渗透率 | WebSearch (中英文多源) → WebFetch 深读 | 非结构化，需多源交叉 |
+| 行业报告/白皮书 | WebSearch → WebFetch 深读 | 搜完整报告 |
+| 政策/补贴/标准 | WebSearch → WebFetch 深读 | 搜政策原文 |
+| 供应链产能/格局 | WebSearch | 搜上游材料/设备信息 |
+
+## 搜索策略（分步流程）
+
+**Step 1: 市场定义 + TAM/SAM/SOM 推算（WebSearch 多源交叉）**
+- 中英文各搜 3 次以上不同来源的市场规模数据
+- 自上而下（行业报告）+ 自下而上（单价×数量）两套方法
+- 区分保守/基准/乐观三种情景
+- ⚠️ 不得直接采用 BP 的 TAM/SAM/SOM
+
+**Step 2: 行业格局 + 政策环境（WebSearch）**
+- 搜索行业竞争格局、替代路线、政策驱动
+- 深读 2-3 份关键行业报告
+- 区分短期订单 vs 长期故事
+
+**Step 3: 供应链验证（TYC）**
+- 对关键供应商/上游企业逐一 TYC 验证
+- `get_company_basic_profile` 确认存续状态
+- `call_tool` 查股东/投资/资质
+- `search_bids` 验证供应关系
+
+**Step 4: 上市竞对财务验证（NeoData + yfinance）**
+- A/HK 竞对走 NeoData 查行情/财报
+- 美股竞对走 yfinance 查估值快照
+- 交叉验证 BP 中的市场数据
+
+## 错误处理
+
+| 情况 | 处理方式 |
+|------|---------|
+| NeoData 无数据 | yfinance 兜底（如美股）；WebSearch 搜公开财报兜底 |
+| yfinance ticker 找不到 | WebSearch 先查 ticker，仍无则标注 "美股无公开行情" |
+| TYC 供应商搜不到 | 换公司全称再试；仍无则 WebSearch 兜底 |
+| 行业报告数据冲突 | 标注口径差异（如"XX 机构口径" vs "YY 机构口径"），不直接采信任一方 |
+| 政策文件搜不到原文 | 标注 "政策原文未找到"，引用二手报道时注明 |
+| 不同来源市场规模差异大 | 拆分口径（TAM vs SAM vs SOM），分别列出 |
+
+## 输出 JSON schema
+
+### facts sidecar 格式
+```json
+{
+  "schema_version": "bp_market_supply.v1",
+  "market_sizing": {
+    "tam": {"value": "数值", "unit": "亿元", "source": "来源", "method": "自上而下/自下而上", "scenario": "基准/保守/乐观"},
+    "sam": {"value": "数值", "unit": "亿元", "source": "来源", "method": "自上而下/自下而上"},
+    "som": {"value": "数值", "unit": "亿元", "source": "来源", "method": "自上而下/自下而上"},
+    "bp_claimed_tam": "BP自述值",
+    "independent_tam": "独立推算值",
+    "tam_gap_note": "口径差异说明"
+  },
+  "industry_landscape": {
+    "mainstream_routes": [{"route": "路线", "market_share": "份额", "key_players": ["厂商"]}],
+    "growth_drivers": ["驱动因素"],
+    "substitution_risks": ["替代风险"]
+  },
+  "policy_environment": [
+    {"policy": "政策名", "level": "国家/省/市", "impact": "影响说明", "source_url": "来源URL"}
+  ],
+  "supply_chain": [
+    {
+      "entity": "供应商/上游名称",
+      "role": "供应商角色",
+      "tyc_verified": true,
+      "company_status": "存续/注销",
+      "key_shareholders": ["股东"],
+      "capacity": "产能/规模",
+      "risk_signals": ["风险信号"]
+    }
+  ],
+  "competitor_financials": [
+    {
+      "competitor": "竞对名",
+      "market": "A/HK/US",
+      "ticker": "股票代码",
+      "market_cap": "市值",
+      "revenue": "营收",
+      "source": "NeoData/yfinance"
+    }
+  ],
+  "data_gaps": ["列出未找到的字段及原因"]
+}
+```
+
+### quality_gate
+- `market_sizing`: TAM/SAM/SOM 三项都必须有独立推算（不能只有 BP 值）
+- `industry_landscape.mainstream_routes`: 至少 3 条路线
+- `supply_chain`: 每个关键供应商必须有 `tyc_verified` 字段
+- `competitor_financials`: 每个上市竞对必须有 `source` 字段
+- `data_gaps`: 搜不到的字段必须列出
 
 ## 输出结构
 1. 市场定义与 TAM/SAM/SOM 口径

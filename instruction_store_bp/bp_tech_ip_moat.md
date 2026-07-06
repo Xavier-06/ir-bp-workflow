@@ -65,6 +65,252 @@ print(neodata_search('{竞品公司名} 研发费用 营收 净利润', data_typ
 ⚠️ 专利验证是**本维度核心**——必须用 TYC `search_patents` / `search_trademarks` / `call_tool` 查结构化专利数据，不能只用 `web_search` 搜"XX公司 专利"。
 ⚠️ 单一数据库有覆盖缺口，查不到某类 IP 不得直接判定"IP 不存在"。
 
+## ⚠️ 工具限制
+
+- 你没有 Glob/Grep 工具。搜索文件 → `Bash: find {path} -name "*.json"`，读取文件 → `Read`，搜索内容 → `Bash: grep -r "keyword" {path}`。
+
+## 工具箱（你能用的）
+
+| 工具 | 调用方式 | 查什么 | 备注 |
+|------|---------|--------|------|
+| **TYC 专利/商标/软著** | 见下方 bash | 专利/商标/软著/布图设计 | IP 核验核心工具 |
+| **TYC 工商基础** | `get_company_basic_profile` | 公司存续/注册资本 | 仅做背景 |
+| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | 上市竞品研发费用/营收 | 仅用于竞品研发投入验证 |
+| **WebSearch** | WorkBuddy 内置 | 技术路线/学术论文/行业标准/竞品技术/布图设计 | 非结构化，搜公开信息 |
+| **WebFetch** | WorkBuddy 内置 | 深读论文/测试报告/标准文档/竞品官网 | 配合 WebSearch 使用 |
+
+### TYC IP 工具调用（本维度核心）
+
+**Step 1: 专利搜索**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+patents = gw.search_patents(query='{技术关键词}', applicant='{公司名}')
+print(json.dumps(patents, ensure_ascii=False, indent=2))
+"
+```
+> 可多次调用：按技术关键词搜、按公司名搜、组合搜
+
+**Step 2: 商标搜索**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+trademarks = gw.search_trademarks(query='{品牌名/产品名}', applicant='{公司名}')
+print(json.dumps(trademarks, ensure_ascii=False, indent=2))
+"
+```
+
+**Step 3: 软著查询（通过 call_tool）**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+caps = gw.get_company_capabilities(company_id='{companyId}', company_name='{公司名}')
+# 从 caps 中取「软件著作权」真实 tool_name
+copyrights = gw.call_tool(tool_name='{软著tool_name}', company_name='{公司名}')
+print(json.dumps(copyrights, ensure_ascii=False, indent=2))
+"
+```
+
+**Step 4: 专利详情（通过 call_tool）**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json
+from scripts.tyc_gateway import TYCGateway
+gw = TYCGateway()
+caps = gw.get_company_capabilities(company_id='{companyId}', company_name='{公司名}')
+# 从 caps 中取「专利信息」真实 tool_name
+patent_detail = gw.call_tool(tool_name='{专利tool_name}', company_name='{公司名}', arguments={'page': 1, 'page_size': 50})
+print(json.dumps(patent_detail, ensure_ascii=False, indent=2))
+"
+```
+> ⚠️ `call_tool` 的 tool_name 必须逐字复制 `get_company_capabilities` 返回表格中的真实名称。
+
+### NeoData 调用（上市竞品验证）
+```bash
+# 行情/财报（验证上市竞品研发投入规模，判断标的技术壁垒是否可持续）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{竞品公司名} 研发费用 营收 净利润', data_type='api')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+```bash
+# 研报（搜技术领域的行业研报，了解技术路线趋势、主流方案对比、市场规模预测）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{技术领域} 技术路线 行业深度 市场规模', data_type='doc')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+```bash
+# 研报（搜竞品公司的深度研报，了解其技术布局、产品矩阵、研发方向）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('{竞品公司名} 技术 产品 研发 布局', data_type='doc')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+- `data_type`: `api`(行情/财报) / `doc`(研报/券商深度报告) / `all`(两者)
+
+### WebSearch 搜索模板（技术路线/论文/标准/竞品技术）
+```
+# 技术路线全景
+web_search: "{技术领域}" 技术路线 对比 主流方案 发展趋势
+web_search: "{技术A}" vs "{技术B}" comparison performance cost
+
+# 学术论文/第三方测试
+web_search: "{技术关键词}" site:arxiv.org OR site:scholar.google.com
+web_search: "{产品名}" 测试报告 第三方检测 性能评估
+
+# 行业标准/认证
+web_search: "{行业}" 标准 认证 AEC-Q100 MIL-STD FDA 门槛
+web_search: "{公司名}" 认证 资质 检测报告
+
+# 竞品技术能力验证（否定结论必须有搜索证据）
+web_search: "{竞品名}" "{技术能力}" product capability
+web_search: "{竞品名}" 认证 certification 资质
+
+# 布图设计（TYC 不覆盖）
+web_search: "{公司名}" 集成电路布图设计 国家知识产权局
+
+# 搜到后深读
+web_fetch: {搜索结果中的URL}
+```
+
+## 数据源路由决策表
+
+| 我要查什么 | 走哪个工具 | 为什么 |
+|-----------|-----------|--------|
+| 专利数量/类型/状态/申请日期 | TYC `search_patents` 或 `call_tool` (专利信息) | 结构化、权威，WebSearch 只能搜到新闻 |
+| 商标注册信息 | TYC `search_trademarks` 或 `call_tool` | 结构化 |
+| 软件著作权 | TYC `call_tool` (软著 tool_name) | 结构化 |
+| 集成电路布图设计 | WebSearch → 国家知识产权局布图设计系统 | ⚠️ TYC 不覆盖，必须单独查 |
+| 技术路线全景/主流方案对比 | WebSearch (中英文) | 搜学术论文、行业分析 |
+| 第三方测试报告/性能评测 | WebSearch → WebFetch 深读 | 搜独立测试结果 |
+| 行业标准/认证门槛 | WebSearch | 搜 AEC-Q100/MIL-STD/FDA 等 |
+| 竞品技术能力验证 | WebSearch（否定结论必须搜索） | 不能凭印象说竞品没有某能力 |
+| 上市竞品研发投入/营收 | NeoData | 研发费用/营收结构化 |
+| 公司工商基础 | TYC `get_company_basic_profile` | 仅做背景 |
+
+## 搜索策略（分步流程）
+
+**Step 1: IP 全量盘点（TYC 结构化）**
+- `search_patents` 按公司名搜全部专利
+- `search_trademarks` 搜商标
+- `call_tool` 查软著
+- WebSearch 查布图设计（TYC 不覆盖）
+- 分类统计：发明/实用新型/外观/商标/软著/布图
+
+**Step 2: 技术路线全景构建（WebSearch）**
+- 搜索行业主流技术路线（≥3 条）
+- 每条路线的性能参数、成本、成熟度、代表厂商
+- 定位标的公司路线在全景中的位置
+- ⚠️ 必须中英文双语搜索
+
+**Step 3: 竞品技术能力验证（WebSearch + NeoData）**
+- 对每个主要竞品搜索技术能力、认证状态
+- 否定性结论（"竞品没有 X 能力"）必须有搜索证据
+- 上市竞品用 NeoData 查研发费用和营收规模
+
+**Step 4: 壁垒评估**
+- 综合 IP 数量/质量 + 技术路线位置 + 认证门槛 + 竞品对比
+- 判断壁垒来源：专利/know-how/设备/认证周期/客户切换成本/团队经验
+- 判断可复制性：复制所需时间、资金、认证周期
+
+## 错误处理
+
+| 情况 | 处理方式 |
+|------|---------|
+| TYC search_patents 返回空 | 换公司全称/简称再试；仍空则标注 "TYC 专利库未查到"，但不判定"无专利" |
+| TYC 覆盖缺口（某类 IP 查不到） | 标注 "单一数据库有覆盖缺口"，WebSearch 兜底 |
+| 布图设计在国家知识产权局无结果 | 标注 "未查到布图设计登记"，不判定不存在 |
+| 竞品技术能力搜不到信息 | 不做否定结论，标注 "竞品技术信息未公开" |
+| 否定结论无搜索证据 | **禁止**写"竞品没有 X 能力"，改为"未找到竞品具有 X 能力的公开证据" |
+| NeoData 竞品无数据 | 标注 "NeoData 无数据"，WebSearch 搜公开财报兜底 |
+
+## 输出 JSON schema
+
+### facts sidecar 格式
+```json
+{
+  "schema_version": "bp_tech_ip.v1",
+  "patents": [
+    {
+      "patent_id": "专利号",
+      "title": "专利名称",
+      "type": "发明/实用新型/外观设计",
+      "status": "已授权/实质审查/公开/失效",
+      "application_date": "申请日期",
+      "grant_date": "授权日期",
+      "relevance": "与核心产品的关联说明"
+    }
+  ],
+  "trademarks": [
+    {
+      "trademark_name": "商标名",
+      "registration_number": "注册号",
+      "status": "已注册/申请中/失效",
+      "classes": "商品类别"
+    }
+  ],
+  "copyrights": [
+    {
+      "software_name": "软件名称",
+      "registration_number": "登记号",
+      "registration_date": "登记日期"
+    }
+  ],
+  "layout_designs": [
+    {
+      "name": "布图设计名称",
+      "registration_number": "登记号",
+      "source": "国家知识产权局/WebSearch/未找到"
+    }
+  ],
+  "tech_routes": {
+    "industry_mainstream": [
+      {"route": "路线名", "principles": "原理", "key_params": {"param1": "值"}, "cost": "成本区间", "maturity": "成熟度", "representative_companies": ["厂商"]}
+    ],
+    "target_company_route": "标的路线名",
+    "route_position": "领先/跟随/错位/边缘"
+  },
+  "certifications": [
+    {
+      "name": "认证名称",
+      "standard": "标准号",
+      "status": "已获得/申请中/未申请/未验证",
+      "significance": "对客户选型的影响"
+    }
+  ],
+  "competitor_tech": [
+    {
+      "competitor": "竞品名",
+      "tech_capability": "技术能力描述",
+      "verified": true,
+      "source": "WebSearch/NeoData/TYC"
+    }
+  ],
+  "data_gaps": ["列出未找到的字段及原因"]
+}
+```
+
+### quality_gate
+- `patents`: 必须执行 TYC search_patents，空也要写 `"patents": []`（表示查了没有）
+- `trademarks`: 同上
+- `tech_routes.industry_mainstream`: 至少列出 3 条行业主流路线
+- `tech_routes.target_company_route`: 必须标注标的在全景中的位置
+- `competitor_tech`: 否定结论必须有 `verified: true` 且 `source` 不为空
+- `data_gaps`: 搜不到的字段必须列出
+
 ## 输出结构
 1. 行业技术路线全景与标的定位
 2. 标的技术原理和关键组件拆解

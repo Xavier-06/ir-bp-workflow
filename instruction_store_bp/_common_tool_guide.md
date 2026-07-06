@@ -51,17 +51,54 @@ MD 报告末尾必须包含"来源与参考"章节，列出所有 `[^N]` 定义�
 
 ### 1. 上市公司金融数据（A/HK/美股行情、财报、估值）
 
-**⚠️ A/HK 股首选 NeoData（结构化金融数据，token 已存好）：**
+**⚠️ A/HK 股首选 NeoData（结构化金融数据 + 券商研报，token 已存好）：**
+
 ```bash
-cd ~/.workbuddy/ir_runtime && python3 -c "
+# data_type='api' — 行情/财报结构化数据（市值/营收/利润/PE/PS 等精确数字）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
 from scripts.search_gateway import neodata_search
-import json
-results = neodata_search('公司名 营收 净利润 市值', data_type='all')
-print(json.dumps(results, ensure_ascii=False))
+result = neodata_search('公司名 营收 净利润 市值 市盈率', data_type='api')
+print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
-- `data_type`：`api`=行情/财报结构化数据，`doc`=研报/新闻，`all`=两者
-- 返回结构化金融数据，可直接引用数字
+
+```bash
+# data_type='doc' — 券商研报/行业深度报告（市场分析/竞争格局/估值逻辑/政策/趋势）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('行业名 行业深度报告 市场规模 竞争格局', data_type='doc')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+```bash
+# data_type='all' — 两者同时返回（最全面，但结果较多）
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('公司名 营收 净利润 市值', data_type='all')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+**NeoData 研报搜索常用场景：**
+
+| 搜什么 | 关键词示例 | data_type |
+|--------|-----------|-----------|
+| 行业深度报告 | `{行业名} 行业深度报告 市场规模 TAM 增速` | `doc` |
+| 公司深度研报 | `{公司名} 深度报告 产品 客户 竞争` | `doc` |
+| 竞争格局/市场份额 | `{行业名} 竞争格局 市场份额 主要厂商 市占率` | `doc` |
+| 供应链/上游材料 | `{材料名} 产能 供应 格局 价格` | `doc` |
+| 政策/补贴/国产替代 | `{行业名} 政策 补贴 国产替代 自主可控` | `doc` |
+| 估值/可比交易 | `{行业名} 估值 PE PS 行业平均 可比公司` | `doc` |
+| 下游需求/采购趋势 | `{行业名} 下游需求 订单趋势 景气度` | `doc` |
+| 行业风险/监管 | `{行业名} 风险 监管 政策变化 合规` | `doc` |
+| 一级市场融资/IPO | `{赛道名} 融资 估值 IPO 并购 投后` | `doc` |
+
+- `data_type`：`api`=行情/财报结构化数据，`doc`=研报/券商深度报告/新闻，`all`=两者
+- 返回结构化数据或研报摘要，可直接引用数字和结论
 
 **search_gateway 聚合搜索（自动识别金融查询，优先走 NeoData）：**
 ```bash
@@ -94,17 +131,17 @@ for q, rs in all_results.items(): print(q, len(rs))
 
 ### 2. 上市公司估值指标（PE/PB/PS/市值/股息率/beta）
 
-**yfinance — 精确估值数字（⚠️ 必须用 /opt/anaconda3/bin/python3，不能用默认 python3）**
+**yfinance — 精确估值数字**
 ```bash
-/opt/anaconda3/bin/python3 -c "
-import yfinance as yf
-t = yf.Ticker('688052.SS')  # A股 .SS/.SZ，港股 .HK，美股直接 ticker
-info = t.info
-print(info.get('marketCap'), info.get('trailingPE'), info.get('priceToSalesTrailing12Months'))
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import yfinance_summary
+result = yfinance_summary('688052.SS')  # A股 .SS/.SZ，港股 .HK，美股直接 ticker
+print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
-- 返回：ticker / price / market_cap / pe_trailing / pe_forward / ps / pb / ev_ebitda / revenue / profit_margin / sector / industry
-- A/HK 股优先走 NeoData（`search_gateway neodata_search`），美股走 yfinance
+- 返回：price / market_cap / pe_trailing / pe_forward / ps / pb / ev_ebitda / revenue / profit_margin / sector / industry
+- A/HK 股优先走 NeoData（`neodata_search`），美股走 yfinance
 - 适合需要精确估值数字、可比公司估值对比时使用
 
 **enrich_valuation — 结构化估值快照（含 NeoData + yfinance 双源交叉验证）**
@@ -188,18 +225,53 @@ print(v)
 
 | 你要查什么 | 首选工具 | 兜底 |
 |-----------|---------|------|
-| A/HK 股行情/财报/板块 | search_gateway (prefer=auto/neodata) | web_search |
-| 美股估值/可比公司 | /opt/anaconda3/bin/python3 + yfinance | search_gateway |
-| A/HK 可比公司估值 | NeoData neodata_search 或 enrich_valuation | yfinance |
-| 企业工商/股东/高管 | TYC search_companies → call_tool | web_search |
-| 司法诉讼/风险/处罚 | TYC call_tool（先 get_company_capabilities 取 tool_name） | web_search |
-| 专利/商标/软著 | TYC search_patents / search_trademarks / call_tool | web_search |
-| 企业资质/招投标 | TYC call_tool（先 get_company_capabilities 取 tool_name） | web_search |
-| 新闻/行业报告/通用 | search_gateway (prefer=multi) | web_search |
-| 读某个 URL 的正文 | web_fetch | — |
-| 搜索+读正文一步到位 | search_gateway search_deep | — |
+| A/HK 股行情/财报/板块 | NeoData (`neodata_search` data_type=api) | WebSearch |
+| 美股估值/可比公司 | yfinance (`yfinance_summary`) | NeoData + WebSearch |
+| A/HK 可比公司估值 | NeoData + enrich_valuation (双源交叉验证) | yfinance |
+| 企业工商/股东/高管 | TYC `get_company_basic_profile` → `call_tool` | WebSearch |
+| 司法诉讼/风险/处罚 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
+| 专利/商标/软著 | TYC `search_patents` / `search_trademarks` / `call_tool` | WebSearch |
+| 企业资质/招投标 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
+| 新闻/行业报告/通用 | WebSearch → WebFetch 深读 | — |
+| 读某个 URL 的正文 | WebFetch | — |
+
+### ⚠️ 不可用工具清单
+
+> 以下工具/数据源已确认不可用，**禁止调用**，浪费时间：
+
+| 工具/数据源 | 不可用原因 | 替代方案 |
+|------------|-----------|---------|
+| ~~OpenAlex~~ | 503 Service Unavailable（匿名限流，需 API Key） | 用 WebSearch 搜学术信息 |
+| ~~Semantic Scholar~~ | 429 Rate Limit（无限挂起，需 API Key） | 用 WebSearch 搜学术信息 |
+| ~~CORE~~ | 无 API Key，脚本直接跳过 | 用 WebSearch 搜学术信息 |
+| ~~GROBID~~ | Docker 未运行 | 不需要 PDF 提取（BP 管线不处理论文全文） |
 
 ### ⚠️ 禁止行为
-- 禁止只用 web_search 做所有搜索——web_search 没有 NeoData 金融数据，没有 TYC（天眼查）结构化数据
-- 禁止在能用 TYC 直接查到结构化数据时用 web_search 去搜（如查股东信息，TYC 直接返回结构列表，web_search 只能搜到新闻）
-- 禁止在需要精确估值数字时只用 web_search（用 yfinance 或 search_gateway）
+- 禁止只用 WebSearch 做所有搜索——WebSearch 没有 NeoData 金融数据，没有 TYC（天眼查）结构化数据
+- 禁止在能用 TYC 直接查到结构化数据时用 WebSearch 去搜（如查股东信息，TYC 直接返回结构列表，WebSearch 只能搜到新闻）
+- 禁止在需要精确估值数字时只用 WebSearch（用 yfinance 或 NeoData）
+- 禁止编造 URL、编造数据源、编造引用
+
+## 角色边界（写在每个角色指令开头）
+
+| 角色 | 可以做 | 禁止做 |
+|------|--------|--------|
+| company_team_compliance | TYC 工商/股东/高管/实控人/风险/资质 + WebSearch 人物履历 + NeoData 上市股东 | 估值分析/市场规模推算/技术路线/论文 |
+| product_commercial | TYC 客户验证/招投标 + WebSearch 产品/客户/合同 + NeoData 上市客户 | 估值分析/技术路线/市场规模 |
+| tech_ip_moat | TYC 专利/商标/软著 + WebSearch 技术路线/论文/标准 + NeoData 竞品研发 | 估值分析/市场规模/客户收入 |
+| market_supply_chain | NeoData 行业研报/竞对 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 | 估值建模/技术路线/团队分析 |
+| competition_positioning | TYC 竞品验证 + NeoData/yfinance 竞品财务 + WebSearch 竞品情报 | 估值主模型/客户收入主结论/泛化风险 |
+| valuation_return | NeoData/yfinance/enrich_valuation 三源估值 + WebSearch 可比交易 | 客户验证/技术判断/竞品主分析/市场规模 |
+| customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData 上市客户 | 估值分析/技术判断/市场规模/竞品主分析 |
+| dealbreaker_risk | TYC 风险全扫(35项) + WebSearch 负面/舆情/监管 + NeoData 前置验证 | 估值建模/客户主验证/技术判断/市场规模 |
+| 统稿 | Read 所有维度输出 + Write 完整报告 | 搜任何外部数据 |
+
+## 搜索规范
+
+1. **双语搜索**: 同一维度英文搜一次、中文搜一次，确保覆盖中英文信息源
+2. **多源交叉验证**: 关键数据（市场规模/估值/客户/专利）至少 2 个独立来源确认
+3. **审计日志**: 每个搜索查询记录（查了什么、返回多少、保留多少），写入 .md 审计部分
+4. **时间过滤**: 优先近 2-3 年数据，历史数据标注年份
+5. **去重**: 同一公司/事实的多条结果合并，不重复计数
+6. **缺口标注**: 搜不到的字段必须写入 `data_gaps`，不能静默跳过
+7. **否定结论需强证据**: "竞品没有 X 能力" 必须有搜索证据，搜不到则改为 "未找到竞品具有 X 能力的公开证据"
