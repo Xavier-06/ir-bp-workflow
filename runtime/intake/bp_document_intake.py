@@ -622,9 +622,20 @@ def _useful_text_from_ocr(ocr_text: str) -> str:
     return "\n".join(useful_lines).strip(" []（）():：，。,./\n\t-")
 
 
+_STRUCTURAL_PAGE_KEYWORDS = (
+    "目录", "contents", "Contents", "目录页",
+    "商业计划书", "BP", "保密", "仅供", "请勿",
+    "市场", "产品", "团队", "财务", "融资", "发展规划",
+    "核心", "概况", "体系", "策略", "方案", "预测",
+)
+
+
 def _page_status(page_text: str) -> str:
     useful = _useful_text_from_ocr(page_text)
-    if len(useful) >= 80:
+    if len(useful) >= 30:
+        return "success"
+    # 封面/目录/章节分隔页：字符少但有结构性关键词 → 也算 success
+    if useful and any(kw in useful for kw in _STRUCTURAL_PAGE_KEYWORDS):
         return "success"
     if any(marker in page_text for marker in OCR_FAILURE_MARKERS) or not useful:
         return "failed"
@@ -772,6 +783,26 @@ def _validate_extracted_profile(profile: dict, ocr_text: str) -> dict:
         short_name = company_name.replace("有限公司", "").replace("股份", "").replace("科技", "").strip()
         if short_name and short_name not in ocr_text:
             print(f"  ⚠️ 公司名 '{company_name}' 未在 OCR 文本中找到，可能是幻觉", flush=True)
+
+    # 4. 数据完整性标记：OCR 文本含团队/财务章节标题但提取为空 → 标记 incomplete
+    #    让下游知道这是"提取失败"而非"没有团队/财务数据"
+    team_section_patterns = [
+        r"(?:核心)?团队", r"创始人", r"管理(?:团队|层)", r"组织架构",
+        r"核心(?:人员|骨干)", r"人才(?:队伍|储备)",
+    ]
+    finance_section_patterns = [
+        r"财务(?:数据|概况|预测|分析)", r"业绩(?:预测|概况)",
+        r"营收", r"收入", r"融资",
+    ]
+    has_team_section = any(re.search(p, ocr_text) for p in team_section_patterns)
+    has_finance_section = any(re.search(p, ocr_text) for p in finance_section_patterns)
+
+    if has_team_section and not profile.get("team_highlights"):
+        profile["team_data_incomplete"] = True
+        print("  📋 OCR 含团队章节标题但 team_highlights 为空，标记 team_data_incomplete", flush=True)
+    if has_finance_section and profile.get("financial_highlights", {}).get("revenue") in ("未披露", None, ""):
+        profile["finance_data_incomplete"] = True
+        print("  📋 OCR 含财务章节标题但 revenue 未提取，标记 finance_data_incomplete", flush=True)
 
     return profile
 

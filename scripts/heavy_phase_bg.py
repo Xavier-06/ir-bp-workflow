@@ -122,7 +122,7 @@ def launch_heavy_phase(
         "--query", job_ctx.query or "",
         "--session-id", metadata.get("session_id", ""),
         "--pipeline", pipeline,
-        "--run",
+        "--background",
     ]
 
     timeout = PHASE_TIMEOUTS.get(phase, 900)
