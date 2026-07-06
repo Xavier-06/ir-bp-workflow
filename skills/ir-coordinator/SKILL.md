@@ -44,13 +44,10 @@ Bash 工具每次调用是**独立 shell**，工作目录默认是用户项目�
 **每一个** `python3 -m runtime.orchestrator.pipeline_orchestrator` 命令都必须用 `cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator ...` 的格式。
 违反此规则 = ModuleNotFoundError。没有例外。submit、execute、任何子命令，全部带 cd。
 
-### 规则2：bg_pid 必须 poll 到进程结束才能推进下一 phase
-当 execute 返回 `needs_poll: true` 和 `bg_pid` 时：
-1. 用 `kill -0 {bg_pid}` 检查进程是否存活
-2. 如果存活，`sleep 30` 后再检查，循环直到进程结束
-3. 进程结束后，检查对应目录产物是否非空
-4. **只有确认 bg 进程完成 + 产物存在后，才能 execute --start-phase 推进下一 phase**
-5. 绝对不能 `sleep` 一个固定时间就推进——必须确认进程真正结束
+### 规则2：heavy phase 全自动等待（2026-07-06 更新）
+**不再需要 agent 轮询 bg_pid。** kernel 内部自动 block-wait heavy phase（phase02/04/33），等完成后继续推进。
+`execute` 永远不会返回 `needs_poll` — 这个状态已被 kernel 内部消化。
+Coordinator 无需关心 heavy phase 的进程状态，一次 execute 跑到底。
 
 ### 规则3：禁止重复粘贴同一行错误命令
 如果同一个命令连续失败 2 次，必须停下来分析错误原因，不能继续重复执行。
@@ -281,11 +278,8 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
   --entity "标的名称" --market cn [--input-file /path/to/bp.pdf]
 
-# 2. 执行到 needs_dispatch 暂停
+# 2. 执行到 needs_dispatch 暂停（heavy phase 自动等完，无需轮询）
 result = cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
-
-# 2a. 如果返回 needs_poll: true + bg_pid，必须轮询直到进程结束
-while kill -0 {bg_pid} 2>/dev/null; do sleep 30; done
 
 # 3. 创建 team，循环派发 wave（IR 和 IC 共用此循环，team_name 前缀不同）
 # IR: team_name=f"ir-{task_id}"
@@ -301,7 +295,6 @@ while True:
     result = launch_next_wave(task_id, entity, query, market, sequential=True)
     if result['all_done']: break
     # 逐 step 派发 team member
-    # 轮询输出文件（sleep 30 → test -s → 重复，最多 15 分钟）
 
 # 4. 清理 team
 send_message(type="shutdown_request", recipient=每个member)
@@ -314,7 +307,7 @@ team_delete()
 # 2. 管线返回 needs_dispatch + has_more=True → 派发单个子代理
 # 3. 子代理完成后 execute --start-phase=当前phase（重跑 collect→gate→下一个 prepare）
 # 4. has_more=False → 管线自动推进到下一 wave
-# 5. 循环直到 phase33 delivery 完成（heavy_bg，轮询 bg_pid）
+# 5. 循环直到 phase33 delivery 完成（heavy phase 自动等完，无需轮询）
 ```
 
 # 5. 交付

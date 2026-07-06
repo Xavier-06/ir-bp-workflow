@@ -154,16 +154,49 @@ class OrchestratorKernel:
                 return results
 
             if phase_result.get("needs_poll"):
-                results["poll_info"] = phase_result
-                results["status"] = "needs_poll"
-                results["paused_after"] = phase_name
-                results["next_phase"] = phases[i + 1] if i + 1 < len(phases) else None
-                results["ok"] = True  # 不是失败，是暂停
+                # ── 内部 block-wait：不再返回给 agent，Python 进程内等待完成 ──
+                # 安全网：正常路径下 launch_heavy_phase 已 block-wait，不会走到这里。
+                # 但如果有任何 handler 返回 needs_poll，kernel 自己等完再继续。
                 bg_pid = phase_result.get("bg_pid", "?")
                 timeout = phase_result.get("timeout", 900)
-                print(f"  ⏸ needs_poll — 后台子进程 PID={bg_pid} 执行中 ({phase_name})", flush=True)
-                print(f"    用 scripts/heavy_phase_bg.py poll_heavy_phase() 或 start_phase='{phases[i + 1] if i + 1 < len(phases) else 'done'}' 恢复", flush=True)
-                return results
+                print(f"  ⏳ [kernel] needs_poll 内部等待 — PID={bg_pid} ({phase_name}, 超时 {timeout}s)", flush=True)
+                try:
+                    from scripts.heavy_phase_bg import poll_heavy_phase
+                    poll_result = poll_heavy_phase(
+                        self.runtime_root, job_ctx.job_id, phase_name, timeout=timeout,
+                    )
+                    if poll_result.get("status") == "completed" and poll_result.get("ok"):
+                        inner = poll_result.get("result", {})
+                        print(f"  ✅ [kernel] {phase_name} 内部等待完成", flush=True)
+                        # 用实际结果替换 needs_poll 占位
+                        phase_result = inner
+                        phase_ok = inner.get("ok", True)
+                        finished_at = time.time()
+                        self._write_phase_state(
+                            workspace, phase_name, phase_result,
+                            started_at=started_at, finished_at=finished_at,
+                            resume_from=start_phase,
+                        )
+                        results["phases"][-1]["result"] = phase_result
+                        if phase_ok is False:
+                            results["ok"] = False
+                            results["failed_phase"] = phase_name
+                            return results
+                        continue  # 继续下一个 phase
+                    else:
+                        # 等待失败或超时
+                        err = poll_result.get("error", "poll 超时或失败")
+                        print(f"  ❌ [kernel] {phase_name} 内部等待失败: {err}", flush=True)
+                        results["ok"] = False
+                        results["failed_phase"] = phase_name
+                        results["error"] = err
+                        return results
+                except Exception as exc:
+                    print(f"  ❌ [kernel] {phase_name} poll 异常: {exc}", flush=True)
+                    results["ok"] = False
+                    results["failed_phase"] = phase_name
+                    results["error"] = str(exc)[:500]
+                    return results
 
             if phase_result.get("ok") is False:
                 results["ok"] = False
@@ -190,8 +223,6 @@ class OrchestratorKernel:
         phase_ok = phase_result.get("ok", True)
         if phase_result.get("needs_dispatch"):
             status = "needs_dispatch"
-        elif phase_result.get("needs_poll"):
-            status = "needs_poll"
         elif phase_ok is False:
             status = "failed"
         else:
