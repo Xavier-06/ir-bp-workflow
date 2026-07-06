@@ -94,13 +94,14 @@ cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestra
 | Wave 4 | dealbreaker_risk | Wave 1 + Wave 2 + Wave 3 |
 | Synthesis | 统稿（读取全部 8 维度输出） | 全部 |
 
-## BP 子代理派发硬规则（2026-06-22 更新）
+## BP 子代理派发硬规则（2026-07-06 更新）
 
 - **必须用 team 模式**：`team_create(team_name=f"bp-{task_id}")` → `Agent(name=..., team_name=..., mode='bypassPermissions')` → 轮询输出文件
 - **sequential 派发（管线内部强制）**：BP 管线已实现 `has_more` 机制——每个 wave prepare 只返回 1 个 manifest + `has_more=True`，主 AI 完成当前 role 后用 `start_phase=当前phase` 恢复，管线返回下一个 manifest，直到 `has_more=False` 才推进到 collect。**Coordinator 不需要自行做 sequential 循环**，管线已自动处理。
 - **repair 派发也是 sequential**：gate FAIL 时的 repair manifest 按 role 聚合 + 只返回第一个 + `has_more`，instruction 含"禁止并行派发"强制指令。repair 子代理使用 `bp_file_lock.locked_read_modify_write` 写共享文件。
 - **禁止用同步 `task()`**（无 name 参数）——会返回 code=10003 挂掉
 - `mode="bypassPermissions"`
+- **⚠️ 禁止 Agent 工具传 `run_in_background=True`**（2026-07-06 新增）：子代理必须前台派发，完成后立即返回结果给 coordinator。只有 Bash 工具跑 heavy_bg 脚本（phase02/04/33）时才用 `run_in_background`。Agent 后台派发会导致通知延迟，管线每步都卡住。
 - **⚠️ 规则4：子代理 prompt 必须声明工具限制**（SKILL.md 规则4）
   所有子代理 prompt 开头加：
   ```

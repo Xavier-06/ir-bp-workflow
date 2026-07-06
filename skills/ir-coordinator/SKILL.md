@@ -337,9 +337,20 @@ finalize_pipeline(task_id, entity, market)  # IR
 
 - **必须用 team 模式（sequential 逐个派发）**：`Agent(name=..., team_name=..., mode='bypassPermissions')`
 - **禁止用同步 `task()`**（无 name 参数）——会 code=10003 挂掉
+- **禁止 Agent 工具传 `run_in_background=True`**——子代理必须前台派发，完成后立即返回结果。只有 Bash 工具跑 heavy_bg 脚本（phase02/04/33）时才用 `run_in_background`
 - `subagent_name` 固定为 `code-explorer`
 - 输出文件超时 → 重派（最多 2 次）
 - 重试仍失败 → 跳过该 step，继续下一 wave
+
+### 派发前检查清单（每次派发子代理必过）
+
+| # | 检查项 | 错误示范 | 正确做法 |
+|---|--------|---------|---------|
+| 1 | CLI 参数 | `--resume-from phase08` | `--start-phase phase08` |
+| 2 | Agent 派发方式 | `Agent(..., run_in_background=True)` | `Agent(...)` 前台调用 |
+| 3 | Bash 后台脚本 | heavy_bg phase 不用后台 | `Bash(..., run_in_background=True)` |
+| 4 | manifest 参数 | 自己编 prompt | 照搬 manifest 的 system_prompt |
+| 5 | 派发数量 | 一条消息多个 Agent | 逐个派发，等完成再下一个 |
 
 ### 子代理自主闭环规则
 

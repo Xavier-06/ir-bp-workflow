@@ -2089,6 +2089,8 @@ def _dispatch_completion_instruction_sequential(
         "- 禁止在单条消息中派发多个 Agent tool_use（会导致并行写冲突）",
         "- 禁止在子代理三文件齐全前推进管线",
         "- 禁止跳过等待直接调 start_phase",
+        "- 禁止给 Agent tool 传 run_in_background=True（子代理必须前台派发，完成后立即返回结果）",
+        "  只有 Bash 工具跑 heavy_bg 脚本时才用 run_in_background",
     ])
     return "\n".join(lines)
 

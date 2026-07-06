@@ -420,11 +420,30 @@ def main():
     l.add_argument("--status", default=None, choices=["pending", "running", "completed", "failed", "paused"])
     l.set_defaults(func=cmd_list)
 
-    args = ap.parse_args()
-    if not hasattr(args, "func"):
+    # ---- 近似参数拦截 ----
+    # 捕获所有未被识别的参数，检查是否是常见误用
+    known_args, unknown = ap.parse_known_args()
+    if unknown:
+        _NEAR_MISS = {
+            "--resume-from": "--start-phase",
+            "--resume": "--start-phase",
+            "--continue-from": "--start-phase",
+            "--from-phase": "--start-phase",
+            "--start_phase": "--start-phase",   # underscore → hyphen
+        }
+        for arg in unknown:
+            key = arg.split("=")[0]  # 支持 --resume-from=xxx 形式
+            if key in _NEAR_MISS:
+                correct = _NEAR_MISS[key]
+                print(f"❌ 未知参数: {key}\n   你是不是想用 {correct}？", file=__import__("sys").stderr)
+                return
+        # 非已知近似参数 → 标准 argparse 报错
+        ap.error(f"unrecognized arguments: {' '.join(unknown)}")
+
+    if not hasattr(known_args, "func"):
         ap.print_help()
         return
-    args.func(args)
+    known_args.func(known_args)
 
 
 def cmd_submit(args):
