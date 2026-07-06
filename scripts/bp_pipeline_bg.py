@@ -94,12 +94,16 @@ def start_phase(job_id: str, phase: str, entity: str = "", market: str = "cn",
     ]
 
     if phase in HEAVY_PHASES:
-        # 后台运行
-        cmd = [_python(), str(PHASE_RUNNER), "--background"] + common_args
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
-        if result.returncode == 0 and result.stdout.strip():
-            return json.loads(result.stdout.strip())
-        return {"ok": False, "error": f"Failed to start background: {result.stderr[:500]}"}
+        # 前台运行（2026-07-06：--background fork 模式已废弃，有 Popen 跟踪父进程的 bug）
+        cmd = [_python(), str(PHASE_RUNNER), "--run"] + common_args
+        timeout = PHASE_TIMEOUTS.get(phase, 900)
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT), timeout=timeout)
+        if result.stdout.strip():
+            try:
+                return json.loads(result.stdout.strip())
+            except json.JSONDecodeError:
+                return {"ok": result.returncode == 0, "stdout": result.stdout[-2000:]}
+        return {"ok": result.returncode == 0, "stderr": result.stderr[:500]}
     else:
         # 前台运行
         cmd = [_python(), str(PHASE_RUNNER), "--run"] + common_args

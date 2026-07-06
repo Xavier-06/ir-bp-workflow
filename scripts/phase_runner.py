@@ -215,28 +215,9 @@ def _write_error(job_id: str, phase: str, error: str):
     path.write_text(error, encoding="utf-8")
 
 
-def _run_in_background(job_id: str, phase: str, entity: str, market: str,
-                       input_file: str, query: str, session_id: str,
-                       pipeline: str = "bp"):
-    """后台执行：写 PID → 执行 → 写结果/错误 → 清理 PID"""
-    # 清理之前的状态文件
-    _result_path(job_id, phase).unlink(missing_ok=True)
-    _error_path(job_id, phase).unlink(missing_ok=True)
-
-    _write_pid(job_id, phase)
-    _running_path(job_id, phase).write_text(str(time.time()), encoding="utf-8")
-
-    try:
-        result = run_phase(job_id, phase, entity, market, input_file, query, session_id,
-                           pipeline=pipeline)
-        if result.get("ok"):
-            _write_result(job_id, phase, result)
-        else:
-            _write_error(job_id, phase, json.dumps(result, ensure_ascii=False, default=str))
-    except Exception as exc:
-        _write_error(job_id, phase, f"{exc}\n\n{traceback.format_exc()}")
-    finally:
-        _cleanup_pid(job_id, phase)
+# _run_in_background 已删除（2026-07-06）
+# os.fork() 模式导致 Popen 跟踪父进程（立即退出 rc=0），实际工作在 daemon 子进程。
+# 现在 heavy phase 由 launch_heavy_phase 在当前进程直接调用 run_phase()。
 
 
 # ═══════════════════════════════════════════════
@@ -257,7 +238,9 @@ def main():
     # 模式选择
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--run", action="store_true", default=True, help="前台运行（默认）")
-    mode.add_argument("--background", action="store_true", help="后台运行（fork + 写 PID）")
+    # --background 已废弃（2026-07-06）：os.fork() 导致 Popen 跟踪父进程（立即退出 rc=0），
+    # 实际工作在 daemon 子进程中，launch_heavy_phase 误判为"异常退出"。
+    # 现在 heavy phase 由 launch_heavy_phase 在当前进程直接调用 run_phase()，不需要子进程。
     mode.add_argument("--status", action="store_true", help="查询状态")
     mode.add_argument("--wait", action="store_true", help="等待完成")
     mode.add_argument("--wait-all", action="store_true", help="等待所有指定 phases 完成")
@@ -278,40 +261,7 @@ def main():
         print(json.dumps(status, ensure_ascii=False, indent=2, default=str))
         return
 
-    # 后台运行
-    if args.background:
-        # 先检查是否已在运行
-        if is_running(args.job_id, args.phase):
-            pid = _pid_path(args.job_id, args.phase).read_text().strip()
-            print(json.dumps({"status": "already_running", "pid": pid}, ensure_ascii=False))
-            return
-
-        # 清理之前的结果（如果有，说明是重跑）
-        _result_path(args.job_id, args.phase).unlink(missing_ok=True)
-        _error_path(args.job_id, args.phase).unlink(missing_ok=True)
-
-        # Fork 到后台
-        pid = os.fork()
-        if pid > 0:
-            # 父进程：返回子进程 PID
-            print(json.dumps({
-                "status": "started",
-                "pid": pid,
-                "phase": args.phase,
-                "job_id": args.job_id,
-            }, ensure_ascii=False))
-            return
-
-        # 子进程：setsid 脱离终端，执行 phase
-        os.setsid()
-        try:
-            _run_in_background(args.job_id, args.phase, args.entity, args.market,
-                               args.input_file, args.query, args.session_id,
-                               pipeline=args.pipeline)
-        finally:
-            os._exit(0)
-
-    # 前台运行（默认）
+    # --background 已删除（2026-07-06），直接前台运行
     result = run_phase(args.job_id, args.phase, args.entity, args.market,
                        args.input_file, args.query, args.session_id,
                        pipeline=args.pipeline)
