@@ -39,15 +39,23 @@ allowed-tools:
 
 ## ⚠️⚠️⚠️ 命令执行铁律（2026-05-09 教训）
 
-### 规则1：所有 python3 管线命令必须带 `cd {IR_RUNTIME} &&`
+### 规则1：所有 python3 管线命令必须带 `cd {IR_RUNTIME} &&` + 超时设置
 Bash 工具每次调用是**独立 shell**，工作目录默认是用户项目目录，不是 IR_RUNTIME。
 **每一个** `python3 -m runtime.orchestrator.pipeline_orchestrator` 命令都必须用 `cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator ...` 的格式。
 违反此规则 = ModuleNotFoundError。没有例外。submit、execute、任何子命令，全部带 cd。
 
+**⚠️ Bash 超时设置（2026-07-06 新增，关键！）：**
+- `execute` 命令**必须**设 `timeout: 600000`（10 分钟）或更长
+- 原因：kernel 内部 block-wait heavy phase（phase02 天眼查 10min + phase04 预搜索 15min + phase33 交付 10min），Bash 默认 120s 超时会导致 agent session 被切断，又要你发"继续"
+- **不设 timeout = Bash 120s 超时 → 管线在后台跑但 agent 对话断了 = 又要人工干预**
+- `submit` 命令可以不加（很快）
+- 格式：`Bash(command="cd ~/.workbuddy/ir_runtime && python3 -m ...", timeout=600000)`
+
 ### 规则2：heavy phase 全自动等待（2026-07-06 更新）
 **不再需要 agent 轮询 bg_pid。** kernel 内部自动 block-wait heavy phase（phase02/04/33），等完成后继续推进。
 `execute` 永远不会返回 `needs_poll` — 这个状态已被 kernel 内部消化。
-Coordinator 无需关心 heavy phase 的进程状态，一次 execute 跑到底。
+**但 Bash 工具必须设够长的 timeout，否则 Bash 自己会超时切断 agent session。**
+Coordinator 无需关心 heavy phase 的进程状态，一次 execute 跑到底（前提是 Bash timeout 设对了）。
 
 ### 规则3：禁止重复粘贴同一行错误命令
 如果同一个命令连续失败 2 次，必须停下来分析错误原因，不能继续重复执行。
