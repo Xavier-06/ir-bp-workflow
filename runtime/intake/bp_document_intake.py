@@ -251,11 +251,42 @@ def _ocr_image(image_path: Path, page_hint: str = "") -> str:
     return _vl_chat(messages, max_tokens=4096)
 
 
-def _ocr_pdf_image_paths(image_paths: list[Path], backend: str) -> tuple[str, int]:
+# OCR 全局时间预算（秒）—— 超过即截断返回已识别部分，管线继续跑
+OCR_TIME_BUDGET_SECONDS = 1200  # 20 分钟
+
+
+def _ocr_pdf_image_paths(
+    image_paths: list[Path],
+    backend: str,
+    deadline: float = 0,
+) -> tuple[str, int, bool]:
+    """逐页 VL OCR PDF 图片。
+
+    Args:
+        deadline: 时间截止点 (time.monotonic())，0 = 不限制。
+
+    Returns:
+        (ocr_text, pages_processed, timed_out)
+    """
     page_texts: list[str] = []
     total_pages = len(image_paths)
-    print(f"  🔍 {backend} + 小马算力 VL OCR: {total_pages} 页", flush=True)
+    timed_out = False
+
+    # 时间预算日志
+    if deadline > 0:
+        remaining = deadline - time.monotonic()
+        print(f"  🔍 {backend} + 小马算力 VL OCR: {total_pages} 页 (预算 {remaining:.0f}s)", flush=True)
+    else:
+        print(f"  🔍 {backend} + 小马算力 VL OCR: {total_pages} 页", flush=True)
+
     for i, image_path in enumerate(image_paths, 1):
+        # ── 超时检查（每 3 页检查一次，避免频繁 syscall）──
+        if deadline > 0 and i % 3 == 0:
+            elapsed_check = time.monotonic()
+            if elapsed_check >= deadline:
+                print(f"  ⏰ OCR 超时：已处理 {i-1}/{total_pages} 页，截止返回已有数据", flush=True)
+                timed_out = True
+                break
         try:
             t = _ocr_image(image_path, page_hint=f"第{i}页")
             if t and len(t) > 10:
@@ -263,11 +294,15 @@ def _ocr_pdf_image_paths(image_paths: list[Path], backend: str) -> tuple[str, in
             else:
                 page_texts.append(f"--- Page {i} ---\n（VL识别无文字）")
             if i % 5 == 0 or i == total_pages:
-                print(f"    OCR 进度: {i}/{total_pages}", flush=True)
+                msg = f"    OCR 进度: {i}/{total_pages}"
+                if deadline > 0 and i < total_pages:
+                    remaining_s = deadline - time.monotonic()
+                    msg += f" | 剩余 {remaining_s:.0f}s"
+                print(msg, flush=True)
         except Exception as e:
             page_texts.append(f"--- Page {i} ---\n[OCR失败: {e}]")
         time.sleep(0.3)
-    return "\n\n".join(page_texts), total_pages
+    return "\n\n".join(page_texts), len(page_texts), timed_out
 
 
 def _render_pdf_with_pdftoppm(pdf_path: Path, output_dir: Path, dpi: int = 200) -> list[Path]:
@@ -302,23 +337,36 @@ def _render_pdf_with_pdf2image(pdf_path: Path, output_dir: Path, dpi: int = 200)
     return paths
 
 
-def _ocr_pdf(pdf_path: Path, output_dir: Path) -> tuple[str, int]:
-    """OCR PDF — 主链必须逐页渲染为图片后调用小马算力 VL。"""
+def _ocr_pdf(
+    pdf_path: Path,
+    output_dir: Path,
+    deadline: float = 0,
+) -> tuple[str, int, bool]:
+    """OCR PDF — 主链必须逐页渲染为图片后调用小马算力 VL。
+
+    Returns:
+        (ocr_text, pages_processed, timed_out)
+    """
 
     # 方法 1（首选）: 系统 pdftoppm 逐页转 PNG → 小马算力 VL OCR。
     try:
         image_paths = _render_pdf_with_pdftoppm(pdf_path, output_dir, dpi=200)
         if image_paths:
-            return _ocr_pdf_image_paths(image_paths, backend="pdftoppm")
+            return _ocr_pdf_image_paths(image_paths, backend="pdftoppm", deadline=deadline)
     except Exception as e:
         print(f"  ⚠ pdftoppm + VL OCR 失败 ({e})，尝试 pdf2image", flush=True)
+
+    # 超时检查：如果方法1已经超时，不再尝试方法2
+    if deadline > 0 and time.monotonic() >= deadline:
+        print("  ⏰ PDF OCR 超时，不再尝试备选方法", flush=True)
+        return "", 0, True
 
     # 方法 2: pdf2image 逐页转图片 → 小马算力 VL OCR。
     try:
         print("  📄 PDF 逐页渲染 (pdf2image) ...", flush=True)
         image_paths = _render_pdf_with_pdf2image(pdf_path, output_dir, dpi=200)
         if image_paths:
-            return _ocr_pdf_image_paths(image_paths, backend="pdf2image")
+            return _ocr_pdf_image_paths(image_paths, backend="pdf2image", deadline=deadline)
     except ImportError:
         print("  ⚠ pdf2image 未安装，跳过 pdf2image VL OCR", flush=True)
     except Exception as e:
@@ -336,22 +384,22 @@ def _ocr_pdf(pdf_path: Path, output_dir: Path) -> tuple[str, int]:
         }]
         result = _vl_chat(messages, max_tokens=8192)
         if result and len(result) > 200:
-            return result, 1  # 整份处理无法确定页数，标记为1
+            return result, 1, False  # 整份处理无法确定页数，标记为1
     except Exception:
         pass
 
-    # 方法 3: pdfminer 提取文字
+    # 方法 4: pdfminer 提取文字（纯文本 fallback，不走 VL，无超时风险）
     try:
         from pdfminer.high_level import extract_text as pdfminer_extract
         text = pdfminer_extract(str(pdf_path))
         if text and len(text) > 100:
-            return text, 1
+            return text, 1, False
     except ImportError:
         pass
     except Exception:
         pass
 
-    # 方法 4: PyPDF2
+    # 方法 5: PyPDF2
     try:
         from PyPDF2 import PdfReader
         reader = PdfReader(str(pdf_path))
@@ -362,13 +410,13 @@ def _ocr_pdf(pdf_path: Path, output_dir: Path) -> tuple[str, int]:
                 pages.append(t)
         text = "\n\n".join(pages)
         if text and len(text) > 100:
-            return text, len(reader.pages)
+            return text, len(reader.pages), False
     except ImportError:
         pass
     except Exception:
         pass
 
-    return f"[无法提取 PDF 文本: {pdf_path.name}，请安装 pdf2image、pdfminer 或 PyPDF2]", 0
+    return f"[无法提取 PDF 文本: {pdf_path.name}，请安装 pdf2image、pdfminer 或 PyPDF2]", 0, False
 
 
 # ── 结构化抽取 ────────────────────────────────────────
@@ -621,7 +669,13 @@ def _ocr_page_records(ocr_text: str, pages_processed: int) -> list[dict[str, Any
     return records
 
 
-def _build_ocr_manifest(input_path: Path, ext: str, ocr_text: str, pages_processed: int) -> dict[str, Any]:
+def _build_ocr_manifest(
+    input_path: Path,
+    ext: str,
+    ocr_text: str,
+    pages_processed: int,
+    timed_out: bool = False,
+) -> dict[str, Any]:
     pages = _ocr_page_records(ocr_text, pages_processed)
     success_pages = sum(1 for page in pages if page.get("status") == "success")
     has_explicit_page_markers = bool(re.search(r"^---\s*(?:第)?[^\n-]+?(?:页|Page|Slide)?\s*---\s*$", ocr_text or "", re.M | re.I))
@@ -640,11 +694,18 @@ def _build_ocr_manifest(input_path: Path, ext: str, ocr_text: str, pages_process
     elif pages_processed <= 0:
         verdict = "FAIL"
         reason = "OCR_NO_PAGES_PROCESSED"
-    elif total_pages >= 3 and success_ratio < MIN_OCR_SUCCESS_RATIO:
+    elif total_pages >= 3 and success_ratio < MIN_OCR_SUCCESS_RATIO and not timed_out:
+        # 超时截断导致的低成功率不算 FAIL（已有数据仍可用）
         verdict = "FAIL"
         reason = "OCR_LOW_SUCCESS_RATIO"
+
+    # 超时但有足够文本 → PASS + 标记 partial
+    if timed_out and useful_chars >= MIN_OCR_USEFUL_CHARS:
+        verdict = "PASS"
+        reason = "OCR_PARTIAL_TIMEOUT"
+
     return {
-        "schema_version": "bp_ocr_manifest.v1",
+        "schema_version": "bp_ocr_manifest.v2",
         "input_file": str(input_path),
         "input_type": ext,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -660,6 +721,8 @@ def _build_ocr_manifest(input_path: Path, ext: str, ocr_text: str, pages_process
             "useful_chars": useful_chars,
             "min_success_ratio": MIN_OCR_SUCCESS_RATIO,
             "min_useful_chars": MIN_OCR_USEFUL_CHARS,
+            "timed_out": timed_out,
+            "time_budget_seconds": OCR_TIME_BUDGET_SECONDS,
         },
         "pages": pages,
     }
@@ -760,9 +823,13 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
             "error": f"不支持的文件类型: {ext}，支持: {SUPPORTED_EXTENSIONS}",
         }
 
-    # 1. OCR 提取文字
+    # 1. OCR 提取文字（带时间预算）
     ocr_text = ""
     pages_processed = 0
+    ocr_timed_out = False
+    ocr_start_time = time.monotonic()
+    deadline = ocr_start_time + OCR_TIME_BUDGET_SECONDS
+    print(f"  ⏱ OCR 时间预算: {OCR_TIME_BUDGET_SECONDS}s", flush=True)
 
     try:
         if ext in (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"):
@@ -771,7 +838,9 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
             pages_processed = 1
 
         elif ext == ".pdf":
-            ocr_text, pages_processed = _ocr_pdf(input_path, extraction_dir)
+            ocr_text, pages_processed, ocr_timed_out = _ocr_pdf(
+                input_path, extraction_dir, deadline=deadline
+            )
 
         elif ext in (".pptx", ".ppt"):
             # PPTX: 优先 LibreOffice 渲染整页 → VL OCR（覆盖图片型页面）
@@ -789,6 +858,11 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
                     total_slides = len(slide_images)
                     print(f"  ✅ 渲染完成，共 {total_slides} 页，开始逐页 OCR ...", flush=True)
                     for img_path in slide_images:
+                        # ── 超时检查 ──
+                        if time.monotonic() >= deadline:
+                            print(f"  ⏰ PPTX OCR 超时：已处理 {pages_processed}/{total_slides} 页", flush=True)
+                            ocr_timed_out = True
+                            break
                         slide_idx = img_path.stem.split("-")[-1] if "-" in img_path.stem else ""
                         try:
                             t = _ocr_image(img_path, page_hint=f"第{slide_idx}页" if slide_idx else "")
@@ -798,7 +872,8 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
                                 page_texts.append(f"--- 第{slide_idx or '?'}页 ---\n（VL识别无文字）")
                             pages_processed += 1
                             if pages_processed % 5 == 0 or pages_processed == total_slides:
-                                print(f"    OCR 进度: {pages_processed}/{total_slides}", flush=True)
+                                remaining_s = deadline - time.monotonic()
+                                print(f"    OCR 进度: {pages_processed}/{total_slides} | 剩余 {remaining_s:.0f}s", flush=True)
                         except Exception as e:
                             page_texts.append(f"--- 第{slide_idx or '?'}页 ---\n[OCR失败: {e}]")
                     print(f"  📊 LibreOffice 渲染 + VL OCR: {len(slide_images)} 页", flush=True)
@@ -808,7 +883,7 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
                 print(f"  ⚠ LibreOffice 渲染失败 ({e})，回退到 python-pptx")
 
             # ── Fallback: python-pptx 读文字 + 嵌入图片 VL OCR ──
-            if not libreoffice_ok:
+            if not libreoffice_ok and not ocr_timed_out:
                 try:
                     from pptx import Presentation
                     prs = Presentation(str(input_path))
@@ -829,10 +904,14 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
                             page_texts.append(f"--- 第{i}页 ---\n（无文字内容）")
                         pages_processed += 1
 
-                    # 补充：嵌入图片 VL OCR
+                    # 补充：嵌入图片 VL OCR（带超时检查）
                     images = _extract_images_from_pptx(input_path, img_dir)
                     if images:
                         for idx, img in enumerate(images[:30], 1):
+                            if time.monotonic() >= deadline:
+                                print(f"  ⏰ PPTX 嵌入图片 OCR 超时：已处理 {idx-1} 张", flush=True)
+                                ocr_timed_out = True
+                                break
                             try:
                                 img_ocr = _ocr_image(img, page_hint=f"嵌入图片{idx}")
                                 if img_ocr and len(img_ocr) > 20:
@@ -844,6 +923,10 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
                     img_dir = extraction_dir / "slide_images"
                     images = _extract_images_from_pptx(input_path, img_dir)
                     for i, img in enumerate(images, 1):
+                        if time.monotonic() >= deadline:
+                            print(f"  ⏰ PPTX 嵌入图片 OCR 超时：已处理 {i-1} 张", flush=True)
+                            ocr_timed_out = True
+                            break
                         try:
                             t = _ocr_image(img, page_hint=f"第{i}页/幻灯片")
                             page_texts.append(f"--- 第{i}页 ---\n{t}")
@@ -877,10 +960,14 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
                 page_texts.append(f"--- 文档文字 ---\n{doc_text}")
                 pages_processed += 1
 
-            # Step 2: OCR 嵌入图片（补充图表信息）
+            # Step 2: OCR 嵌入图片（补充图表信息，带超时检查）
             img_dir = extraction_dir / "doc_images"
             images = _extract_images_from_docx(input_path, img_dir)
             for i, img in enumerate(images, 1):
+                if time.monotonic() >= deadline:
+                    print(f"  ⏰ DOCX 嵌入图片 OCR 超时：已处理 {i-1}/{len(images)} 张", flush=True)
+                    ocr_timed_out = True
+                    break
                 try:
                     t = _ocr_image(img, page_hint=f"图片{i}")
                     page_texts.append(f"--- 图片{i} ---\n{t}")
@@ -898,23 +985,28 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
             "error": f"OCR 处理失败: {e}",
         }
 
-    manifest = _build_ocr_manifest(input_path, ext, ocr_text, pages_processed)
+    manifest = _build_ocr_manifest(input_path, ext, ocr_text, pages_processed, timed_out=ocr_timed_out)
     manifest_path = output_dir / "bp_ocr_manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    unusable_reason = manifest.get("quality_gate", {}).get("reason", "") if manifest.get("quality_gate", {}).get("verdict") == "FAIL" else ""
+    gate_verdict = manifest.get("quality_gate", {}).get("verdict", "")
+    unusable_reason = manifest.get("quality_gate", {}).get("reason", "") if gate_verdict == "FAIL" else ""
     if unusable_reason:
-        return {
-            "ok": False,
-            "mode": "legacy_wrapped",
-            "phase": "phase01_document_intake",
-            "job_id": job_ctx.job_id,
-            "error": unusable_reason,
-            "details": {
-                "pages_processed": pages_processed,
-                "ocr_text_length": len(ocr_text or ""),
-                "manifest_path": str(manifest_path),
-            },
-        }
+        # 超时截断 → 即使 quality gate FAIL 也放行（有数据总比没有好）
+        if ocr_timed_out and pages_processed > 0 and len(ocr_text or "") > 200:
+            print(f"  ⚠ OCR 超时但已获取足够文本 ({pages_processed} 页, {len(ocr_text)} 字)，继续执行", flush=True)
+        else:
+            return {
+                "ok": False,
+                "mode": "legacy_wrapped",
+                "phase": "phase01_document_intake",
+                "job_id": job_ctx.job_id,
+                "error": unusable_reason,
+                "details": {
+                    "pages_processed": pages_processed,
+                    "ocr_text_length": len(ocr_text or ""),
+                    "manifest_path": str(manifest_path),
+                },
+            }
 
     # 2. 写 OCR 文本
     ocr_path = output_dir / "bp_ocr_text.txt"
@@ -959,6 +1051,8 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
     except Exception:
         pass
 
+    ocr_elapsed = time.monotonic() - ocr_start_time
+
     return {
         "ok": True,
         "mode": "legacy_wrapped",
@@ -974,5 +1068,8 @@ def run_document_intake(job_ctx, input_file: str) -> dict[str, Any]:
             "company_name": profile.get("company_name", ""),
             "industry": profile.get("industry", ""),
             "financing_stage": profile.get("financing_stage", ""),
+            "ocr_timed_out": ocr_timed_out,
+            "ocr_elapsed_seconds": round(ocr_elapsed, 1),
+            "ocr_time_budget_seconds": OCR_TIME_BUDGET_SECONDS,
         },
     }
