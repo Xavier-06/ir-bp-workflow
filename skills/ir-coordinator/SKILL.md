@@ -287,7 +287,9 @@ cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestra
   --entity "标的名称" --market cn [--input-file /path/to/bp.pdf]
 
 # 2. 执行到 needs_dispatch 暂停（heavy phase 自动等完，无需轮询）
+# ⚠️ Bash 必须设 timeout=600000（10分钟），否则 Bash 120s 超时切断 agent session
 result = cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
+# Bash(command="cd ~/.workbuddy/ir_runtime && python3 -m ...", timeout=600000)  ← 必须！
 
 # 3. 创建 team，循环派发 wave（IR 和 IC 共用此循环，team_name 前缀不同）
 # IR: team_name=f"ir-{task_id}"

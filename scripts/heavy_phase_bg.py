@@ -1,28 +1,40 @@
 """
 Heavy Phase Background Runner — 用于 profile handler 内部
 
-将耗时 > 2 分钟的 phase（company_verify, presearch, delivery）放到
-独立子进程中执行，避免受 Bash 工具超时限制。
+将耗时 > 2 分钟的 phase（company_verify, presearch, delivery）在**当前进程内**
+直接执行，避免子进程管理的复杂性。
 
-工作原理：
-    1. Handler 调用 launch_heavy_phase() → fork 子进程
-    2. 函数内部 block-wait 直到子进程完成或超时
-    3. 直接返回结果 dict（不再返回 needs_poll）
-    4. Agent 永远不需要 poll，管线自动推进
+2026-07-06 重构：彻底删除子进程架构。
 
-子进程使用 start_new_session=True，不受父进程 SIGTERM 影响。
-等待发生在 Python 进程内部（免费），不消耗 agent API turn。
+之前的设计（v1）：
+  Popen → phase_runner --background → os.fork() → daemon 子进程
+  → launch_heavy_phase 轮询 .result.json 文件
+  问题：Popen 跟踪 fork 父进程（立即退出 rc=0），实际工作在 daemon 子进程。
+  launch_heavy_phase 看到父进程退出但找不到结果文件 → 误判为"异常退出"。
+
+之后的修复（v2）：
+  Popen → phase_runner --run → 从 stdout 读 JSON
+  问题：stdout 混杂了 print 日志和 JSON，解析不稳定。
+  start_new_session=True 可能影响 stdout 缓冲。
+
+当前设计（v3）：
+  直接在当前进程内调用 phase_runner.run_phase()。
+  kernel.run() 已经在 Python 进程内执行 profile handler，
+  heavy phase handler 直接调 run_phase 即可。
+  不需要子进程、不需要文件轮询、不需要 stdout 解析。
+  "block-wait" 就是函数调用本身。
+
+poll_heavy_phase 保留作为安全网（kernel 内部消化遗留 needs_poll）。
 """
 from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Any
 
+# phase_runner 的 ROOT 和 sys.path 在 launch_heavy_phase 内按需添加
 PHASE_RUNNER = Path(__file__).resolve().parent / "phase_runner.py"
 
 PHASE_TIMEOUTS = {
@@ -96,116 +108,63 @@ def launch_heavy_phase(
     phase: str,
     pipeline: str = "bp",
 ) -> dict[str, Any]:
-    """启动一个 heavy phase 的后台子进程，block-wait 直到完成。
+    """在当前进程内直接执行 heavy phase，block-wait 直到完成。
 
-    子进程通过 Popen(start_new_session=True) 启动，脱离父进程组。
-    本函数在 Python 进程内部等待（不消耗 agent API turn），直到子进程
-    写出结果文件或超时。
-
-    结果写入 state/{phase}.result.json。
+    2026-07-06 v3：不再使用子进程，直接调用 phase_runner.run_phase()。
+    "block-wait" 就是函数调用本身——没有 fork、没有文件轮询、没有 stdout 解析。
     """
     metadata = job_ctx.metadata or {}
 
-    # 清理旧的 PID/result/error 文件
-    for p in (_result_path(runtime_root, job_ctx.job_id, phase),
-              _error_path(runtime_root, job_ctx.job_id, phase)):
-        p.unlink(missing_ok=True)
+    # 确保 phase_runner 的路径在 sys.path 中（run_phase 需要 ROOT）
+    import sys
+    root_str = str(runtime_root)
+    scripts_str = str(runtime_root / "scripts")
+    for p in [root_str, scripts_str]:
+        if p not in sys.path:
+            sys.path.insert(0, p)
 
-    cmd = [
-        sys.executable,
-        str(PHASE_RUNNER),
-        "--job-id", job_ctx.job_id,
-        "--phase", phase,
-        "--entity", job_ctx.entity or "",
-        "--market", getattr(job_ctx, "market", "cn") or "cn",
-        "--input-file", metadata.get("input_file", ""),
-        "--query", job_ctx.query or "",
-        "--session-id", metadata.get("session_id", ""),
-        "--pipeline", pipeline,
-        "--background",
-    ]
+    # 设置 IRBP_BG_CHILD 标记，让 handler 内部不再 fork
+    os.environ["IRBP_BG_CHILD"] = "1"
+
+    # 先检查是否有缓存结果（来自之前中断的执行）
+    cached = check_cached_result(runtime_root, job_ctx.job_id, phase)
+    if cached is not None:
+        print(f"  📦 [heavy_phase_bg] 使用缓存结果: {phase}", flush=True)
+        return cached
 
     timeout = PHASE_TIMEOUTS.get(phase, 900)
-    print(f"  🔄 [heavy_phase_bg] 启动后台子进程: {phase} (超时 {timeout}s)", flush=True)
+    print(f"  🔄 [heavy_phase_bg] 当前进程执行: {phase} (超时 {timeout}s)", flush=True)
 
+    start_time = time.time()
     try:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            cwd=str(runtime_root),
-            start_new_session=True,
+        from phase_runner import run_phase
+
+        result = run_phase(
+            job_id=job_ctx.job_id,
+            phase=phase,
+            entity=job_ctx.entity or "",
+            market=getattr(job_ctx, "market", "cn") or "cn",
+            input_file=metadata.get("input_file", ""),
+            query=job_ctx.query or "",
+            session_id=metadata.get("session_id", ""),
+            pipeline=pipeline,
         )
+        elapsed = time.time() - start_time
+        ok = result.get("ok", False)
+        icon = "✅" if ok else "❌"
+        print(f"  {icon} [heavy_phase_bg] {phase} 完成 ({elapsed:.1f}s)", flush=True)
+        return result
 
-        # 写 PID 文件（仅用于调试/监控）
-        pid_file = _pid_path(runtime_root, job_ctx.job_id, phase)
-        pid_file.write_text(str(proc.pid), encoding="utf-8")
-
-        print(f"  📌 [heavy_phase_bg] 子进程 PID={proc.pid}，block-waiting ...", flush=True)
-
-        # ── Block-wait：在 Python 内部等待，不烧 agent turn ──
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            # 检查结果文件
-            result_file = _result_path(runtime_root, job_ctx.job_id, phase)
-            if result_file.exists():
-                data = json.loads(result_file.read_text(encoding="utf-8"))
-                result_file.unlink(missing_ok=True)
-                pid_file.unlink(missing_ok=True)
-                elapsed = time.time() - start_time
-                print(f"  ✅ [heavy_phase_bg] {phase} 完成 ({elapsed:.1f}s)", flush=True)
-                return data
-
-            # 检查错误文件
-            error_file = _error_path(runtime_root, job_ctx.job_id, phase)
-            if error_file.exists():
-                error_text = error_file.read_text(encoding="utf-8")
-                error_file.unlink(missing_ok=True)
-                pid_file.unlink(missing_ok=True)
-                elapsed = time.time() - start_time
-                print(f"  ❌ [heavy_phase_bg] {phase} 失败 ({elapsed:.1f}s): {error_text[:200]}", flush=True)
-                return {"ok": False, "error": error_text}
-
-            # 检查进程是否已死
-            if proc.poll() is not None:
-                # 进程已结束但没写结果/错误文件 → 最后一次检查
-                break
-
-            time.sleep(2)  # 2 秒检查间隔，Python sleep 免费
-
-        # 超时或进程意外退出
-        # 最后一次检查结果文件
-        cached = check_cached_result(runtime_root, job_ctx.job_id, phase)
-        if cached is not None:
-            elapsed = time.time() - start_time
-            print(f"  ✅ [heavy_phase_bg] {phase} 完成 ({elapsed:.1f}s, cached)", flush=True)
-            return cached
-
-        # 进程还在跑 → kill
-        if proc.poll() is None:
-            print(f"  ⏰ [heavy_phase_bg] {phase} 超时 ({timeout}s)，终止子进程 PID={proc.pid}", flush=True)
-            try:
-                proc.kill()
-            except Exception:
-                pass
-            pid_file.unlink(missing_ok=True)
-            return {"ok": False, "phase": phase, "error": f"子进程超时 ({timeout}s)，已终止"}
-
-        # 进程已死，无结果
-        stderr_text = proc.stderr.read() if proc.stderr else ""
-        pid_file.unlink(missing_ok=True)
-        return {
-            "ok": False,
-            "phase": phase,
-            "error": f"子进程 PID={proc.pid} 异常退出 (rc={proc.returncode})，无结果文件",
-            "stderr_tail": stderr_text[-500:] if stderr_text else "",
-        }
     except Exception as exc:
+        elapsed = time.time() - start_time
+        import traceback
+        tb = traceback.format_exc()
+        print(f"  ❌ [heavy_phase_bg] {phase} 异常 ({elapsed:.1f}s): {exc}", flush=True)
         return {
             "ok": False,
             "phase": phase,
-            "error": f"Failed to launch subprocess: {exc}",
+            "error": str(exc),
+            "traceback": tb,
         }
 
 
@@ -217,8 +176,8 @@ def poll_heavy_phase(
 ) -> dict[str, Any]:
     """轮询 heavy phase 的后台执行状态。
 
-    timeout=0: 只查一次，立即返回
-    timeout>0: 阻塞等待直到完成或超时
+    注意：launch_heavy_phase 已改为当前进程执行，不再写文件。
+    此函数仅作为安全网保留（kernel 内部消化遗留 needs_poll）。
     """
     pid_file = _pid_path(runtime_root, job_id, phase)
 
