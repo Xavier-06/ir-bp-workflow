@@ -1409,7 +1409,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
                 f'3. 根据 brief 中的统稿规则，将 step1~step7 的内容汇总为一份完整研报\n'
                 f'   （step_macro 宏观判断需纳入投资摘要和风险章节）\n'
-                f'4. 如发现数据缺口或矛盾，用 web_search 补搜验证（最多 3 轮）\n'
+                f'4. 如发现数据缺口或矛盾，优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（web_search 仅作兜底，最多 3 轮）\n'
                 f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         elif step_deps_list:
@@ -1417,14 +1417,14 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             prompt_body += (
                 f'2. 逐一读取上方列出的前序 step 完整输出文件（不是跳过，是强制）\n'
                 f'3. 根据 brief 中的角色指令执行分析，前序 step 的完整数据是你的核心输入\n'
-                f'4. 如发现数据缺口，用 web_search 补搜（最多 3 轮）\n'
+                f'4. 如发现数据缺口，优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（web_search 仅作兜底，最多 3 轮）\n'
                 f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         else:
             # 无依赖的 step（step1_data, step_macro）：直接从 brief 开始
             prompt_body += (
                 f'2. 根据 brief 中的角色指令和预搜索数据，执行完整分析\n'
-                f'3. 如发现数据缺口，用 web_search 补搜（最多 3 轮）\n'
+                f'3. 如发现数据缺口，优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（web_search 仅作兜底，最多 3 轮）\n'
                 f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
 
@@ -1451,7 +1451,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             'team_name_template': 'ir-{task_id}',
             'team_name': team_name,
             'mode': 'bypassPermissions',
-            'connectorIds': IR_SUBAGENT_CONNECTOR_IDS,  # 天眼查/腾讯自选股/通达信/企查查
+            'connectorIds': IR_SUBAGENT_CONNECTOR_IDS,  # 天眼查 + 腾讯自选股（tdx/qcc 当前环境不可用，已剔除）
             'prompt': prompt_body,
             'brief_path': brief_path,
             'output_path': output_path,
