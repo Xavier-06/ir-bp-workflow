@@ -56,7 +56,7 @@ LIT_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
     "tech_decomposition": [],       # 快速预搜 + JSON 输出，无需 MCP
     "academic_scout": [],           # 纯学术 API 脚本，无需 MCP
     "industry_scout": [],           # NeoData 走 search_gateway，无需 MCP
-    "enterprise_scout": LIT_QCC_CONNECTOR_IDS,  # QCC MCP
+    "enterprise_scout": LIT_QCC_CONNECTOR_IDS,  # 天眼查 MCP (tyc-mcp，经 LIT_QCC_CONNECTOR_IDS 别名)
     "deep_reader": [],              # 读本地文件 + WebFetch
     "tech_strategist": [],          # 纯分析，Read + Write
     "report_writer": [],            # 纯写作，Read + Write
