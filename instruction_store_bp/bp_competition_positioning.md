@@ -48,6 +48,7 @@
 | 上市竞品财务数据（市值/PE/PS） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData |
 | 美股竞品估值交叉验证 | `yfinance` | A股代码: `{代码}.SS`/`.SZ`，港股: `{代码}.HK` |
 | 竞品产品/客户/新闻 | `web_search` + `web_fetch` | 搜竞品官网、媒体报道、行业排名 |
+| **竞品新闻/行业研报/市场动态** | **NeoData (`neodata_search` data_type=doc)** | **券商竞品分析、行业新闻、市场份额研报——比 web_search 更精准** |
 
 **NeoData 调用**（可比公司市值/PE/PS 的首选数据源，A/HK 股必用）：
 ```bash
@@ -86,7 +87,8 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 工具 | 调用方式 | 查什么 | 备注 |
 |------|---------|--------|------|
 | **TYC 两阶段** | 见下方 bash | 竞品工商/融资/资质/招投标/股东 | 竞品验证核心工具 |
-| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | A/HK 竞品市值/PE/PS/营收 | 上市竞品财务首选 |
+| **NeoData(api)** | `neodata_search('关键词', data_type='api')` | A/HK 竞品市值/PE/PS/营收 | 上市竞品财务首选 |
+| **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **竞品研报/行业新闻/市场份额分析/竞争格局** | **新闻+研报主力** |
 | **yfinance** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import yfinance_summary; ..."` | 美股竞品估值快照 | 交叉验证用 |
 | **WebSearch** | WorkBuddy 内置 | 竞品产品/客户/新闻/市场份额/行业排名 | 竞品情报主力 |
 | **WebFetch** | WorkBuddy 内置 | 深读竞品官网/媒体报道/行业报告 | 配合 WebSearch |
@@ -219,7 +221,9 @@ web_fetch: {搜索结果中的URL}
 | 竞品股东/融资 | TYC `call_tool` (股东信息/融资记录) | 结构化 |
 | 竞品招投标（市场地位判断） | TYC `search_bids` | 结构化 |
 | 竞品资质许可 | TYC `call_tool` (企业资质) | 结构化 |
-| A/HK 竞品市值/PE/PS/营收 | NeoData (`neodata_search`) | 结构化金融数据首选 |
+| A/HK 竞品市值/PE/PS/营收 | NeoData (`neodata_search` data_type=api) | 结构化金融数据首选 |
+| **竞品研报/竞争格局/市场份额分析** | **NeoData (`neodata_search` data_type=doc)** | **券商竞品分析、行业排名研报** |
+| **竞品新闻/融资/产品发布** | **NeoData (`neodata_search` data_type=doc)** | **竞品动态、行业新闻** |
 | 美股竞品估值 | yfinance (`yfinance_summary`) | 美股精确估值 |
 | 竞品产品/客户/新闻报道 | WebSearch → WebFetch 深读 | 非结构化情报 |
 | 竞品产品参数/价格 | WebSearch | 搜 datasheet/评测 |

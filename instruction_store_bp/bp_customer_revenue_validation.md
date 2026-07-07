@@ -31,7 +31,9 @@
 | 客户风险全面扫描 | TYC `call_tool`（先 `get_company_capabilities` 取风险扫描类 tool_name，组合多个维度扫描） | 35 项风险因子前置预筛 |
 | 客户经营异常/行政处罚/失信 | `get_business_exception` / `get_administrative_penalty` / `get_dishonest_info` | 按扫描结果下钻（判断客户是否还能回款） |
 | 收入/订单外部报道 | `web_search` + `web_fetch` | 搜新闻、行业媒体、客户公告 |
+| **客户新闻/订单报道/合作动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、客户合作报道、行业媒体——比 web_search 更精准** |
 | 上市客户财务验证（市值/营收/利润） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证客户体量和采购能力 |
+| **上市客户/行业研报** | **NeoData (`neodata_search` data_type=doc)** | **客户深度研报、行业采购趋势分析** |
 
 **NeoData 调用**（上市客户财务验证，A/HK 股首选）：
 ```bash
@@ -56,7 +58,8 @@ print(neodata_search('{客户公司名} 营收 净利润 市值', data_type='all
 | 工具 | 调用方式 | 查什么 | 备注 |
 |------|---------|--------|------|
 | **TYC 两阶段** | 见下方 bash | 客户工商/股东/实控人/风险/招投标/资质 | **客户验证核心工具** |
-| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | 上市客户营收/利润/市值 | 仅用于上市客户财务验证 |
+| **NeoData(api)** | `neodata_search('关键词', data_type='api')` | 上市客户营收/利润/市值 | 上市客户财务验证 |
+| **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **客户新闻/订单报道/合作动态/行业研报** | **新闻+研报主力** |
 | **WebSearch** | WorkBuddy 内置 | 收入/订单/合同/交付外部报道 | 非结构化，搜新闻/公告 |
 | **WebFetch** | WorkBuddy 内置 | 深读客户公告/行业报道/采购信息 | 配合 WebSearch |
 
@@ -201,7 +204,8 @@ web_fetch: {搜索结果中的URL}
 | 客户招投标记录 | TYC `search_bids` | 验证合同/交付真实性 |
 | 客户资质许可 | TYC `call_tool` (企业资质) | 判断客户是否有能力采购 |
 | 收入/订单/合同外部报道 | WebSearch → WebFetch 深读 | 搜新闻、行业媒体、客户公告 |
-| 上市客户财务体量 | NeoData | 营收/市值/利润结构化 |
+| 上市客户财务体量 | NeoData (`neodata_search` data_type=api) | 营收/市值/利润结构化 |
+| **客户新闻/订单报道/合作动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、客户合作报道——比 web_search 更精准** |
 
 ## 搜索策略（分步流程）
 

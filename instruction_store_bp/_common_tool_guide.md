@@ -83,12 +83,24 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
 
-**NeoData 研报搜索常用场景：**
+**NeoData 三种 data_type 及其适用场景：**
+
+| data_type | 返回内容 | 适用场景 |
+|-----------|---------|---------|
+| `api` | 结构化行情/财报数据（市值/营收/利润/PE/PS 等精确数字） | 需要精确数字的估值、财务对比 |
+| `doc` | **券商研报 + 行业深度报告 + 财经新闻 + 政策分析** | 行业分析、竞争格局、政策解读、新闻舆情、供应链、估值逻辑 |
+| `all` | api + doc 两者同时返回 | 最全面，但结果较多 |
+
+**⚠️ `data_type=doc` 是新闻和研报的主力数据源——所有维度都应该用它搜行业报告和新闻，不要只用 web_search。**
+
+**NeoData `data_type=doc` 常用场景（所有维度通用）：**
 
 | 搜什么 | 关键词示例 | data_type |
 |--------|-----------|-----------|
 | 行业深度报告 | `{行业名} 行业深度报告 市场规模 TAM 增速` | `doc` |
 | 公司深度研报 | `{公司名} 深度报告 产品 客户 竞争` | `doc` |
+| **财经新闻/行业动态** | `{公司名} 最新动态 融资 合作 订单` | `doc` |
+| **行业新闻/政策变化** | `{行业名} 行业新闻 政策 监管 2024 2025` | `doc` |
 | 竞争格局/市场份额 | `{行业名} 竞争格局 市场份额 主要厂商 市占率` | `doc` |
 | 供应链/上游材料 | `{材料名} 产能 供应 格局 价格` | `doc` |
 | 政策/补贴/国产替代 | `{行业名} 政策 补贴 国产替代 自主可控` | `doc` |
@@ -96,9 +108,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 下游需求/采购趋势 | `{行业名} 下游需求 订单趋势 景气度` | `doc` |
 | 行业风险/监管 | `{行业名} 风险 监管 政策变化 合规` | `doc` |
 | 一级市场融资/IPO | `{赛道名} 融资 估值 IPO 并购 投后` | `doc` |
+| **负面新闻/风险信号** | `{公司名} 诉讼 纠纷 风险 问题` | `doc` |
 
-- `data_type`：`api`=行情/财报结构化数据，`doc`=研报/券商深度报告/新闻，`all`=两者
-- 返回结构化数据或研报摘要，可直接引用数字和结论
+- `data_type`：`api`=行情/财报结构化数据，`doc`=研报/券商深度报告/**新闻**，`all`=两者
+- 返回结构化数据、研报摘要或新闻标题+URL，可直接引用数字和结论
 
 **search_gateway 聚合搜索（自动识别金融查询，优先走 NeoData）：**
 ```bash
@@ -232,7 +245,10 @@ print(v)
 | 司法诉讼/风险/处罚 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
 | 专利/商标/软著 | TYC `search_patents` / `search_trademarks` / `call_tool` | WebSearch |
 | 企业资质/招投标 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
-| 新闻/行业报告/通用 | WebSearch → WebFetch 深读 | — |
+| **券商研报/行业深度报告** | **NeoData (`neodata_search` data_type=doc)** | WebSearch → WebFetch 深读 |
+| **财经新闻/行业动态/政策** | **NeoData (`neodata_search` data_type=doc)** | WebSearch → WebFetch 深读 |
+| **负面新闻/风险舆情** | **NeoData (`neodata_search` data_type=doc)** | WebSearch |
+| 通用网络搜索 | WebSearch → WebFetch 深读 | — |
 | 读某个 URL 的正文 | WebFetch | — |
 
 ### ⚠️ 不可用工具清单
@@ -256,14 +272,14 @@ print(v)
 
 | 角色 | 可以做 | 禁止做 |
 |------|--------|--------|
-| company_team_compliance | TYC 工商/股东/高管/实控人/风险/资质 + WebSearch 人物履历 + NeoData 上市股东 | 估值分析/市场规模推算/技术路线/论文 |
-| product_commercial | TYC 客户验证/招投标 + WebSearch 产品/客户/合同 + NeoData 上市客户 | 估值分析/技术路线/市场规模 |
-| tech_ip_moat | TYC 专利/商标/软著 + WebSearch 技术路线/论文/标准 + NeoData 竞品研发 | 估值分析/市场规模/客户收入 |
-| market_supply_chain | NeoData 行业研报/竞对 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 | 估值建模/技术路线/团队分析 |
-| competition_positioning | TYC 竞品验证 + NeoData/yfinance 竞品财务 + WebSearch 竞品情报 | 估值主模型/客户收入主结论/泛化风险 |
-| valuation_return | NeoData/yfinance/enrich_valuation 三源估值 + WebSearch 可比交易 | 客户验证/技术判断/竞品主分析/市场规模 |
-| customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData 上市客户 | 估值分析/技术判断/市场规模/竞品主分析 |
-| dealbreaker_risk | TYC 风险全扫(35项) + WebSearch 负面/舆情/监管 + NeoData 前置验证 | 估值建模/客户主验证/技术判断/市场规模 |
+| company_team_compliance | TYC 工商/股东/高管/实控人/风险/资质 + WebSearch 人物履历 + NeoData(api)上市股东 + **NeoData(doc)行业新闻/人物报道** | 估值分析/市场规模推算/技术路线/论文 |
+| product_commercial | TYC 客户验证/招投标 + WebSearch 产品/客户/合同 + NeoData(api)上市客户 + **NeoData(doc)行业新闻/产品报道** | 估值分析/技术路线/市场规模 |
+| tech_ip_moat | TYC 专利/商标/软著 + WebSearch 技术路线/论文/标准 + NeoData(api)竞品研发 + **NeoData(doc)技术趋势/行业研报** | 估值分析/市场规模/客户收入 |
+| market_supply_chain | NeoData(api+doc)行业研报/竞对/新闻 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 | 估值建模/技术路线/团队分析 |
+| competition_positioning | TYC 竞品验证 + NeoData(api+doc)/yfinance 竞品财务/新闻/研报 + WebSearch 竞品情报 | 估值主模型/客户收入主结论/泛化风险 |
+| valuation_return | NeoData(api+doc)/yfinance/enrich_valuation 三源估值+研报 + WebSearch 可比交易 | 客户验证/技术判断/竞品主分析/市场规模 |
+| customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData(api)上市客户 + **NeoData(doc)客户新闻/订单报道** | 估值分析/技术判断/市场规模/竞品主分析 |
+| dealbreaker_risk | TYC 风险全扫(35项) + **NeoData(doc)负面新闻/风险舆情/监管动态** + WebSearch 负面/舆情/监管 + NeoData(api)前置验证 | 估值建模/客户主验证/技术判断/市场规模 |
 | 统稿 | Read 所有维度输出 + Write 完整报告 | 搜任何外部数据 |
 
 ## 搜索规范

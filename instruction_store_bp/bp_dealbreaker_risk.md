@@ -36,8 +36,10 @@
 | 客户/供应商工商存续 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 验证关键合作方是否存续正常 |
 | 客户/供应商股东（关联交易） | TYC `call_tool`（先 `get_company_capabilities` 取「股东信息」真实 tool_name，再 `call_tool(tool_name="...", company_name="...", arguments={page: 1, page_size: 20})`） | 一层股东构成、识别隐性关联 |
 | 负面新闻/舆情/举报 | `web_search` + `web_fetch` | 搜媒体报道、行业投诉、监管通报 |
+| **负面新闻/风险舆情/监管动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、风险报道、监管通报、行业投诉——比 web_search 更精准** |
 | 正向叙事中的事实链验证 | `web_search` + TYC 工具交叉验证 | 交叉验证前置维度引用的关键事实 |
 | 前置维度引用的上市竞品财务数据验证 | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，交叉验证竞品营收/市值/PS 等关键数字 |
+| **前置维度引用的研报/新闻验证** | **NeoData (`neodata_search` data_type=doc)** | **交叉验证前置维度引用的行业研报、市场数据、新闻报道** |
 
 **NeoData 调用**（验证前置维度引用的上市竞品财务数据，A/HK 股首选）：
 ```bash
@@ -63,7 +65,8 @@ print(neodata_search('{公司名} 市值 营收 净利润', data_type='all'))
 |------|---------|--------|------|
 | **TYC 风险工具集** | 见下方 bash | 风险扫描/司法/失信/处罚/异常/冻结/限高/历史风险 | **红队核心武器** |
 | **TYC 工商基础** | `get_company_basic_profile` / `call_tool` | 客户/供应商存续 + 股东信息 | 验证合作方 |
-| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | 前置维度引用的上市竞品财务数据验证 | 交叉验证数字 |
+| **NeoData(api)** | `neodata_search('关键词', data_type='api')` | 前置维度引用的上市竞品财务数据验证 | 交叉验证数字 |
+| **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **负面新闻/风险舆情/监管通报/行业研报交叉验证** | **新闻+研报主力，红队必备** |
 | **WebSearch** | WorkBuddy 内置 | 负面新闻/舆情/举报/监管通报/事实链验证 | 非结构化搜索 |
 | **WebFetch** | WorkBuddy 内置 | 深读负面报道/监管文件/举报内容 | 配合 WebSearch |
 
@@ -245,8 +248,10 @@ web_fetch: {搜索结果中的URL}
 | 历史失信/司法 | TYC `call_tool` (历史失信/司法) | 已移出/已结案记录 |
 | 客户/供应商存续验证 | TYC `get_company_basic_profile` + `call_tool` (股东) | 验证合作方真实性 |
 | 负面新闻/舆情/举报 | WebSearch → WebFetch 深读 | 搜媒体报道/投诉/监管通报 |
+| **负面新闻/风险舆情/监管通报** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、风险报道——比 web_search 更精准** |
 | 前置维度事实链验证 | WebSearch + TYC 交叉验证 | 验证前置维度引用的关键事实 |
-| 前置维度引用的竞品财务数据 | NeoData | 交叉验证数字准确性 |
+| **前置维度引用的研报/新闻验证** | **NeoData (`neodata_search` data_type=doc)** | **交叉验证行业研报、市场数据、新闻报道** |
+| 前置维度引用的竞品财务数据 | NeoData (`neodata_search` data_type=api) | 交叉验证数字准确性 |
 
 ## 搜索策略（分步流程）
 

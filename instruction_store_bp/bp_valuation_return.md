@@ -87,7 +87,8 @@
 
 | 工具 | 调用方式 | 查什么 | 备注 |
 |------|---------|--------|------|
-| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | A/HK 可比公司行情/财报/估值 | **本维度主力数据源** |
+| **NeoData(api)** | `neodata_search('关键词', data_type='api')` | A/HK 可比公司行情/财报/估值 | **本维度主力数据源** |
+| **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **可比公司研报/估值分析/融资新闻/退出案例报道** | **新闻+研报主力** |
 | **yfinance** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import yfinance_summary; ..."` | 美股可比公司估值快照 + A/HK 交叉验证 | 精确估值数字 |
 | **enrich_valuation** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.valuation_enricher import enrich_valuation; ..."` | 结构化估值快照（NeoData+yfinance 双源交叉验证） | 自动聚合 |
 | **WebSearch** | WorkBuddy 内置 | 可比交易/融资新闻/退出案例/行业估值报告 | 非结构化 |

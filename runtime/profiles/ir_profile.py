@@ -936,12 +936,14 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
 
 # ═══════════════════════════════════════════════════════════
-# Phase 09c: Wave Evidence Gate (对标 BP wave evidence gate)
+# Phase 09c: Per-Wave Evidence Gate (Batch3: 拆分为 per-wave 独立 gate)
 # ═══════════════════════════════════════════════════════════
 
-def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 09c: Wave Evidence Gate — 检查各 wave step 的证据完整性。
+def _run_single_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext,
+                                     wave_idx: int) -> dict[str, Any]:
+    """Per-wave evidence gate — 只检查指定 wave 的 step 证据完整性。
 
+    Batch3 改动: 从合并 4-wave gate 拆为 per-wave 独立 gate。
     REPAIR 时返回 needs_dispatch + has_more（sequential 派发 repair 子代理）。
     降级放行时记录 repair_exhausted 继续推进。
     """
@@ -953,79 +955,58 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
     from scripts.bp_utils import read_attempt_count
 
     tasks_dir = runtime_root / "data" / "tasks"
+    gate_key = f"wave{wave_idx}_evidence_gate"
 
-    # 对每个 wave 跑 gate（wave 0-4 对应 LAUNCH_WAVES）
-    all_verdicts: list[str] = []
-    all_issues: list[dict] = []
-    all_repair_manifests: list[str] = []
-    last_wave = 0
+    gate_result = evaluate_wave_evidence_gate(
+        task_id=job_ctx.job_id,
+        wave=wave_idx,
+        tasks_dir=tasks_dir,
+    )
+    write_wave_gate(job_ctx.job_id, wave_idx, gate_result, tasks_dir)
+    verdict = gate_result["verdict"]
+    issues = gate_result.get("issues", [])
 
-    for wave_idx in range(4):
-        gate_result = evaluate_wave_evidence_gate(
-            task_id=job_ctx.job_id,
-            wave=wave_idx,
-            tasks_dir=tasks_dir,
-        )
-        write_wave_gate(job_ctx.job_id, wave_idx, gate_result, tasks_dir)
-        all_verdicts.append(gate_result["verdict"])
-        all_issues.extend(gate_result.get("issues", []))
-
-        if gate_result.get("needs_repair"):
-            manifests = build_ir_repair_manifests(
-                task_id=job_ctx.job_id,
-                wave=wave_idx,
-                gate_result=gate_result,
-                tasks_dir=tasks_dir,
-            )
-            all_repair_manifests.extend(manifests)
-            last_wave = wave_idx
-
-    # 判定总体 verdict
-    has_repair = "REPAIR" in all_verdicts
-    has_fail = "FAIL" in all_verdicts
-
-    if has_fail:
-        # 直接终止
+    if verdict == "FAIL":
         return {
             "ok": False,
             "mode": "wave_evidence_gate",
-            "phase": "phase09_wave_evidence_gate",
+            "phase": gate_key,
             "job_id": job_ctx.job_id,
-            "result": {
-                "verdicts": all_verdicts,
-                "issues": all_issues,
-            },
+            "result": {"verdict": "FAIL", "wave": wave_idx, "issues": issues},
         }
 
-    if has_repair:
-        # 检查 repair 次数
-        attempt = read_attempt_count(job_ctx.job_id, "wave_evidence_gate", tasks_dir=tasks_dir)
+    if verdict == "REPAIR":
+        manifests = build_ir_repair_manifests(
+            task_id=job_ctx.job_id,
+            wave=wave_idx,
+            gate_result=gate_result,
+            tasks_dir=tasks_dir,
+        )
+        attempt = read_attempt_count(job_ctx.job_id, gate_key, tasks_dir=tasks_dir)
         if attempt > 1:
-            # 降级放行
-            print(f"  ⚠️ [wave_evidence_gate] repair 次数已用尽 (attempt={attempt}), 降级放行", flush=True)
+            print(f"  ⚠️ [{gate_key}] repair 次数已用尽 (attempt={attempt}), 降级放行", flush=True)
             return {
                 "ok": True,
                 "mode": "wave_evidence_gate",
-                "phase": "phase09_wave_evidence_gate",
+                "phase": gate_key,
                 "job_id": job_ctx.job_id,
                 "result": {
                     "verdict": "PASS_WITH_DISCLOSURE",
                     "repair_exhausted": True,
-                    "verdicts": all_verdicts,
-                    "issues": all_issues,
+                    "wave": wave_idx,
+                    "issues": issues,
                 },
             }
 
-        # 返回 needs_dispatch + 第一个 manifest + has_more
-        if all_repair_manifests:
-            first_manifest = all_repair_manifests[0]
-            remaining = all_repair_manifests[1:]
+        if manifests:
+            first_manifest = manifests[0]
+            remaining = manifests[1:]
             return {
                 "ok": True,
                 "needs_dispatch": True,
                 "has_more": len(remaining) > 0,
                 "mode": "wave_evidence_gate",
-                "phase": "phase09_wave_evidence_gate",
+                "phase": gate_key,
                 "job_id": job_ctx.job_id,
                 "dispatch_info": {
                     "manifests": [first_manifest],
@@ -1036,13 +1017,13 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
                     f"Read manifest: {first_manifest}\n"
                     f"Dispatch ONE repair sub-agent using Agent tool.\n"
                     f"⚠️ 禁止在单条消息中派发多个 Agent。\n"
-                    f"修复完成后用 start_phase='phase09_wave_evidence_gate' 恢复管线。"
+                    f"修复完成后用 start_phase='{gate_key}' 恢复管线。"
                     + (f"\n\n还有 {len(remaining)} 个 repair manifest 待处理。" if remaining else "")
                 ),
                 "result": {
                     "verdict": "REPAIR",
-                    "verdicts": all_verdicts,
-                    "issues": all_issues,
+                    "wave": wave_idx,
+                    "issues": issues,
                     "remaining_manifests": remaining,
                 },
             }
@@ -1051,13 +1032,92 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
     return {
         "ok": True,
         "mode": "wave_evidence_gate",
-        "phase": "phase09_wave_evidence_gate",
+        "phase": gate_key,
         "job_id": job_ctx.job_id,
-        "result": {
-            "verdict": "PASS",
-            "verdicts": all_verdicts,
-            "issues": all_issues,
-        },
+        "result": {"verdict": "PASS", "wave": wave_idx, "issues": issues},
+    }
+
+
+def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 09c (legacy): 合并 4-wave gate — 保留向后兼容。
+
+    Batch3 后推荐使用 per-wave gate，但保留此函数供旧 task 断点续跑。
+    """
+    from scripts.ir_wave_evidence_gate import (
+        evaluate_wave_evidence_gate,
+        write_wave_gate,
+        build_ir_repair_manifests,
+    )
+    from scripts.bp_utils import read_attempt_count
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    all_verdicts: list[str] = []
+    all_issues: list[dict] = []
+    all_repair_manifests: list[str] = []
+
+    for wave_idx in range(4):
+        gate_result = evaluate_wave_evidence_gate(
+            task_id=job_ctx.job_id, wave=wave_idx, tasks_dir=tasks_dir,
+        )
+        write_wave_gate(job_ctx.job_id, wave_idx, gate_result, tasks_dir)
+        all_verdicts.append(gate_result["verdict"])
+        all_issues.extend(gate_result.get("issues", []))
+        if gate_result.get("needs_repair"):
+            manifests = build_ir_repair_manifests(
+                task_id=job_ctx.job_id, wave=wave_idx,
+                gate_result=gate_result, tasks_dir=tasks_dir,
+            )
+            all_repair_manifests.extend(manifests)
+
+    has_repair = "REPAIR" in all_verdicts
+    has_fail = "FAIL" in all_verdicts
+
+    if has_fail:
+        return {
+            "ok": False, "mode": "wave_evidence_gate",
+            "phase": "phase09_wave_evidence_gate", "job_id": job_ctx.job_id,
+            "result": {"verdicts": all_verdicts, "issues": all_issues},
+        }
+
+    if has_repair:
+        attempt = read_attempt_count(job_ctx.job_id, "wave_evidence_gate", tasks_dir=tasks_dir)
+        if attempt > 1:
+            return {
+                "ok": True, "mode": "wave_evidence_gate",
+                "phase": "phase09_wave_evidence_gate", "job_id": job_ctx.job_id,
+                "result": {
+                    "verdict": "PASS_WITH_DISCLOSURE", "repair_exhausted": True,
+                    "verdicts": all_verdicts, "issues": all_issues,
+                },
+            }
+        if all_repair_manifests:
+            first_manifest = all_repair_manifests[0]
+            remaining = all_repair_manifests[1:]
+            return {
+                "ok": True, "needs_dispatch": True, "has_more": len(remaining) > 0,
+                "mode": "wave_evidence_gate",
+                "phase": "phase09_wave_evidence_gate", "job_id": job_ctx.job_id,
+                "dispatch_info": {
+                    "manifests": [first_manifest], "roles": ["ir_repair"],
+                    "task_dir": str(tasks_dir),
+                },
+                "instruction": (
+                    f"Read manifest: {first_manifest}\n"
+                    f"Dispatch ONE repair sub-agent using Agent tool.\n"
+                    f"⚠️ 禁止在单条消息中派发多个 Agent。\n"
+                    f"修复完成后用 start_phase='phase09_wave_evidence_gate' 恢复管线。"
+                    + (f"\n\n还有 {len(remaining)} 个 repair manifest 待处理。" if remaining else "")
+                ),
+                "result": {
+                    "verdict": "REPAIR", "verdicts": all_verdicts,
+                    "issues": all_issues, "remaining_manifests": remaining,
+                },
+            }
+
+    return {
+        "ok": True, "mode": "wave_evidence_gate",
+        "phase": "phase09_wave_evidence_gate", "job_id": job_ctx.job_id,
+        "result": {"verdict": "PASS", "verdicts": all_verdicts, "issues": all_issues},
     }
 
 
@@ -1458,6 +1518,83 @@ def _run_readability_review(runtime_root: Path, job_ctx: JobContext) -> dict[str
 
 
 # ═══════════════════════════════════════════════════════════
+# Phase 14.5: Claim Coverage — claim 覆盖校验 + 2 轮 repair（对标 BP phase24）
+# ═══════════════════════════════════════════════════════════
+
+def _run_claim_coverage(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Claim coverage 校验: 确保所有 claim 都有 fact 支撑。
+
+    对标 BP bp_claim_coverage_validator.py:
+    - REPAIR: not_addressed 比例 >50% → 生成 repair manifest → needs_dispatch
+    - 最多 2 轮 repair → 降级 PASS_WITH_DISCLOSURE
+    """
+    from scripts.ir_claim_coverage_validator import (
+        write_ir_claim_coverage,
+        build_ir_claim_repair_manifests,
+    )
+    from scripts.bp_utils import read_attempt_count
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    task_dir = tasks_dir
+
+    result = write_ir_claim_coverage(task_dir)
+    gate_verdict = result.get("gate_verdict", "UNKNOWN")
+
+    ws = _workspace_for(job_ctx)
+    if ws is not None:
+        try:
+            gate_path = task_dir / "ir_claim_coverage.json"
+            if gate_path.exists():
+                shutil.copy2(gate_path, ws.outputs_dir / "ir_claim_coverage.json")
+        except Exception:
+            pass
+
+    # REPAIR → 生成 manifest
+    if gate_verdict == "REPAIR":
+        attempt = read_attempt_count(task_dir / "ir_claim_coverage_gate.json")
+        if attempt >= 2:
+            # 降级放行
+            result["gate_verdict"] = "PASS_WITH_DISCLOSURE"
+            result["repair_exhausted"] = True
+            gate_verdict = "PASS_WITH_DISCLOSURE"
+        else:
+            manifests = build_ir_claim_repair_manifests(
+                task_id=job_ctx.job_id,
+                gate_result=result,
+                tasks_dir=tasks_dir,
+            )
+            if manifests:
+                # 更新 attempt count
+                gate_data = {"attempt": attempt + 1, "gate_verdict": "REPAIR"}
+                (task_dir / "ir_claim_coverage_gate.json").write_text(
+                    json.dumps(gate_data, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                return {
+                    "ok": True,
+                    "needs_dispatch": True,
+                    "has_more": False,
+                    "mode": "quality_production",
+                    "phase": "phase14_claim_coverage",
+                    "job_id": job_ctx.job_id,
+                    "dispatch_info": {
+                        "manifests": manifests,
+                        "roles": ["ir_claim_repair"],
+                        "task_dir": str(task_dir),
+                    },
+                    "result": result,
+                }
+
+    return {
+        "ok": True,
+        "mode": "quality_production",
+        "phase": "phase14_claim_coverage",
+        "job_id": job_ctx.job_id,
+        "result": result,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
 # Phase 14.6: Cross-Dimension Gate — 跨维度一致性检查（对标 BP phase25）
 # ═══════════════════════════════════════════════════════════
 
@@ -1769,14 +1906,25 @@ class IRProfile(PipelineProfile):
                 "phase08_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
                 "phase09_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
                 "phase09_wave_evidence_gate": lambda job_ctx: _run_wave_evidence_gate(runtime_root, job_ctx),
+                # ── Batch3: per-wave evidence gate (独立 gate per wave) ──
+                "phase09_wave1_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=0),
+                "phase09_wave2_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=1),
+                "phase09_wave3_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=2),
+                "phase09_wave4_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=3),
                 "phase10_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
                 "phase10_shared_state_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx),
+                # ── Batch3: per-wave shared_state_refresh ──
+                "phase10_wave1_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=0),
+                "phase10_wave2_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=1),
+                "phase10_wave3_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=2),
+                "phase10_wave4_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=3),
                 "phase11_section_package_validation": lambda job_ctx: _run_section_package_validation(runtime_root, job_ctx),
                 "phase12_debate_review": lambda job_ctx: _run_debate_review_phase(runtime_root, job_ctx),
                 "phase13_synthesis_prepare": lambda job_ctx: _run_synthesis_prepare(runtime_root, job_ctx),
                 "phase13_synthesis_collect": lambda job_ctx: _run_synthesis_collect(runtime_root, job_ctx),
                 "phase14_final_assembly": lambda job_ctx: _run_final_assembly_phase(runtime_root, job_ctx),
                 "phase14_readability_review": lambda job_ctx: _run_readability_review(runtime_root, job_ctx),
+                "phase14_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
                 "phase14_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
                 "phase14_delivery_gate": lambda job_ctx: _run_delivery_gate(runtime_root, job_ctx),
                 "phase15_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
@@ -1800,8 +1948,9 @@ class IRProfile(PipelineProfile):
             "phase13_synthesis_prepare": ["{task_id}-research_plan.json"],
             "phase14_final_assembly": ["{task_id}-section_packages.json", "{task_id}-debate_review.json"],
             "phase14_readability_review": ["{task_id}-final_report.md"],
+            "phase14_claim_coverage": ["{task_id}-research_plan.json"],
             "phase14_cross_dimension_gate": ["{task_id}-final_report.md"],
-            "phase14_delivery_gate": ["ir_readability_review.json", "ir_cross_dimension_gate.json", "{task_id}-final_assembly.json"],
+            "phase14_delivery_gate": ["ir_readability_review.json", "ir_claim_coverage.json", "ir_cross_dimension_gate.json", "{task_id}-final_assembly.json"],
         }
 
     def phase_outputs(self) -> dict[str, list[str]]:
@@ -1822,14 +1971,23 @@ class IRProfile(PipelineProfile):
             "phase08_dispatch_prepare": [],
             "phase09_dispatch_collect": [],
             "phase09_wave_evidence_gate": [],
+            "phase09_wave1_evidence_gate": ["{task_id}-step1_data-facts.json", "{task_id}-step1_data-section.json"],
+            "phase09_wave2_evidence_gate": ["{task_id}-step2_industry-facts.json", "{task_id}-step3_biz-facts.json", "{task_id}-step4_finance-facts.json", "{task_id}-step5_mgmt-facts.json"],
+            "phase09_wave3_evidence_gate": ["{task_id}-step6b_valuation-facts.json"],
+            "phase09_wave4_evidence_gate": ["{task_id}-step6_insight-facts.json", "{task_id}-step7_risk-facts.json"],
             "phase10_fact_store_merge": ["{task_id}-fact_store.json", "{task_id}-fact_store_index.json"],
             "phase10_shared_state_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
+            "phase10_wave1_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
+            "phase10_wave2_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
+            "phase10_wave3_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
+            "phase10_wave4_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
             "phase11_section_package_validation": ["{task_id}-section_packages.json", "{task_id}-section_gate.json"],
             "phase12_debate_review": ["{task_id}-debate_review.json"],
             "phase13_synthesis_prepare": ["{task_id}-synthesis_manifest.json"],
             "phase13_synthesis_collect": ["{task_id}-synthesis.md"],
             "phase14_final_assembly": ["{task_id}-final_report.md", "{task_id}-final_assembly.json"],
             "phase14_readability_review": ["{task_id}-ir_readability_review.json"],
+            "phase14_claim_coverage": ["{task_id}-ir_claim_coverage.json"],
             "phase14_cross_dimension_gate": ["{task_id}-ir_cross_dimension_gate.json"],
             "phase14_delivery_gate": ["{task_id}-ir_delivery_gate.json", "{task_id}-ir_delivery_deferred_fixes.json"],
             "phase15_delivery": [],

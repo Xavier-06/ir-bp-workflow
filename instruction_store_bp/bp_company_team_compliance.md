@@ -66,7 +66,9 @@
 | 历史股东变更 | TYC `call_tool`（先 `get_company_capabilities` 取「历史股东」真实 tool_name） | 已退出股东、历史股权结构 |
 | 历史投资 | TYC `call_tool`（先 `get_company_capabilities` 取「历史投资」真实 tool_name） | 历史对外投资 |
 | 团队履历外部验证、负面舆情 | `web_search` + `web_fetch` | 搜索高管公开信息、媒体报道 |
+| **创始人/高管新闻报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻、行业媒体——比 web_search 更精准** |
 | 上市战略股东财务数据（市值/PE/PS） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证战略股东体量和持股价值 |
+| **战略股东/关联方研报** | **NeoData (`neodata_search` data_type=doc)** | **上市股东的深度研报、投资分析** |
 
 **NeoData 调用**（上市战略股东财务验证，A/HK 股首选）：
 ```bash
@@ -91,7 +93,8 @@ print(neodata_search('{股东公司名} 市值 市盈率 市销率', data_type='
 | 工具 | 调用方式 | 查什么 | 备注 |
 |------|---------|--------|------|
 | **TYC 两阶段** | 见下方 bash | 工商/股东/高管/实控人/风险/资质/融资 | 结构化数据首选 |
-| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | 上市战略股东行情/财报 | 仅用于上市股东验证 |
+| **NeoData(api)** | `neodata_search('关键词', data_type='api')` | 上市战略股东行情/财报 | 上市股东验证 |
+| **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **人物报道/财经新闻/股东研报** | **新闻+研报主力** |
 | **WebSearch** | WorkBuddy 内置 | 创始人履历/背景/负面新闻 | 非结构化，搜公开报道 |
 | **WebFetch** | WorkBuddy 内置 | 深读搜索结果页/公司官网/媒体报道 | 配合 WebSearch 使用 |
 
@@ -242,7 +245,9 @@ web_fetch: {搜索结果中的URL}
 | 资质许可 | TYC `call_tool` (企业资质) | 结构化 |
 | 招投标记录 | TYC `search_bids` 或 `call_tool` | 结构化 |
 | 创始人/高管公开履历 | WebSearch (中英文) → WebFetch 深读 | 非结构化，TYC 不覆盖个人背景报道 |
-| 上市战略股东财务体量 | NeoData | 行情/财报结构化 |
+| **创始人/高管财经报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻——比 web_search 更精准** |
+| 上市战略股东财务体量 | NeoData (`neodata_search` data_type=api) | 行情/财报结构化 |
+| **战略股东/关联方研报新闻** | **NeoData (`neodata_search` data_type=doc)** | **上市股东深度研报、投资分析、新闻动态** |
 
 ## 搜索策略（分步流程）
 

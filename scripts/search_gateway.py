@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-统一搜索网关 v5
+统一搜索网关 v6
 
 搜索栈：
-  Layer 0: NeoData 金融数据（A/HK股行情、财报、板块、研报，金融查询优先）
+  Layer 0: NeoData 金融数据（A/HK股行情、财报、板块、研报、新闻，金融查询优先）
   Layer 1: DDG Python API 直连（清代理，中英文主力）
   Layer 2: SearXNG 8888（Baidu + Bing 补充）
   Layer 3: Google 直接抓取（scrapling 走 7897 代理，自己解析）
   Layer 4: scrapling 深度抓取（对搜索结果做正文提取）
-  Layer 5: yfinance 估值数据（IR 管线专用）
+  Layer 5: Yahoo Finance 搜索（美股新闻 + quote 页，免费无 key）
+  Layer 6: 腾讯新闻 CLI（实时中文新闻，7×24）
+  Layer 7: yfinance 估值数据（IR 管线专用）
 
 接口：
     from scripts.search_gateway import search, search_deep, search_many, verify_engines
     from scripts.search_gateway import fetch_page, yfinance_summary, google_search
-    from scripts.search_gateway import neodata_search
+    from scripts.search_gateway import neodata_search, tencent_news_search
 """
 from __future__ import annotations
 
@@ -572,7 +574,85 @@ def fetch_page(url: str, timeout: int = 20, use_proxy: bool = False) -> Optional
         return None
 
 
-# ── Layer 5: yfinance 估值数据 ────────────────────────
+# ── Layer 5: Yahoo Finance 搜索（新闻 + quote 页面） ──────
+
+def _yahoo_search(query: str, max_results: int = 8) -> list:
+    """Yahoo Finance 搜索：金融查询返回新闻 + quote 页面，非金融查询返回空。
+
+    免费无 API key，自动识别金融查询并返回 Yahoo Finance 新闻和 quote 页 URL。
+    """
+    try:
+        sys.path.insert(0, str(WORKSPACE))
+        from search.adapters.yahoo import YahooAdapter
+        adapter = YahooAdapter(timeout=20)
+        hits = adapter.search(query, max_results=max_results)
+        return _dedupe([{
+            "title": h.title,
+            "url": h.url,
+            "content": h.snippet or "",
+            "engine": "yahoo",
+            "source": "yahoo:finance",
+            "publishedDate": getattr(h, "published_at", ""),
+        } for h in hits], max_results, query=query)
+    except Exception:
+        return []
+
+
+# ── Layer 6: 腾讯新闻搜索（实时中文新闻） ──────────────
+
+_TENCENT_NEWS_CLI = os.path.expanduser("~/.tencent-news-cli/bin/tencent-news-cli")
+
+def tencent_news_search(query: str, max_results: int = 5) -> list:
+    """通过腾讯新闻 CLI 搜索实时中文新闻。
+
+    7×24 新闻资讯，比 web_search 更精准、更结构化。
+    适合：搜新闻、行业动态、公司报道、政策变化。
+    CLI 无 --json 参数，解析结构化文本输出。
+    """
+    if not os.path.exists(_TENCENT_NEWS_CLI):
+        return []
+    try:
+        import subprocess
+        # Strip SSL env vars set by this module — they interfere with Go CLI subprocess
+        _cli_env = {k: v for k, v in os.environ.items()
+                    if k not in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")}
+        _cli_env["PATH"] = f"{os.path.dirname(_TENCENT_NEWS_CLI)}:{_cli_env.get('PATH', '')}"
+        result = subprocess.run(
+            [_TENCENT_NEWS_CLI, "search", query, "--limit", str(max_results)],
+            capture_output=True, text=True, timeout=20,
+            env=_cli_env,
+        )
+        if result.returncode != 0 or not result.stdout:
+            return []
+        # Parse structured text: N. 标题：...\n   摘要: ...\n   来源: ...\n   发布时间: ...\n   链接: ...
+        # Note: 标题/摘要/来源/发布时间 use fullwidth colon ：, 链接 uses ASCII colon :
+        text = result.stdout
+        blocks = re.split(r'\n(?=\d+\.\s+标题[:：])', text)
+        out = []
+        for block in blocks:
+            title_m = re.search(r'\d+\.\s+标题[:：]\s*(.+)', block)
+            if not title_m:
+                continue
+            url_m = re.search(r'链接[:：]\s*(https?://\S+)', block)
+            summary_m = re.search(r'摘要[:：]\s*(.+?)(?:\n|$)', block, re.DOTALL)
+            source_m = re.search(r'来源[:：]\s*(.+)', block)
+            time_m = re.search(r'发布时间[:：]\s*(.+)', block)
+            out.append({
+                "title": title_m.group(1).strip(),
+                "url": url_m.group(1).strip() if url_m else "",
+                "content": summary_m.group(1).strip()[:500] if summary_m else "",
+                "engine": "tencent_news",
+                "source": f"tencent_news:{source_m.group(1).strip()}" if source_m else "tencent_news",
+                "publishedDate": time_m.group(1).strip() if time_m else "",
+            })
+            if len(out) >= max_results:
+                break
+        return out
+    except Exception:
+        return []
+
+
+# ── Layer 7: yfinance 估值数据 ────────────────────────
 
 def yfinance_summary(ticker: str) -> Optional[dict]:
     """获取上市公司估值快照（IR 管线专用）。需要走代理访问 Yahoo Finance。"""
@@ -607,11 +687,12 @@ def search(query: str, max_results: int = 10, timeout: int = 25, prefer: str = "
     """统一搜索入口。
 
     prefer:
-        auto    - 金融查询先走 NeoData Layer 0，不够再 DDG + SearXNG 补充
+        auto    - 金融查询先走 NeoData Layer 0，不够再 DDG + Yahoo + SearXNG 补充
         ddg     - 只用 DDG
         searxng  - 只用 SearXNG
         google   - 只用 Google 直接抓取
-        multi    - NeoData + DDG + SearXNG + Google 四路合并（最全）
+        yahoo    - 只用 Yahoo Finance（金融查询专用，返回新闻+quote页）
+        multi    - NeoData + DDG + Yahoo + SearXNG + Google 五路合并（最全）
         neodata  - 只用 NeoData
     """
     if prefer == "neodata":
@@ -626,19 +707,35 @@ def search(query: str, max_results: int = 10, timeout: int = 25, prefer: str = "
     if prefer == "google":
         return google_search(query, max_results)
 
+    if prefer == "yahoo":
+        return _yahoo_search(query, max_results)
+
+    if prefer == "tencent_news":
+        return tencent_news_search(query, max_results)
+
     if prefer == "multi":
         s0 = neodata_search(query, data_type="all") if _is_finance_query(query) else []
         s1 = _ddg_search(query, max_results + 5)
+        s_yahoo = _yahoo_search(query, max_results + 5) if _is_finance_query(query) else []
+        s_tnews = tencent_news_search(query, max_results + 3)
         s2 = _searxng_search(query, max_results + 5, timeout=timeout)
         s3 = google_search(query, max_results + 5)
-        return _dedupe(s0 + s1 + s2 + s3, max_results, query=query)
+        return _dedupe(s0 + s1 + s_yahoo + s_tnews + s2 + s3, max_results, query=query)
 
-    # auto: 金融查询先走 NeoData Layer 0，不够再 DDG + SearXNG 补充
+    # auto: 金融查询先走 NeoData Layer 0，不够再 DDG + Yahoo + 腾讯新闻 + SearXNG 补充
     results = []
     if _is_finance_query(query):
         results = neodata_search(query, data_type="all")
         if len(results) >= max_results:
             return results
+        # Yahoo Finance 新闻补充（金融查询专用，免费无 key）
+        yahoo_results = _yahoo_search(query, max_results)
+        results = _dedupe(results + yahoo_results, max_results, query=query)
+
+    # 中文查询补腾讯新闻（实时新闻，比 DDG/SearXNG 更精准）
+    if _has_chinese(query):
+        tnews_results = tencent_news_search(query, max_results)
+        results = _dedupe(results + tnews_results, max_results + 5, query=query)
 
     # DDG 优先，不够再补 SearXNG
     ddg_results = _ddg_search(query, max_results)
@@ -705,7 +802,31 @@ def verify_engines() -> dict:
     except ImportError:
         pass
 
+    yahoo_ok = False
+    try:
+        sys.path.insert(0, str(WORKSPACE))
+        from search.adapters.yahoo import YahooAdapter
+        adapter = YahooAdapter()
+        yahoo_ok = adapter.healthcheck()
+    except Exception:
+        pass
+
     neodata_ok = _neodata_read_token() is not None
+
+    tencent_news_ok = False
+    try:
+        import subprocess
+        _cli_env = {k: v for k, v in os.environ.items()
+                    if k not in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")}
+        _cli_env["PATH"] = f"{os.path.dirname(_TENCENT_NEWS_CLI)}:{_cli_env.get('PATH', '')}"
+        r = subprocess.run(
+            [_TENCENT_NEWS_CLI, "apikey-get"],
+            capture_output=True, text=True, timeout=5,
+            env=_cli_env,
+        )
+        tencent_news_ok = r.returncode == 0 and "API Key" in r.stdout
+    except Exception:
+        pass
 
     proxy_ok = False
     try:
@@ -730,6 +851,8 @@ def verify_engines() -> dict:
         "google_direct": google_ok,
         "scrapling": scrapling_ok,
         "yfinance": yf_ok,
+        "yahoo": yahoo_ok,
+        "tencent_news": tencent_news_ok,
         "proxy": proxy_ok,
         "proxy_url": PROXY_URL,
     }
@@ -743,7 +866,7 @@ if __name__ == "__main__":
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--verify", action="store_true")
     ap.add_argument("--deep", action="store_true")
-    ap.add_argument("--prefer", choices=["auto", "ddg", "searxng", "google", "multi", "neodata"], default="auto")
+    ap.add_argument("--prefer", choices=["auto", "ddg", "searxng", "google", "yahoo", "tencent_news", "multi", "neodata"], default="auto")
     args = ap.parse_args()
 
     if args.verify:

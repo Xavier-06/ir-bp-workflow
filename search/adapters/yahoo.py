@@ -144,7 +144,12 @@ class YahooAdapter(SearchAdapter):
         return hits[:max_results]
 
     def _fetch_json(self, query: str, quotes: int = 5, news: int = 5) -> dict[str, Any]:
-        """Call Yahoo Finance search API directly (same as Yahoo Skill)."""
+        """Call Yahoo Finance search API. Tries proxy first (common in China), falls back to direct.
+
+        Temporarily clears SSL_CERT_FILE/REQUESTS_CA_BUNDLE env vars that search_gateway
+        sets for requests, which interfere with urllib SSL handshake through proxy.
+        """
+        import os as _os
         params = urlencode({
             "q": query,
             "quotesCount": quotes,
@@ -152,9 +157,37 @@ class YahooAdapter(SearchAdapter):
             "enableFuzzyQuery": "false",
             "enableCb": "false",
         })
-        req = Request(f"{SEARCH_URL}?{params}", headers=HEADERS)
-        with urlopen(req, timeout=self._timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
+        url = f"{SEARCH_URL}?{params}"
+
+        # Save and clear SSL env vars that interfere with urllib proxy connections
+        _ssl_backup = {}
+        for _k in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+            if _k in _os.environ:
+                _ssl_backup[_k] = _os.environ.pop(_k)
+
+        try:
+            # Try proxy first (Yahoo Finance is often blocked/throttled in China)
+            proxy_url = "http://127.0.0.1:7897"
+            try:
+                import urllib.request
+                proxy_handler = urllib.request.ProxyHandler({
+                    "http": proxy_url,
+                    "https": proxy_url,
+                })
+                opener = urllib.request.build_opener(proxy_handler)
+                req = Request(url, headers=HEADERS)
+                with opener.open(req, timeout=self._timeout) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except Exception:
+                pass
+
+            # Fallback: direct connection
+            req = Request(url, headers=HEADERS)
+            with urlopen(req, timeout=self._timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        finally:
+            # Restore SSL env vars
+            _os.environ.update(_ssl_backup)
 
     @staticmethod
     def _parse_publish_time(item: dict) -> str:

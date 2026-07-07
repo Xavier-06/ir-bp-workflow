@@ -48,7 +48,9 @@
 | 公司工商基础信息 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 注册资本、存续状态 |
 | 集成电路布图设计 | `web_search` → 国家知识产权局布图设计系统 | ⚠️ TYC 不覆盖，必须单独查 |
 | 技术路线/学术论文/行业方案 | `web_search` + `web_fetch` | 搜学术论文、第三方测试报告、行业标准 |
+| **技术趋势/行业研报/技术新闻** | **NeoData (`neodata_search` data_type=doc)** | **券商技术研报、行业深度报告、技术趋势分析——比 web_search 更专业** |
 | 竞品技术能力验证 | `web_search` | 否定性结论（"竞品没有X能力"）必须搜索验证 |
+| **竞品技术新闻/产品发布** | **NeoData (`neodata_search` data_type=doc)** | **竞品新品发布、技术突破、研发动态新闻** |
 | 上市竞品研发投入/财务数据 | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证竞品研发费用和营收规模 |
 
 **NeoData 调用**（上市竞品研发投入验证，A/HK 股首选）：
@@ -75,7 +77,8 @@ print(neodata_search('{竞品公司名} 研发费用 营收 净利润', data_typ
 |------|---------|--------|------|
 | **TYC 专利/商标/软著** | 见下方 bash | 专利/商标/软著/布图设计 | IP 核验核心工具 |
 | **TYC 工商基础** | `get_company_basic_profile` | 公司存续/注册资本 | 仅做背景 |
-| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | 上市竞品研发费用/营收 | 仅用于竞品研发投入验证 |
+| **NeoData(api)** | `neodata_search('关键词', data_type='api')` | 上市竞品研发费用/营收 | 竞品研发投入验证 |
+| **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **技术研报/行业新闻/竞品新品发布/技术趋势** | **新闻+研报主力** |
 | **WebSearch** | WorkBuddy 内置 | 技术路线/学术论文/行业标准/竞品技术/布图设计 | 非结构化，搜公开信息 |
 | **WebFetch** | WorkBuddy 内置 | 深读论文/测试报告/标准文档/竞品官网 | 配合 WebSearch 使用 |
 
@@ -195,10 +198,12 @@ web_fetch: {搜索结果中的URL}
 | 软件著作权 | TYC `call_tool` (软著 tool_name) | 结构化 |
 | 集成电路布图设计 | WebSearch → 国家知识产权局布图设计系统 | ⚠️ TYC 不覆盖，必须单独查 |
 | 技术路线全景/主流方案对比 | WebSearch (中英文) | 搜学术论文、行业分析 |
+| **技术趋势/行业研报/技术新闻** | **NeoData (`neodata_search` data_type=doc)** | **券商技术研报、行业深度报告——比 web_search 更专业** |
 | 第三方测试报告/性能评测 | WebSearch → WebFetch 深读 | 搜独立测试结果 |
 | 行业标准/认证门槛 | WebSearch | 搜 AEC-Q100/MIL-STD/FDA 等 |
 | 竞品技术能力验证 | WebSearch（否定结论必须搜索） | 不能凭印象说竞品没有某能力 |
-| 上市竞品研发投入/营收 | NeoData | 研发费用/营收结构化 |
+| **竞品新品发布/研发动态** | **NeoData (`neodata_search` data_type=doc)** | **竞品技术新闻、产品发布、研发突破** |
+| 上市竞品研发投入/营收 | NeoData (`neodata_search` data_type=api) | 研发费用/营收结构化 |
 | 公司工商基础 | TYC `get_company_basic_profile` | 仅做背景 |
 
 ## 搜索策略（分步流程）

@@ -47,6 +47,7 @@ Professional research report chapter on market sizing, industry landscape, and s
 | 供应链招投标 | `search_bids(query="公司名 招投标")` 或 TYC `call_tool`（取「招投标」tool_name） | 招投标记录 |
 | 供应商资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期 |
 | 市场规模/行业报告/政策 | `web_search` | 中英文行业报告、政府/协会统计数据 |
+| **行业深度研报/新闻/政策分析** | **NeoData (`neodata_search` data_type=doc)** | **券商行业研报、产业分析、政策解读、供应链新闻——比 web_search 更专业** |
 | 美股竞对财务数据 | `yfinance` | 美股行情、财报、估值交叉验证 |
 
 **NeoData 调用**（A/HK 股行情/财报/板块，本维度查上市竞对必用）：
@@ -85,7 +86,8 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 | 工具 | 调用方式 | 查什么 | 备注 |
 |------|---------|--------|------|
-| **NeoData** | `cd {RUNTIME_ROOT} && python3 scripts/search/neodata_search.py "关键词" --json` | A/HK 竞对行情/财报/板块/研报 | **本维度主力数据源** |
+| **NeoData(api)** | `neodata_search('关键词', data_type='api')` | A/HK 竞对行情/财报/板块 | **本维度主力数据源** |
+| **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **行业深度研报/新闻/政策分析/供应链新闻** | **新闻+研报主力** |
 | **yfinance** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import yfinance_summary; ..."` | 美股竞对估值快照 | 交叉验证用 |
 | **TYC 两阶段** | 见下方 bash | 供应商/客户工商/股东/招投标/资质 | 供应链验证 |
 | **WebSearch** | WorkBuddy 内置 | 行业报告/政策/市场规模/白皮书 | 中英文双语 |
@@ -217,6 +219,7 @@ web_fetch: {搜索结果中的URL}
 |-----------|-----------|--------|
 | A/HK 竞对行情/财报/板块 | NeoData (`neodata_search` data_type=api) | 结构化金融数据，多源聚合 |
 | A/HK 行业研报 | NeoData (`neodata_search` data_type=doc) | 券商行业深度报告 |
+| **行业新闻/政策动态/供应链新闻** | **NeoData (`neodata_search` data_type=doc)** | **行业新闻、政策解读、供应链动态** |
 | 美股竞对估值/财务 | yfinance (`yfinance_summary`) | 美股精确估值数字 |
 | 供应商存续/注册/状态 | TYC `get_company_basic_profile` | 结构化、权威 |
 | 供应商股东（产业链位置） | TYC `call_tool` (股东信息) | 判断产业链关系 |
