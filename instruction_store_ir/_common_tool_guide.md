@@ -10,7 +10,8 @@
 | A/HK 股行情/财报/估值 | NeoData `api` | `neodata_search('公司名 营收 净利润 市值', data_type='api')` | yfinance → web_search |
 | 美股行情/估值/分红 | yfinance | `yf.Ticker('AAPL').info` | NeoData → web_search |
 | **券商研报/行业深度/新闻分析** | **NeoData `doc`** | `neodata_search('公司名 最新动态', data_type='doc')` | web_search |
-| **产品发布/技术动态/突发新闻** | NeoData `doc` + web_search 补充 | 先 NeoData doc 拿深度分析，再 web_search 补最新 | web_search |
+| **突发新闻/实时动态（分钟级）** | **腾讯新闻 CLI** | `sh {SKILL_DIR}/scripts/run-cli.sh search "关键词" --limit 5` | web_search |
+| **产品发布/技术动态/新闻分析** | NeoData `doc` + 腾讯新闻补充 | NeoData doc 拿深度分析，腾讯新闻补实时动态 | web_search |
 | 企业工商/股东/司法/专利 | 天眼查 MCP | `mcp__tyc-mcp__search_companies` → `call_tool` | web_search |
 | 技术论文/arxiv | web_search | `web_search('arxiv {company} {technology} {YYYY}')` | web_fetch 读论文页 |
 | 开源项目/GitHub/HF | web_search | `web_search('github.com/{company} latest release {YYYY}')` | web_fetch 读 README |
@@ -175,7 +176,32 @@ for r in (result + result2):
 **⚠️ publishedDate 经常为空** → 必须从 content 文本中提取时间线索（如"4月23日"、"2026年Q1"），据此判断信息新旧。
 **NeoData doc + web_search 组合拳**：NeoData doc 拿深度分析 → web_search 补昨日突发新闻和实时动态。
 
-### 2. 通用网络搜索（新闻、产品发布、技术动态 — 时效性最高）
+### 2. 腾讯新闻 CLI（突发新闻/实时动态 — 分钟级时效）
+
+**腾讯新闻是突发新闻的首选数据源**，能搜到分钟级的实时报道（如"腾讯混元Hy3昨天发布"）。
+
+```bash
+# 搜索新闻（返回标题、摘要、来源、发布时间、链接）
+sh {SKILL_DIR}/scripts/run-cli.sh search "腾讯 混元 大模型" --limit 5
+```
+
+- `{SKILL_DIR}` = `/Users/xavier/.workbuddy/skills/skill_2053082907836022784`
+- 支持的子命令: `search`（搜索）、`hot`（热点榜）、`morning`（早报）、`evening`（晚报）
+- `--limit N` 控制返回条数（默认 10）
+- 返回结果包含：标题、摘要（100-200字）、来源媒体、精确到分钟的发布时间、原文链接
+
+**使用场景**:
+- 第零轮时效锚定：`search "{entity} 最新动态" --limit 5`
+- 产品发布验证：`search "{company} {product} 发布" --limit 5`
+- 突发新闻：`search "关键词" --limit 5`
+- 行业热点：`hot`（当前热点榜）
+
+**腾讯新闻 + NeoData doc 组合拳**：
+- 腾讯新闻 → 分钟级突发（标题+摘要，深度有限）
+- NeoData doc → 小时~天级深度分析（200-500字/条，分析深度高）
+- web_search → 兜底（覆盖英文源和长尾信息）
+
+### 3. 通用网络搜索（新闻、产品发布、技术动态 — 兜底）
 
 **web_search（WorkBuddy 内置工具，直接用）：**
 - 用于新闻/产品发布/技术动态等**时效敏感**查询

@@ -293,6 +293,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
     output_path = step_output_path(task_id, step)
     research_plan_path = TASKS_DIR / f'{task_id}-research_plan.json'
     fact_store_path = TASKS_DIR / f'{task_id}-fact_store.json'
+    skill_dir = Path.home() / '.workbuddy' / 'skills' / 'skill_2053082907836022784'
     
     brief_lines = [
         f'# Step Brief: {STEP_ROLE.get(step, step)} ({step})',
@@ -387,7 +388,8 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'| A/HK 股行情/财报/估值 | NeoData api → yfinance 交叉 | web_search |',
         f'| 美股行情/估值/分红 | yfinance | NeoData → web_search |',
         f'| 券商研报/行业深度 | NeoData doc (按日期降序) | web_search |',
-        f'| **新闻/产品发布/技术动态** | web_search + 时效锚定(含年月) | search_gateway |',
+        f'| **突发新闻/实时动态(分钟级)** | 腾讯新闻 CLI (sh run-cli.sh search) | web_search |',
+        f'| **产品发布/技术动态/新闻分析** | NeoData doc + 腾讯新闻补充 | web_search |',
         f'| 企业工商/司法/专利 | 天眼查 MCP (已配置) | web_search |',
         f'| 技术论文/arxiv | web_search + 年份 | web_fetch 读论文 |',
         f'| 开源项目/GitHub/HF | web_search + 年份 | web_fetch 读 README |',
@@ -431,10 +433,12 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'',
         f'**搜索策略（必须按顺序执行）：**',
         f'0. **第零轮：时效锚定（最先执行，不可跳过）**',
-        f'   - NeoData doc: neodata_search(\'{entity} 最新动态\', data_type=\'doc\') — 拿深度分析文章',
-        f'   - web_search: "{entity} {{当前年月}} 最新动态" — 锁定突发新闻',
+        f'   - 腾讯新闻 CLI: sh {skill_dir}/scripts/run-cli.sh search "{entity} 最新动态" --limit 5 — 分钟级突发新闻',
+        f'   - NeoData doc: neodata_search(\'{entity} 最新动态\', data_type=\'doc\') — 小时~天级深度分析',
+        f'   - web_search: "{entity} {{当前年月}} 最新动态" — 锁定英文源和长尾信息',
         f'   - 如涉及产品/技术: web_search("{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
         f'   - 目的: 先知道"最新"是什么，后续分析才不会引用过期信息',
+        f'   - 三层组合: 腾讯新闻(分钟级) → NeoData doc(深度) → web_search(兜底)',
         f'1. **第一轮：广度扫描** — NeoData doc 拿研报/分析 + search_gateway prefer=multi 多关键词并行',
         f'2. **第二轮：深度验证** — 对第一轮发现的关键 claim，用 web_fetch 或 search_deep 读全文验证',
         f'3. **第三轮：交叉验证/反证** — 搜竞品对比、负面信息、行业报告、分析师观点',
@@ -675,6 +679,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
         # 替换占位符
         tool_guide = tool_guide.replace('{RUNTIME_ROOT}', str(ROOT))
         tool_guide = tool_guide.replace('{TASK_DIR}', str(TASKS_DIR))
+        tool_guide = tool_guide.replace('{SKILL_DIR}', str(Path.home() / '.workbuddy' / 'skills' / 'skill_2053082907836022784'))
         prompt = prompt + '\n\n' + tool_guide
 
     return prompt
