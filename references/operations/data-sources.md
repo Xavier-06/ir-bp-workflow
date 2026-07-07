@@ -68,3 +68,29 @@ python3 {IR_RUNTIME}/tasks/valuation_enricher.py --entity "标的名称"
 - valuation_enricher 自动映射：6位代码→SZ/SS/BJ 后缀
 - 中文名映射：公司名→股票代码→yfinance 查询
 - NeoData 估值数据含：实时价格、PE(TTM)、PB、市值、成交额、资金流向、换手率
+
+## 文献综述管线数据源 (Literature Review)
+
+> 与 BP/IR 管线共享 NeoData / 天眼查 / 腾讯新闻 / Yahoo，但额外有学术源与全文提取链。子代理工具箱详见 `instruction_store_lit/_common_tool_guide.md`。
+
+### 数据源优先级
+
+| 优先级 | 数据源 | 使用方式 |
+|-------|--------|---------|
+| 1 | arXiv / DBLP / PMC / Crossref | 学术论文元数据（`scripts/api_clients/*` + `unified_search`，领域判定后路由） |
+| 2 | PMC EFetch | 生物医学全文 XML（OA 首选） |
+| 3 | pdf_downloader | 全文 PDF 获取（arXiv OA / Unpaywall DOI / PMC） |
+| 4 | NeoData | A/HK 行业研报 + 行情估值（`scripts/search/neodata_search.py`） |
+| 5 | 腾讯新闻 | 中文企业/行业快讯（0.7s，`tencent_news_search`） |
+| 6 | Yahoo Finance | 美股竞品新闻/earnings（`_yahoo_search`） |
+| 7 | TYC 天眼查 MCP | 中国企业工商/融资/诉讼/知产（enterprise_scout） |
+| 8 | yfinance | 美股估值快照（price/PE/PB/market_cap） |
+| 9 | WeStock / SEC EDGAR | 个股研报 / 美股 10-K·S-1 |
+| 10 | WebSearch / WebFetch | 白皮书/咨询报告/已知 URL 爬取 |
+
+### 全文提取链
+- Marker（报告/白皮书，首选）→ pdfplumber（兜底）
+- GROBID 不可用（Docker 未运行）
+
+### 不可用源（已确认）
+- OpenAlex（503）、Semantic Scholar（429）、CORE（无 key）：学术引用网络分析受限，改用 WebSearch
