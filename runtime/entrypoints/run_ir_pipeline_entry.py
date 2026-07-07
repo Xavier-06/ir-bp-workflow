@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,12 @@ def run_ir_job(
     migrate_phases: list[str] | None = None,
     legacy_fallback: bool = False,
     start_phase: str | None = None,
+    research_tier: str | None = None,
 ) -> dict:
+    # Stage Tier 分级（P2）：注入环境变量供 IRProfile 读取。
+    # 不传则保留已有环境变量，最终回退到 deep（全量 phase，行为等同改动前）。
+    if research_tier:
+        os.environ["IR_RESEARCH_TIER"] = str(research_tier).strip().lower()
     profile = IRProfile(runtime_root=RUNTIME_ROOT)
     job_ctx = JobContext(
         job_id=job_id,

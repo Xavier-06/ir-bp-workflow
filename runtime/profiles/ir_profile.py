@@ -73,8 +73,83 @@ def _sync_artifact_to_workspace(job_ctx: JobContext, artifact_type: str, src_pat
 
 
 # ═══════════════════════════════════════════════════════════
-# Phase 0-3: Research chain (unchanged, now with workspace sync)
+# Stage Tier 分级（P2: 按研究深度触发不同 phase 组合）
 # ═══════════════════════════════════════════════════════════
+#
+# deep    (默认): 全量 31(+1) phase，所有质量门禁与 per-wave gate 均运行。
+# standard:      跳过 claim_coverage + cross_dimension_gate（保留可读性/辩论/per-wave gate）。
+# quick:         快速扫描，跳过 per-wave evidence gate、per-wave shared refresh、
+#                debate_review、claim_coverage、cross_dimension_gate、readability_review。
+#
+# 核心数据采集链（preflight → delivery + 合成）在任何 tier 下均完整运行，
+# 仅可选的质量/验证 phase 被裁剪，因此不会破坏下游依赖。
+IR_RESEARCH_TIERS: dict[str, dict[str, Any]] = {
+    "deep": {
+        "label": "深度研究（默认，全量 phase）",
+        "skip": set(),
+    },
+    "standard": {
+        "label": "标准研究（跳过 claim/cross gate）",
+        "skip": {
+            "phase14_claim_coverage",
+            "phase14_cross_dimension_gate",
+        },
+    },
+    "quick": {
+        "label": "快速扫描（最小化验证）",
+        "skip": {
+            "phase09_wave1_evidence_gate", "phase09_wave2_evidence_gate",
+            "phase09_wave3_evidence_gate", "phase09_wave4_evidence_gate",
+            "phase10_wave1_shared_refresh", "phase10_wave2_shared_refresh",
+            "phase10_wave3_shared_refresh", "phase10_wave4_shared_refresh",
+            "phase12_debate_review",
+            "phase14_claim_coverage",
+            "phase14_cross_dimension_gate",
+            "phase14_readability_review",
+        },
+    },
+}
+
+# delivery_gate 中可随 tier 跳过的门禁产物文件 → 其产出 phase
+_SKIPPABLE_GATE_FILES = {
+    "ir_readability_review.json": "phase14_readability_review",
+    "ir_claim_coverage.json": "phase14_claim_coverage",
+    "ir_cross_dimension_gate.json": "phase14_cross_dimension_gate",
+}
+
+
+def resolve_ir_research_tier() -> str:
+    """解析当前 IR 研究 tier。
+
+    查找顺序：环境变量 IR_RESEARCH_TIER → runtime/ir_research_tier.json → 默认 deep。
+    默认 deep 保证不传 tier 时行为完全等同于改动前（31 phase 全量）。
+    """
+    env_tier = os.environ.get("IR_RESEARCH_TIER", "").strip().lower()
+    if env_tier in IR_RESEARCH_TIERS:
+        return env_tier
+    cfg = Path(__file__).resolve().parent.parent / "ir_research_tier.json"
+    if cfg.exists():
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+            t = str(data.get("tier", "")).strip().lower()
+            if t in IR_RESEARCH_TIERS:
+                return t
+        except Exception:
+            pass
+    return "deep"
+
+
+def _producer_active(fname: str, active: set[str]) -> bool:
+    """门禁产物文件是否仍有产出 phase 在激活集合内。"""
+    producer = _SKIPPABLE_GATE_FILES.get(fname)
+    if producer is None:
+        return True
+    return producer in active
+
+
+# ═══════════════════════════════════════════════
+# Phase 0-3: Research chain (unchanged, now with workspace sync)
+# ═══════════════════════════════════════════════
 
 def _run_preflight(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     from scripts.ir_preflight_check import run_preflight
@@ -1668,14 +1743,20 @@ def _run_delivery_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
                 "suggestion": f"检查 {path.name} 并修复",
             })
 
-    # 逐项检查
+    # 逐项检查（tier 感知：被裁剪的可选门禁跳过对应检查）
+    tier = os.environ.get("IR_RESEARCH_TIER", "deep")
+    skip_set = IR_RESEARCH_TIERS.get(tier, IR_RESEARCH_TIERS["deep"])["skip"]
+
     _check("final_assembly", task_dir / f"{job_ctx.job_id}-final_assembly.json")
-    _check("readability", task_dir / "ir_readability_review.json",
-           ok_field="verdict", pass_values=("PASS", "PASS_WITH_WARNINGS"))
-    _check("debate_review", task_dir / f"{job_ctx.job_id}-debate_review.json",
-           ok_field="passed", pass_values=(True,))
-    _check("cross_dimension", task_dir / "ir_cross_dimension_gate.json",
-           ok_field="gate_verdict", pass_values=("PASS", "PASS_WITH_WARNINGS"))
+    if "phase14_readability_review" not in skip_set:
+        _check("readability", task_dir / "ir_readability_review.json",
+               ok_field="verdict", pass_values=("PASS", "PASS_WITH_WARNINGS"))
+    if "phase12_debate_review" not in skip_set:
+        _check("debate_review", task_dir / f"{job_ctx.job_id}-debate_review.json",
+               ok_field="passed", pass_values=(True,))
+    if "phase14_cross_dimension_gate" not in skip_set:
+        _check("cross_dimension", task_dir / "ir_cross_dimension_gate.json",
+               ok_field="gate_verdict", pass_values=("PASS", "PASS_WITH_WARNINGS"))
     _check("section_packages", task_dir / f"{job_ctx.job_id}-section_gate.json",
            ok_field="passed", pass_values=(True,))
     _check("synthesis_footnotes", task_dir / f"{job_ctx.job_id}-synthesis.md",
@@ -1736,6 +1817,44 @@ def _run_delivery_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
         "phase": "phase14_delivery_gate",
         "job_id": job_ctx.job_id,
         "result": result,
+    }
+
+
+def _run_ir_investment_judgment(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 14: 投资判断汇总（P2: 明确投资建议 + 逻辑 + 风险）。
+
+    读取所有 step 输出与最终报告，生成 ir_investment_judgment.json/.md/.docx。
+    """
+    from scripts.ir_investment_judgment import build_ir_investment_judgment
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    result = build_ir_investment_judgment(job_ctx.job_id, tasks_dir=tasks_dir)
+
+    ws = _workspace_for(job_ctx)
+    if ws is not None:
+        for fname in ("ir_investment_judgment.json", "ir_investment_judgment.md", "ir_investment_judgment.docx"):
+            src = tasks_dir / fname
+            if src.exists():
+                try:
+                    shutil.copy2(src, ws.outputs_dir / fname)
+                except Exception:
+                    pass
+
+    return {
+        "ok": True,
+        "mode": "quality_production",
+        "phase": "phase14_investment_judgment",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "recommendation": result.get("recommendation", ""),
+            "rationale": result.get("rationale", ""),
+            "low_confidence_dimension_count": result.get("low_confidence_dimension_count", 0),
+            "total_data_gaps": result.get("total_data_gaps", 0),
+            "dimensions": result.get("dimensions", []),
+            "json_path": result.get("json_path", ""),
+            "md_path": result.get("md_path", ""),
+            "docx_path": result.get("docx_path", ""),
+        },
     }
 
 
@@ -1849,6 +1968,20 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
         except Exception as e:
             docx_error = str(e)
 
+    # 4.5 投资判断汇总同步到交付目录（phase14_investment_judgment 产物）
+    _tasks_dir = runtime_root / "data" / "tasks"
+    for _ij_name in ("ir_investment_judgment.md", "ir_investment_judgment.docx"):
+        _ij_src = _tasks_dir / _ij_name
+        if _ij_src.exists():
+            try:
+                _sync_artifact_to_workspace(job_ctx, "investment_judgment", _ij_src)
+            except Exception:
+                pass
+
+    # 4.6 每 step 独立 DOCX 导出（P2: per-step DOCX）
+    _step_docx_results = _export_ir_step_docx(job_ctx, runtime_root)
+    _step_docx_paths = [r.get("path") for r in _step_docx_results if r.get("path")]
+
     # 4. 交付通知 — 已移除（开源发布版本不含消息推送）
     delivery_ok = False
     delivery_error = "Notification removed for open-source release"
@@ -1883,61 +2016,120 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
             "delivery_ok": delivery_ok,
             "delivery_error": delivery_error,
             "delivery_quality": verification_verdict.lower() if verification_verdict != "ERROR" else "unknown",
+            "step_docx_paths": _step_docx_paths,
+            "step_docx_count": len(_step_docx_paths),
             "workspace_artifacts": workspace_artifacts,
             "workspace_delivery_dir": str(ws.delivery_dir) if ws else "",
         },
     }
 
 
+# ═══════════════════════════════════════════════
+# Per-step DOCX 独立导出（P2）
+# ═══════════════════════════════════════════════
+_STEP_DOCX_STEPS = (
+    "step1_data", "step2_industry", "step3_biz", "step4_finance",
+    "step5_mgmt", "step_macro", "step6_insight", "step6b_valuation", "step7_risk",
+)
+_STEP_DOCX_LABELS = {
+    "step1_data": "数据收集", "step2_industry": "行业分析", "step3_biz": "商业模式",
+    "step4_finance": "财务分析", "step5_mgmt": "管理层与治理", "step_macro": "宏观分析",
+    "step6_insight": "差异化洞察", "step6b_valuation": "预测与估值", "step7_risk": "风险与催化",
+}
+
+
+def _export_ir_step_docx(job_ctx: JobContext, runtime_root: Path) -> list[dict[str, Any]]:
+    """为每个已完成的 step 生成独立 DOCX，落入 delivery/step_reports/。"""
+    try:
+        from scripts.ir_step_docx import build_ir_step_docx
+    except Exception:
+        return []
+    tasks_dir = runtime_root / "data" / "tasks"
+    ws = _workspace_for(job_ctx)
+    results: list[dict[str, Any]] = []
+    for step in _STEP_DOCX_STEPS:
+        md = tasks_dir / f"{job_ctx.job_id}-{step}.md"
+        if not md.exists() or md.stat().st_size < 100:
+            continue
+        label = _STEP_DOCX_LABELS.get(step, step)
+        out_dir = ws.delivery_dir / "step_reports" if ws is not None else tasks_dir / "step_docx"
+        out_name = f"{step}.docx"
+        try:
+            built = build_ir_step_docx(md, out_dir / out_name, title=f"{label}（{step}）")
+            if built:
+                results.append({"step": step, "label": label, "path": built})
+                if ws is not None:
+                    _sync_artifact_to_workspace(job_ctx, f"step_docx_{step}", Path(built))
+        except Exception as e:
+            results.append({"step": step, "label": label, "error": str(e)[:200]})
+    return results
+
+
+def _IR_FULL_PHASE_HANDLERS(runtime_root: Path) -> dict[str, Any]:
+    """完整 IR phase 注册表（含新增 phase14_investment_judgment）。
+
+    由 IRProfile.__init__ 按 tier 裁剪后传入 kernel。保持插入顺序即 phase 执行顺序。
+    """
+    return {
+        "phase01_preflight": lambda job_ctx: _run_preflight(runtime_root, job_ctx),
+        "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),
+        "phase03_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
+        "phase03_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
+        "phase04_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),
+        "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
+        "phase06_fact_store_bootstrap": lambda job_ctx: _run_fact_store_bootstrap(runtime_root, job_ctx),
+        "phase07_precompute": lambda job_ctx: _run_precompute(runtime_root, job_ctx),
+        "phase08_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
+        "phase09_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
+        "phase09_wave_evidence_gate": lambda job_ctx: _run_wave_evidence_gate(runtime_root, job_ctx),
+        # ── Batch3: per-wave evidence gate (独立 gate per wave) ──
+        "phase09_wave1_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=0),
+        "phase09_wave2_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=1),
+        "phase09_wave3_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=2),
+        "phase09_wave4_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=3),
+        "phase10_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
+        "phase10_shared_state_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx),
+        # ── Batch3: per-wave shared_state_refresh ──
+        "phase10_wave1_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=0),
+        "phase10_wave2_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=1),
+        "phase10_wave3_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=2),
+        "phase10_wave4_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=3),
+        "phase11_section_package_validation": lambda job_ctx: _run_section_package_validation(runtime_root, job_ctx),
+        "phase12_debate_review": lambda job_ctx: _run_debate_review_phase(runtime_root, job_ctx),
+        "phase13_synthesis_prepare": lambda job_ctx: _run_synthesis_prepare(runtime_root, job_ctx),
+        "phase13_synthesis_collect": lambda job_ctx: _run_synthesis_collect(runtime_root, job_ctx),
+        "phase14_final_assembly": lambda job_ctx: _run_final_assembly_phase(runtime_root, job_ctx),
+        "phase14_readability_review": lambda job_ctx: _run_readability_review(runtime_root, job_ctx),
+        "phase14_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
+        "phase14_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
+        "phase14_delivery_gate": lambda job_ctx: _run_delivery_gate(runtime_root, job_ctx),
+        # ── P2: 投资判断汇总（明确建议 + 逻辑 + 风险）──
+        "phase14_investment_judgment": lambda job_ctx: _run_ir_investment_judgment(runtime_root, job_ctx),
+        "phase15_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
+    }
+
+
 class IRProfile(PipelineProfile):
     def __init__(self, runtime_root: Path):
+        tier = resolve_ir_research_tier()
+        skip = IR_RESEARCH_TIERS.get(tier, IR_RESEARCH_TIERS["deep"])["skip"]
+        full = _IR_FULL_PHASE_HANDLERS(runtime_root)
+        handlers = {k: v for k, v in full.items() if k not in skip}
         super().__init__(
             name="ir",
             job_type="investment_research",
-            phase_handlers={
-                "phase01_preflight": lambda job_ctx: _run_preflight(runtime_root, job_ctx),
-                "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),
-                "phase03_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
-                "phase03_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
-                "phase04_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),
-                "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
-                "phase06_fact_store_bootstrap": lambda job_ctx: _run_fact_store_bootstrap(runtime_root, job_ctx),
-                "phase07_precompute": lambda job_ctx: _run_precompute(runtime_root, job_ctx),
-                "phase08_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
-                "phase09_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-                "phase09_wave_evidence_gate": lambda job_ctx: _run_wave_evidence_gate(runtime_root, job_ctx),
-                # ── Batch3: per-wave evidence gate (独立 gate per wave) ──
-                "phase09_wave1_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=0),
-                "phase09_wave2_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=1),
-                "phase09_wave3_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=2),
-                "phase09_wave4_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=3),
-                "phase10_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
-                "phase10_shared_state_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx),
-                # ── Batch3: per-wave shared_state_refresh ──
-                "phase10_wave1_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=0),
-                "phase10_wave2_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=1),
-                "phase10_wave3_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=2),
-                "phase10_wave4_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=3),
-                "phase11_section_package_validation": lambda job_ctx: _run_section_package_validation(runtime_root, job_ctx),
-                "phase12_debate_review": lambda job_ctx: _run_debate_review_phase(runtime_root, job_ctx),
-                "phase13_synthesis_prepare": lambda job_ctx: _run_synthesis_prepare(runtime_root, job_ctx),
-                "phase13_synthesis_collect": lambda job_ctx: _run_synthesis_collect(runtime_root, job_ctx),
-                "phase14_final_assembly": lambda job_ctx: _run_final_assembly_phase(runtime_root, job_ctx),
-                "phase14_readability_review": lambda job_ctx: _run_readability_review(runtime_root, job_ctx),
-                "phase14_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
-                "phase14_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
-                "phase14_delivery_gate": lambda job_ctx: _run_delivery_gate(runtime_root, job_ctx),
-                "phase15_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
-            },
+            phase_handlers=handlers,
         )
         self.runtime_root = runtime_root
+        self._research_tier = tier
+        self._active_phases = set(handlers.keys())
 
     def phase_prerequisites(self) -> dict[str, list[str]]:
         """声明 phase 间的关键产物依赖（对标 BP bp_profile.py）。
 
         kernel 在 start_phase 跳过前置 phase 时，自动回填缺失产物。
         """
-        return {
+        full = {
             "phase06_fact_store_bootstrap": ["{task_id}-research_plan.json"],
             "phase07_precompute": ["{task_id}-ir_company_verify.json"],
             "phase08_dispatch_prepare": ["{task_id}-research_plan.json"],
@@ -1951,7 +2143,15 @@ class IRProfile(PipelineProfile):
             "phase14_claim_coverage": ["{task_id}-research_plan.json"],
             "phase14_cross_dimension_gate": ["{task_id}-final_report.md"],
             "phase14_delivery_gate": ["ir_readability_review.json", "ir_claim_coverage.json", "ir_cross_dimension_gate.json", "{task_id}-final_assembly.json"],
+            "phase14_investment_judgment": ["{task_id}-final_report.md"],
         }
+        active = self._active_phases
+        out: dict[str, list[str]] = {}
+        for _k, _files in full.items():
+            if _k not in active:
+                continue
+            out[_k] = [f for f in _files if _producer_active(f, active)]
+        return out
 
     def phase_outputs(self) -> dict[str, list[str]]:
         """声明每个 phase 产出的关键文件（相对 task_dir）。
@@ -1959,7 +2159,7 @@ class IRProfile(PipelineProfile):
         kernel 用它构建反查表 file → producer_phase，
         在依赖缺失时精准回填到产出该文件的 phase。
         """
-        return {
+        full = {
             "phase01_preflight": [],
             "phase02_company_verify": ["{task_id}-ir_company_verify.json"],
             "phase03_research_plan": ["{task_id}-ir_research_plan_skeleton.json"],
@@ -1990,5 +2190,7 @@ class IRProfile(PipelineProfile):
             "phase14_claim_coverage": ["{task_id}-ir_claim_coverage.json"],
             "phase14_cross_dimension_gate": ["{task_id}-ir_cross_dimension_gate.json"],
             "phase14_delivery_gate": ["{task_id}-ir_delivery_gate.json", "{task_id}-ir_delivery_deferred_fixes.json"],
+            "phase14_investment_judgment": ["{task_id}-ir_investment_judgment.json", "{task_id}-ir_investment_judgment.md"],
             "phase15_delivery": [],
         }
+        return {k: v for k, v in full.items() if k in self._active_phases}
