@@ -40,20 +40,39 @@ from typing import Any
 PHASE_RUNNER = Path(__file__).resolve().parent / "phase_runner.py"
 
 # HEAVY_PHASES: 走 launch_heavy_phase 路径的 phase 列表
-# 不设超时——跑到完成或异常为止
 HEAVY_PHASES = {
     # BP phases
     "phase01_document_intake",
     "phase02_company_verify",
     "phase04_presearch",
     "phase33_delivery",
-    # IR phases (phase01-15 with synthesis)
-    "phase15_delivery",
+    # IR phases
+    "phase14_delivery",
     "phase05_extract",
     # IC phases
     "phase03_presearch",
     "phase04_extract",
     "phase08_delivery",
+}
+
+# NO_TIMEOUT_PHASES: 不设超时，跑到完成为止
+NO_TIMEOUT_PHASES = {
+    "phase01_document_intake",
+    "phase04_presearch",
+}
+
+# PHASE_TIMEOUTS: 其他 heavy phase 的超时设置（秒）
+PHASE_TIMEOUTS = {
+    # BP phases
+    "phase02_company_verify": 600,
+    "phase33_delivery": 600,
+    # IR phases
+    "phase14_delivery": 600,
+    "phase05_extract": 900,
+    # IC phases
+    "phase03_presearch": 900,
+    "phase04_extract": 900,
+    "phase08_delivery": 600,
 }
 
 
@@ -143,7 +162,11 @@ def launch_heavy_phase(
         print(f"  📦 [heavy_phase_bg] 使用缓存结果: {phase}", flush=True)
         return cached
 
-    print(f"  🔄 [heavy_phase_bg] 当前进程执行: {phase} (无超时，跑到完)", flush=True)
+    if phase in NO_TIMEOUT_PHASES:
+        print(f"  🔄 [heavy_phase_bg] 当前进程执行: {phase} (无超时，跑到完)", flush=True)
+    else:
+        timeout = PHASE_TIMEOUTS.get(phase, 900)
+        print(f"  🔄 [heavy_phase_bg] 当前进程执行: {phase} (超时 {timeout}s)", flush=True)
 
     start_time = time.time()
     try:
@@ -182,14 +205,18 @@ def poll_heavy_phase(
     runtime_root: Path,
     job_id: str,
     phase: str,
+    timeout: int = 0,
 ) -> dict[str, Any]:
     """轮询 heavy phase 的后台执行状态。
 
     注意：launch_heavy_phase 已改为当前进程执行，不再写文件。
     此函数仅作为安全网保留（kernel 内部消化遗留 needs_poll）。
-    不设超时——跑到完成为止。
+
+    NO_TIMEOUT_PHASES (phase01, phase04) 忽略 timeout 参数，无限等待。
+    其他 phase 按 timeout 参数等待。
     """
     pid_file = _pid_path(runtime_root, job_id, phase)
+    no_timeout = phase in NO_TIMEOUT_PHASES
 
     # 检查是否已有结果
     cached = check_cached_result(runtime_root, job_id, phase)
@@ -201,20 +228,31 @@ def poll_heavy_phase(
         try:
             pid = int(pid_file.read_text().strip())
             if _is_process_alive(pid):
-                # 无限等待，直到完成或进程死亡
-                while True:
-                    cached = check_cached_result(runtime_root, job_id, phase)
-                    if cached is not None:
-                        return {"status": "completed", "ok": cached.get("ok", False), "result": cached}
-                    if not _is_process_alive(pid):
-                        break
-                    time.sleep(3)
-                # 进程已死
+                if no_timeout or timeout <= 0:
+                    # 无限等待
+                    while True:
+                        cached = check_cached_result(runtime_root, job_id, phase)
+                        if cached is not None:
+                            return {"status": "completed", "ok": cached.get("ok", False), "result": cached}
+                        if not _is_process_alive(pid):
+                            break
+                        time.sleep(3)
+                else:
+                    # 有超时的等待
+                    start = time.time()
+                    while time.time() - start < timeout:
+                        cached = check_cached_result(runtime_root, job_id, phase)
+                        if cached is not None:
+                            return {"status": "completed", "ok": cached.get("ok", False), "result": cached}
+                        if not _is_process_alive(pid):
+                            break
+                        time.sleep(3)
+                # 超时或进程已死
                 cached = check_cached_result(runtime_root, job_id, phase)
                 if cached is not None:
                     return {"status": "completed", "ok": cached.get("ok", False), "result": cached}
-                return {"status": "failed", "ok": False,
-                        "error": f"Process {pid} dead without result"}
+                return {"status": "timeout" if (not no_timeout and timeout > 0) else "failed",
+                        "ok": False, "error": f"Process {pid} dead without result"}
             else:
                 # 进程已死但没结果 → 检查 error
                 pid_file.unlink(missing_ok=True)

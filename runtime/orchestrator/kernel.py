@@ -157,13 +157,13 @@ class OrchestratorKernel:
                 # ── 内部 block-wait：不再返回给 agent，Python 进程内等待完成 ──
                 # 安全网：正常路径下 launch_heavy_phase 已 block-wait，不会走到这里。
                 # 但如果有任何 handler 返回 needs_poll，kernel 自己等完再继续。
-                # 不设超时——跑到完成为止。
                 bg_pid = phase_result.get("bg_pid", "?")
-                print(f"  ⏳ [kernel] needs_poll 内部等待 — PID={bg_pid} ({phase_name}, 无超时)", flush=True)
+                timeout = phase_result.get("timeout", 900)
+                print(f"  ⏳ [kernel] needs_poll 内部等待 — PID={bg_pid} ({phase_name}, 超时 {timeout}s)", flush=True)
                 try:
                     from scripts.heavy_phase_bg import poll_heavy_phase
                     poll_result = poll_heavy_phase(
-                        self.runtime_root, job_ctx.job_id, phase_name,
+                        self.runtime_root, job_ctx.job_id, phase_name, timeout=timeout,
                     )
                     if poll_result.get("status") == "completed" and poll_result.get("ok"):
                         inner = poll_result.get("result", {})

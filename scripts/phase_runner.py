@@ -122,13 +122,21 @@ def get_status(job_id: str, phase: str) -> dict:
     return {"status": "not_started", "ok": None}
 
 
-def wait_for_completion(job_id: str, phase: str) -> dict:
-    """阻塞等待 phase 完成（无超时，跑到完成为止）"""
-    while True:
+# phase01 OCR 和 phase04 预搜索无超时，其他 phase 保留超时
+_NO_TIMEOUT_PHASES = {"phase01_document_intake", "phase04_presearch"}
+
+
+def wait_for_completion(job_id: str, phase: str, timeout: int = 1800) -> dict:
+    """阻塞等待 phase 完成。NO_TIMEOUT_PHASES 忽略 timeout，跑到完为止。"""
+    if phase in _NO_TIMEOUT_PHASES:
+        timeout = 0
+    start = time.time()
+    while timeout <= 0 or (time.time() - start < timeout):
         status = get_status(job_id, phase)
         if status["status"] in ("completed", "failed"):
             return status
         time.sleep(POLL_INTERVAL)
+    return {"status": "timeout", "ok": False, "error": f"Timed out after {timeout}s"}
 
 
 # ═══════════════════════════════════════════════

@@ -692,6 +692,55 @@ def _run_fact_store_merge(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     }
 
 
+def _run_shared_state_refresh(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 10 refresh: 构建跨 Wave 共享状态摘要页。
+
+    在 fact_store_merge 之后运行，汇总所有已完成 step 的 fact、gap、progress。
+    输出 shared_state.json + shared_state_page.md，供后续 phase 子代理 brief 注入。
+    """
+    from scripts.ir_shared_state import write_ir_shared_state
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    json_path = write_ir_shared_state(
+        task_id=job_ctx.job_id,
+        tasks_dir=tasks_dir,
+        after_wave=len(LAUNCH_WAVES) - 1,
+        entity=job_ctx.entity,
+    )
+
+    ws = _workspace_for(job_ctx)
+    if ws is not None:
+        for fname in (f"{job_ctx.job_id}-shared_state.json", f"{job_ctx.job_id}-shared_state_page.md"):
+            src = tasks_dir / fname
+            if src.exists():
+                try:
+                    shutil.copy2(src, ws.outputs_dir / fname)
+                except Exception:
+                    pass
+
+    # 读取摘要数据
+    state = {}
+    try:
+        state = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "mode": "shared_state_refresh",
+        "phase": "phase10_shared_state_refresh",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "json_path": json_path,
+            "fact_count": state.get("fact_summary", {}).get("total", 0),
+            "data_gap_count": len(state.get("data_gaps", [])),
+            "completed_steps": [
+                s["step"] for s in state.get("step_progress", []) if s.get("md_exists")
+            ],
+        },
+    }
+
+
 def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     """Phase 4b: 检查子代理输出是否完成，做质量门禁。
 
@@ -1308,6 +1357,7 @@ class IRProfile(PipelineProfile):
                 "phase09_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
                 "phase09_wave_evidence_gate": lambda job_ctx: _run_wave_evidence_gate(runtime_root, job_ctx),
                 "phase10_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
+                "phase10_shared_state_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx),
                 "phase11_section_package_validation": lambda job_ctx: _run_section_package_validation(runtime_root, job_ctx),
                 "phase12_debate_review": lambda job_ctx: _run_debate_review_phase(runtime_root, job_ctx),
                 "phase13_synthesis_prepare": lambda job_ctx: _run_synthesis_prepare(runtime_root, job_ctx),
@@ -1353,6 +1403,7 @@ class IRProfile(PipelineProfile):
             "phase09_dispatch_collect": [],
             "phase09_wave_evidence_gate": [],
             "phase10_fact_store_merge": ["{task_id}-fact_store.json", "{task_id}-fact_store_index.json"],
+            "phase10_shared_state_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
             "phase11_section_package_validation": ["{task_id}-section_packages.json", "{task_id}-section_gate.json"],
             "phase12_debate_review": ["{task_id}-debate_review.json"],
             "phase13_synthesis_prepare": ["{task_id}-synthesis_manifest.json"],
