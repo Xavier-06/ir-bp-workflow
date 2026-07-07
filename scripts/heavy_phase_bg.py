@@ -162,11 +162,21 @@ def launch_heavy_phase(
         print(f"  📦 [heavy_phase_bg] 使用缓存结果: {phase}", flush=True)
         return cached
 
+    # 打印给 Agent 看的等待提示
+    _EST_MINUTES = {
+        "phase01_document_intake": 20,
+        "phase04_presearch": 15,
+        "phase02_company_verify": 5,
+        "phase33_delivery": 5,
+    }
+    est = _EST_MINUTES.get(phase, 10)
     if phase in NO_TIMEOUT_PHASES:
         print(f"  🔄 [heavy_phase_bg] 当前进程执行: {phase} (无超时，跑到完)", flush=True)
     else:
         timeout = PHASE_TIMEOUTS.get(phase, 900)
         print(f"  🔄 [heavy_phase_bg] 当前进程执行: {phase} (超时 {timeout}s)", flush=True)
+    print(f"  ⏰ [heavy_phase_bg] ⚠️ 此阶段预计需要 {est} 分钟，请勿中断对话，"
+          f"用 TaskOutput(task_id, block=true, timeout={est*60*1000}) 等待完成。", flush=True)
 
     start_time = time.time()
     try:
