@@ -57,6 +57,25 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 # Heavy phases — 走 launch_heavy_phase 路径
 HEAVY_PHASES = {"phase01_document_intake", "phase02_company_verify", "phase04_presearch", "phase33_delivery"}
 
+# phase01 OCR 和 phase04 预搜索无超时，其他 phase 保留超时
+_NO_TIMEOUT_PHASES = {"phase01_document_intake", "phase04_presearch"}
+
+# 超时设置（秒）— NO_TIMEOUT_PHASES 不使用此表
+PHASE_TIMEOUTS = {
+    "phase02_company_verify": 600,    # 10 分钟
+    "phase08_dispatch_prepare": 120,
+    "phase09_dispatch_collect": 120,
+    "phase16_wave3_prepare": 120,
+    "phase17_wave3_collect": 120,
+    "phase13_wave2_prepare": 120,
+    "phase14_wave2_collect": 120,
+    "phase20_wave4_prepare": 120,
+    "phase21_wave4_collect": 120,
+    "phase27_synthesis_prepare": 120,
+    "phase28_synthesis_collect": 120,
+    "phase33_delivery": 600,            # 10 分钟
+}
+
 
 def _python() -> str:
     return sys.executable
@@ -64,7 +83,7 @@ def _python() -> str:
 
 def start_phase(job_id: str, phase: str, entity: str = "", market: str = "cn",
                 input_file: str = "", query: str = "", session_id: str = "") -> dict:
-    """启动一个 phase。不设超时，跑到完成为止。"""
+    """启动一个 phase。NO_TIMEOUT_PHASES 无超时，其他 phase 有超时。"""
     common_args = [
         "--job-id", job_id,
         "--phase", phase,
@@ -76,7 +95,11 @@ def start_phase(job_id: str, phase: str, entity: str = "", market: str = "cn",
     ]
 
     cmd = [_python(), str(PHASE_RUNNER), "--run"] + common_args
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
+    if phase in _NO_TIMEOUT_PHASES:
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
+    else:
+        timeout = PHASE_TIMEOUTS.get(phase, 300)
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT), timeout=timeout)
     if result.stdout.strip():
         try:
             return json.loads(result.stdout.strip())
@@ -85,13 +108,14 @@ def start_phase(job_id: str, phase: str, entity: str = "", market: str = "cn",
     return {"ok": result.returncode == 0, "stderr": result.stderr[:500]}
 
 
-def poll_phase(job_id: str, phase: str, wait: bool = False) -> dict:
-    """轮询 phase 状态。wait=True 阻塞等待到完成（无超时），wait=False 只查一次。"""
-    if wait:
-        cmd = [_python(), str(PHASE_RUNNER), "--wait", "--job-id", job_id, "--phase", phase]
+def poll_phase(job_id: str, phase: str, timeout: int = 0) -> dict:
+    """轮询 phase 状态。timeout=0 表示只查一次，>0 表示阻塞等待。"""
+    if timeout > 0:
+        cmd = [_python(), str(PHASE_RUNNER), "--wait", "--job-id", job_id, "--phase", phase,
+               "--timeout", str(timeout)]
     else:
         cmd = [_python(), str(PHASE_RUNNER), "--status", "--job-id", job_id, "--phase", phase]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT), timeout=timeout + 30 if timeout > 0 else None)
     if result.stdout.strip():
         try:
             return json.loads(result.stdout.strip())
@@ -126,7 +150,8 @@ def main():
     # poll
     p_poll = sub.add_parser("poll", help="轮询 phase 状态")
     p_poll.add_argument("phase", help="阶段名称")
-    p_poll.add_argument("--wait", action="store_true", help="阻塞等待到完成（无超时）")
+    p_poll.add_argument("--wait", action="store_true", help="阻塞等待到完成")
+    p_poll.add_argument("--timeout", type=int, default=0, help="阻塞等待秒数（0=只查一次）")
 
     # result
     p_result = sub.add_parser("result", help="读取 phase 结果")
@@ -143,7 +168,7 @@ def main():
         print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
     elif args.action == "poll":
-        result = poll_phase(args.job_id, args.phase, wait=args.wait)
+        result = poll_phase(args.job_id, args.phase, timeout=args.timeout if args.wait else 0)
         print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
     elif args.action == "result":

@@ -248,8 +248,10 @@ def main():
     # 实际工作在 daemon 子进程中，launch_heavy_phase 误判为"异常退出"。
     # 现在 heavy phase 由 launch_heavy_phase 在当前进程直接调用 run_phase()，不需要子进程。
     mode.add_argument("--status", action="store_true", help="查询状态")
-    mode.add_argument("--wait", action="store_true", help="等待完成（无超时）")
+    mode.add_argument("--wait", action="store_true", help="等待完成")
     mode.add_argument("--wait-all", action="store_true", help="等待所有指定 phases 完成")
+
+    ap.add_argument("--timeout", type=int, default=1800, help="等待超时（秒，默认1800；phase01/04忽略此参数）")
 
     args = ap.parse_args()
 
@@ -259,9 +261,9 @@ def main():
         print(json.dumps(status, ensure_ascii=False, indent=2, default=str))
         return
 
-    # 等待完成（无超时）
+    # 等待完成（phase01/04 内部忽略 timeout）
     if args.wait:
-        status = wait_for_completion(args.job_id, args.phase)
+        status = wait_for_completion(args.job_id, args.phase, timeout=args.timeout)
         print(json.dumps(status, ensure_ascii=False, indent=2, default=str))
         return
 
