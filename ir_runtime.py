@@ -310,8 +310,9 @@ def _normalize_start_phase(phase: str) -> str:
         '10': 'phase10_fact_store_merge',
         '11': 'phase11_section_package_validation',
         '12': 'phase12_debate_review',
-        '13': 'phase13_final_assembly',
-        '14': 'phase14_delivery',
+        '13': 'phase13_synthesis_prepare',
+        '14': 'phase14_final_assembly',
+        '15': 'phase15_delivery',
         # 兼容旧编号
         '0': 'phase01_preflight',
         '0.5': 'phase02_company_verify',
@@ -320,8 +321,8 @@ def _normalize_start_phase(phase: str) -> str:
         '4b': 'phase09_dispatch_collect',
         '4.5': 'phase11_section_package_validation',
         '4.6': 'phase12_debate_review',
-        '4.7': 'phase13_final_assembly',
-        '5': 'phase14_delivery',
+        '4.7': 'phase14_final_assembly',
+        '5': 'phase15_delivery',
     }
     return phase_map.get(str(phase), str(phase))
 

@@ -122,15 +122,13 @@ def get_status(job_id: str, phase: str) -> dict:
     return {"status": "not_started", "ok": None}
 
 
-def wait_for_completion(job_id: str, phase: str, timeout: int = 1800) -> dict:
-    """阻塞等待 phase 完成"""
-    start = time.time()
-    while time.time() - start < timeout:
+def wait_for_completion(job_id: str, phase: str) -> dict:
+    """阻塞等待 phase 完成（无超时，跑到完成为止）"""
+    while True:
         status = get_status(job_id, phase)
         if status["status"] in ("completed", "failed"):
             return status
         time.sleep(POLL_INTERVAL)
-    return {"status": "timeout", "ok": False, "error": f"Timed out after {timeout}s"}
 
 
 # ═══════════════════════════════════════════════
@@ -242,10 +240,8 @@ def main():
     # 实际工作在 daemon 子进程中，launch_heavy_phase 误判为"异常退出"。
     # 现在 heavy phase 由 launch_heavy_phase 在当前进程直接调用 run_phase()，不需要子进程。
     mode.add_argument("--status", action="store_true", help="查询状态")
-    mode.add_argument("--wait", action="store_true", help="等待完成")
+    mode.add_argument("--wait", action="store_true", help="等待完成（无超时）")
     mode.add_argument("--wait-all", action="store_true", help="等待所有指定 phases 完成")
-
-    ap.add_argument("--timeout", type=int, default=1800, help="等待超时（秒）")
 
     args = ap.parse_args()
 
@@ -255,9 +251,9 @@ def main():
         print(json.dumps(status, ensure_ascii=False, indent=2, default=str))
         return
 
-    # 等待完成
+    # 等待完成（无超时）
     if args.wait:
-        status = wait_for_completion(args.job_id, args.phase, timeout=args.timeout)
+        status = wait_for_completion(args.job_id, args.phase)
         print(json.dumps(status, ensure_ascii=False, indent=2, default=str))
         return
 

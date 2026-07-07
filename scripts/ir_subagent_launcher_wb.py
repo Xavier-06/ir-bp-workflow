@@ -88,7 +88,7 @@ LAUNCH_WAVES = [
     ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro'],
     ['step6b_valuation'],
     ['step6_insight', 'step7_risk'],
-    ['step8_master'],
+    # step8_master 已剥离为独立 synthesis 子代理（phase13）
 ]
 
 # 超时
@@ -564,7 +564,18 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
     }
 
     rules = step_rules.get(step, '')
-    return base + rules if rules else base
+    prompt = base + rules if rules else base
+
+    # 拼接 _common_tool_guide.md（对标 BP/Lit 管线的 instruction store 模式）
+    tool_guide_path = INSTRUCTION_STORE / '_common_tool_guide.md'
+    if tool_guide_path.exists():
+        tool_guide = tool_guide_path.read_text(encoding='utf-8')
+        # 替换占位符
+        tool_guide = tool_guide.replace('{RUNTIME_ROOT}', str(ROOT))
+        tool_guide = tool_guide.replace('{TASK_DIR}', str(TASKS_DIR))
+        prompt = prompt + '\n\n' + tool_guide
+
+    return prompt
 
 
 # ═══════════════════════════════════════════════════════

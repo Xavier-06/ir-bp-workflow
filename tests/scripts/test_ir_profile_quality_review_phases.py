@@ -11,9 +11,9 @@ def test_ir_profile_registers_quality_review_phases(tmp_path):
 
     assert "phase11_section_package_validation" in phases
     assert "phase12_debate_review" in phases
-    assert "phase13_final_assembly" in phases
+    assert "phase14_final_assembly" in phases
     assert phases.index("phase09_dispatch_collect") < phases.index("phase11_section_package_validation")
-    assert phases.index("phase13_final_assembly") < phases.index("phase14_delivery")
+    assert phases.index("phase14_final_assembly") < phases.index("phase15_delivery")
 
 
 def test_run_section_package_validation_writes_index(tmp_path):

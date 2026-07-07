@@ -95,19 +95,20 @@ def _not_implemented_phase(phase: str, reason: str, *, result_key: str) -> dict[
 # ── Phase 01: 文档入库（OCR + 结构化抽取）──────────────
 
 def _run_document_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    from runtime.intake.bp_document_intake import run_document_intake
-
-    metadata = job_ctx.metadata or {}
-    input_file = metadata.get("input_file", "")
-    if not input_file:
-        return {
-            "ok": False,
-            "mode": "shared_kernel",
-            "phase": "phase01_document_intake",
-            "job_id": job_ctx.job_id,
-            "error": "metadata.input_file 未提供",
-        }
-    return run_document_intake(job_ctx, input_file)
+    if os.environ.get("IRBP_BG_CHILD") == "1":
+        # 当前是后台子进程，直接执行
+        from runtime.intake.bp_document_intake import run_document_intake
+        metadata = job_ctx.metadata or {}
+        input_file = metadata.get("input_file", "")
+        if not input_file:
+            return {"ok": False, "error": "metadata.input_file 未提供"}
+        return run_document_intake(job_ctx, input_file)
+    from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase01_document_intake")
+    if cached is not None:
+        print(f"  📦 [bp] 使用缓存的 document_intake 结果", flush=True)
+        return cached
+    return launch_heavy_phase(runtime_root, job_ctx, "phase01_document_intake", pipeline="bp")
 
 
 # ── Phase 02-04: 主体核验 + 预搜索 ────────────

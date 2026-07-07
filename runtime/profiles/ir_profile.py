@@ -191,7 +191,7 @@ PHASE03 IR RESEARCH PLAN ENRICHMENT — 主 AI 执行
 3. 围绕标的 `{entity}` 和研究重点 `{query}` 生成 5 条尖锐的 strategic_questions
 4. 按 instruction 要求生成 delta JSON
 5. 将输出写入 `{tasks_dir / f"{entity}-ir_research_plan_enrichment.json"}`
-6. 用 start_phase='phase03c_research_plan_collect' 恢复管线
+6. 用 start_phase='phase03_research_plan_collect' 恢复管线
 
 ## 输出格式
 严格遵循 instruction_store_ir/ir_research_plan_enrichment.md 中定义的 JSON schema。
@@ -228,7 +228,7 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
         return {
             "ok": True,
             "mode": "ir_research_plan",
-            "phase": "phase03c_research_plan_collect",
+            "phase": "phase03_research_plan_collect",
             "job_id": job_ctx.job_id,
             "result": {"plan_path": path, "enrichment": "skipped_fallback"},
         }
@@ -261,7 +261,7 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
     return {
         "ok": plan.get("plan_status") == "ready",
         "mode": "ir_research_plan",
-        "phase": "phase03c_research_plan_collect",
+        "phase": "phase03_research_plan_collect",
         "job_id": job_ctx.job_id,
         "result": {
             "plan_path": str(path),
@@ -791,7 +791,7 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
     all_repair_manifests: list[str] = []
     last_wave = 0
 
-    for wave_idx in range(5):
+    for wave_idx in range(4):
         gate_result = evaluate_wave_evidence_gate(
             task_id=job_ctx.job_id,
             wave=wave_idx,
@@ -820,7 +820,7 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
         return {
             "ok": False,
             "mode": "wave_evidence_gate",
-            "phase": "phase09c_wave_evidence_gate",
+            "phase": "phase09_wave_evidence_gate",
             "job_id": job_ctx.job_id,
             "result": {
                 "verdicts": all_verdicts,
@@ -837,7 +837,7 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
             return {
                 "ok": True,
                 "mode": "wave_evidence_gate",
-                "phase": "phase09c_wave_evidence_gate",
+                "phase": "phase09_wave_evidence_gate",
                 "job_id": job_ctx.job_id,
                 "result": {
                     "verdict": "PASS_WITH_DISCLOSURE",
@@ -856,7 +856,7 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
                 "needs_dispatch": True,
                 "has_more": len(remaining) > 0,
                 "mode": "wave_evidence_gate",
-                "phase": "phase09c_wave_evidence_gate",
+                "phase": "phase09_wave_evidence_gate",
                 "job_id": job_ctx.job_id,
                 "dispatch_info": {
                     "manifests": [first_manifest],
@@ -867,7 +867,7 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
                     f"Read manifest: {first_manifest}\n"
                     f"Dispatch ONE repair sub-agent using Agent tool.\n"
                     f"⚠️ 禁止在单条消息中派发多个 Agent。\n"
-                    f"修复完成后用 start_phase='phase09c_wave_evidence_gate' 恢复管线。"
+                    f"修复完成后用 start_phase='phase09_wave_evidence_gate' 恢复管线。"
                     + (f"\n\n还有 {len(remaining)} 个 repair manifest 待处理。" if remaining else "")
                 ),
                 "result": {
@@ -882,7 +882,7 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
     return {
         "ok": True,
         "mode": "wave_evidence_gate",
-        "phase": "phase09c_wave_evidence_gate",
+        "phase": "phase09_wave_evidence_gate",
         "job_id": job_ctx.job_id,
         "result": {
             "verdict": "PASS",
@@ -942,6 +942,180 @@ def _run_debate_review_phase(runtime_root: Path, job_ctx: JobContext) -> dict[st
     }
 
 
+# ═══════════════════════════════════════════════════════════
+# Phase 13: Synthesis — 独立统稿子代理（对标 BP phase27-28）
+# ═══════════════════════════════════════════════════════════
+
+_SYNTHESIS_STEPS = [
+    "step1_data", "step2_industry", "step3_biz", "step4_finance",
+    "step5_mgmt", "step_macro", "step6b_valuation", "step6_insight", "step7_risk",
+]
+
+
+def _run_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 13: Synthesis prepare — 构建统稿子代理 manifest，返回 needs_dispatch。
+
+    对标 BP phase27_synthesis_prepare：
+    - 从 instruction_store_ir/ir_统稿.md 加载 system prompt
+    - 拼接 _common_tool_guide.md
+    - 生成结构化 brief（列出所有输入文件路径）
+    - 返回 needs_dispatch + manifest
+    """
+    from scripts.ir_subagent_launcher_wb import step_output_path, INSTRUCTION_STORE
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    # 加载统稿指令
+    synth_prompt_path = INSTRUCTION_STORE / "ir_统稿.md"
+    synth_prompt = ""
+    if synth_prompt_path.exists():
+        synth_prompt = synth_prompt_path.read_text(encoding="utf-8")
+    else:
+        synth_prompt = "你是投研统稿子代理。请读取所有 step 输出并组装为完整报告。"
+
+    # 拼接 tool guide
+    tool_guide_path = INSTRUCTION_STORE / "_common_tool_guide.md"
+    if tool_guide_path.exists():
+        tool_guide = tool_guide_path.read_text(encoding="utf-8")
+        tool_guide = tool_guide.replace("{RUNTIME_ROOT}", str(runtime_root))
+        tool_guide = tool_guide.replace("{TASK_DIR}", str(tasks_dir))
+        synth_prompt += "\n\n" + tool_guide
+
+    # 构建 brief
+    output_path = tasks_dir / f"{job_ctx.job_id}-synthesis.md"
+    brief_lines = [
+        f"# Synthesis Brief: {job_ctx.entity} 统稿",
+        f"",
+        f"Task: {job_ctx.job_id}",
+        f"Entity: {job_ctx.entity}",
+        f"Query: {job_ctx.query}",
+        f"",
+        f"## ⚠️ 输出路径（必须写入此路径）",
+        f"",
+        f"`{output_path}`",
+        f"",
+        f"## 输入文件（读取以下所有 step 输出）",
+        f"",
+    ]
+
+    for step in _SYNTHESIS_STEPS:
+        sp = step_output_path(job_ctx.job_id, step)
+        exists = sp.exists() and sp.stat().st_size > 100
+        brief_lines.append(f"- {step}: `{sp}` (exists={exists})")
+
+    brief_lines.extend([
+        f"",
+        f"## ⚠️ 工具限制",
+        f"你没有 Glob/Grep 工具。搜索文件用 Bash（find/ls），读文件用 Read。",
+        f"你不需要额外搜索——只读取已有 step 输出并组装。",
+    ])
+
+    brief_path = tasks_dir / f"{job_ctx.job_id}-synthesis_brief.md"
+    brief_path.write_text("\n".join(brief_lines), encoding="utf-8")
+
+    # 组装完整 system_prompt
+    full_prompt = synth_prompt.replace("{JOB_ID}", job_ctx.job_id)
+    full_prompt += f"\n\n## Brief\n\n请读取 brief 文件: `{brief_path}`\n"
+
+    # 写 manifest
+    manifest = {
+        "manifest_version": "1.0",
+        "pipeline": "ir",
+        "role": "ir_统稿",
+        "step": "step8_master",
+        "system_prompt": full_prompt,
+        "connectorIds": [],
+        "subagent_type": "general-purpose",
+        "team_name_template": "ir-{task_id}",
+        "task_dir": str(tasks_dir),
+        "brief_path": str(brief_path),
+        "output_path": str(output_path),
+    }
+    manifest_path = tasks_dir / f"{job_ctx.job_id}-synthesis_manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    return {
+        "ok": True,
+        "needs_dispatch": True,
+        "has_more": False,
+        "mode": "synthesis",
+        "phase": "phase13_synthesis_prepare",
+        "job_id": job_ctx.job_id,
+        "dispatch_info": {
+            "manifests": [str(manifest_path)],
+            "roles": ["ir_统稿"],
+            "task_dir": str(tasks_dir),
+        },
+        "instruction": (
+            f"Read manifest: {manifest_path}\n"
+            f"Dispatch ONE synthesis sub-agent using Agent tool.\n"
+            f"⚠️ 禁止在单条消息中派发多个 Agent。\n"
+            f"完成后用 start_phase='phase13_synthesis_collect' 恢复管线。"
+        ),
+        "result": {
+            "manifest_path": str(manifest_path),
+            "brief_path": str(brief_path),
+            "output_path": str(output_path),
+        },
+    }
+
+
+def _run_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 13 collect: 验证统稿输出完整性。"""
+    from scripts.ir_subagent_launcher_wb import step_output_path
+
+    tasks_dir = runtime_root / "data" / "tasks"
+
+    # 检查统稿输出
+    synthesis_path = tasks_dir / f"{job_ctx.job_id}-synthesis.md"
+    if synthesis_path.exists() and synthesis_path.stat().st_size > 500:
+        ws = _workspace_for(job_ctx)
+        if ws is not None:
+            try:
+                shutil.copy2(synthesis_path, ws.outputs_dir / "synthesis.md")
+            except Exception:
+                pass
+
+        # 脚注密度检查
+        text = synthesis_path.read_text(encoding="utf-8")
+        footnote_count = text.count("[^")
+        char_count = len(text)
+        # 动态阈值：每 2000 字至少 3 个脚注
+        min_footnotes = max(3, (char_count // 2000) * 3)
+        footnote_ok = footnote_count >= min_footnotes
+
+        return {
+            "ok": True,
+            "mode": "synthesis",
+            "phase": "phase13_synthesis_collect",
+            "job_id": job_ctx.job_id,
+            "result": {
+                "synthesis_path": str(synthesis_path),
+                "char_count": char_count,
+                "footnote_count": footnote_count,
+                "min_footnotes": min_footnotes,
+                "footnote_ok": footnote_ok,
+            },
+        }
+
+    # 输出缺失
+    return {
+        "ok": False,
+        "mode": "synthesis",
+        "phase": "phase13_synthesis_collect",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "error": "Synthesis output missing or too short",
+            "synthesis_path": str(synthesis_path),
+            "exists": synthesis_path.exists(),
+        },
+    }
+
+
 def _run_final_assembly_phase(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     from scripts.ir_final_assembler import write_final_report
 
@@ -960,7 +1134,7 @@ def _run_final_assembly_phase(runtime_root: Path, job_ctx: JobContext) -> dict[s
     return {
         "ok": bool(payload.get("ok", False)),
         "mode": "quality_production",
-        "phase": "phase13_final_assembly",
+        "phase": "phase14_final_assembly",
         "job_id": job_ctx.job_id,
         "result": payload,
     }
@@ -974,11 +1148,11 @@ def _run_delivery(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     if os.environ.get("IRBP_BG_CHILD") == "1":
         return _run_delivery_inner(runtime_root, job_ctx)
     from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase14_delivery")
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase15_delivery")
     if cached is not None:
         print(f"  📦 [ir] 使用缓存的 delivery 结果", flush=True)
         return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase14_delivery", pipeline="ir")
+    return launch_heavy_phase(runtime_root, job_ctx, "phase15_delivery", pipeline="ir")
 
 
 def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
@@ -1095,7 +1269,7 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
     return {
         "ok": delivery_phase_ok,
         "mode": "legacy_wrapped",
-        "phase": "phase14_delivery",
+        "phase": "phase15_delivery",
         "job_id": job_ctx.job_id,
         "result": {
             "verification_verdict": verification_verdict,
@@ -1125,19 +1299,21 @@ class IRProfile(PipelineProfile):
                 "phase01_preflight": lambda job_ctx: _run_preflight(runtime_root, job_ctx),
                 "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),
                 "phase03_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
-                "phase03c_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
+                "phase03_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
                 "phase04_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),
                 "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
                 "phase06_fact_store_bootstrap": lambda job_ctx: _run_fact_store_bootstrap(runtime_root, job_ctx),
                 "phase07_precompute": lambda job_ctx: _run_precompute(runtime_root, job_ctx),
                 "phase08_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
                 "phase09_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-                "phase09c_wave_evidence_gate": lambda job_ctx: _run_wave_evidence_gate(runtime_root, job_ctx),
+                "phase09_wave_evidence_gate": lambda job_ctx: _run_wave_evidence_gate(runtime_root, job_ctx),
                 "phase10_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
                 "phase11_section_package_validation": lambda job_ctx: _run_section_package_validation(runtime_root, job_ctx),
                 "phase12_debate_review": lambda job_ctx: _run_debate_review_phase(runtime_root, job_ctx),
-                "phase13_final_assembly": lambda job_ctx: _run_final_assembly_phase(runtime_root, job_ctx),
-                "phase14_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
+                "phase13_synthesis_prepare": lambda job_ctx: _run_synthesis_prepare(runtime_root, job_ctx),
+                "phase13_synthesis_collect": lambda job_ctx: _run_synthesis_collect(runtime_root, job_ctx),
+                "phase14_final_assembly": lambda job_ctx: _run_final_assembly_phase(runtime_root, job_ctx),
+                "phase15_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
             },
         )
         self.runtime_root = runtime_root
