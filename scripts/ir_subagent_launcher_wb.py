@@ -549,6 +549,11 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
         f"- ≥ 3 ## level sections\n"
         f"- Content length ≥ 3000 chars\n"
         f"If self-check fails, do more research before outputting.\n\n"
+        f"INVESTMENT-IMPLICATION MANDATE (CRITICAL): This is a BUY-SIDE research report for internal "
+        f"investment decision-making, NOT a sell-side broker note. You are NOT writing a descriptive "
+        f"data dossier. Every analytical section MUST state its investment implication — how the finding "
+        f"affects the investment thesis, valuation, or risk assessment (bull/bear impact, conviction level, "
+        f"what would change the view). Prioritize decision-relevant insight over exhaustive description.\n\n"
     )
 
     # 角色专属 ANTI-DEFECT RULES
@@ -1413,6 +1418,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'- ≥3 个来源引用（带 URL）\n'
             f'- 多个 ## 章节\n'
             f'- 关键数据加粗\n'
+            f'- ⚠️ 买方研究要求：每项分析必须落到投资含义（对 thesis/估值/风险的影响），禁止纯描述性资料堆砌\n'
             f'- 禁止输出"Pre-search Results"格式的搜索备忘录——必须是正式分析报告'
         )
 

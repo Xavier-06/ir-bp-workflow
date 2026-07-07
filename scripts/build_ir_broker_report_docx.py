@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-build_ir_broker_report_docx.py — 将 step8 统稿转为券商风格 Word 研报
+build_ir_broker_report_docx.py — 将 step8 统稿转为买方研究风格 Word 研报
 
 v5 (2026-05-07):
   - 字体修复：所有 run 显式设置 font.name="Microsoft YaHei"，
@@ -538,7 +538,7 @@ def main():
 
     tid = args.task_id
     REPORTS.mkdir(parents=True, exist_ok=True)
-    out_path = Path(args.output) if args.output else REPORTS / f'{tid}-券商版研报.docx'
+    out_path = Path(args.output) if args.output else REPORTS / f'{tid}-买方研究报告.docx'
 
     pkg_path = TASKS / f'{tid}.json'
     if pkg_path.exists():
@@ -634,7 +634,7 @@ def main():
 
     title = doc.add_paragraph()
     title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    run = title.add_run(f'{company_hint} 深度研究报告')
+    run = title.add_run(f'{company_hint} 投资研究报告')
     run.font.size = Pt(28)
     run.font.bold = True
     run.font.color.rgb = RGBColor(0x1F, 0x4E, 0x79)
