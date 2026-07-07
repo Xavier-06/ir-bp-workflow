@@ -141,6 +141,8 @@ WebSearch → WebFetch 爬取
 | **NeoData** | `python3 scripts/search/neodata_search.py "公司名" --data-type all --json` | A股/港股研报+行情估值 |
 | **yfinance** | `python3 -c "from scripts.search_gateway import yfinance_summary; yfinance_summary('AAPL')"` | 美股估值快照 (price/PE/PB/market_cap) |
 | **SEC EDGAR** | WebFetch | 美股上市公司 10-K/S-1 |
+| **腾讯新闻** | `python3 -c "from scripts.search_gateway import tencent_news_search; tencent_news_search('公司名 融资', max_results=5)"` | 中文企业融资/产品/人事动态 (0.7s 最快) |
+| **Yahoo Finance** | `python3 -c "from scripts.search_gateway import _yahoo_search; _yahoo_search('NVDA earnings revenue', max_results=5)"` | 美股竞品新闻/earnings/quote |
 
 ### E. 通用搜索
 
@@ -148,6 +150,50 @@ WebSearch → WebFetch 爬取
 |------|------|
 | WebSearch | 白皮书/咨询报告/新闻/公司官网 |
 | WebFetch | 已知 URL 爬取正文 |
+
+### F. 新闻搜索（中文快讯 + 美股竞品）
+
+> 与 BP 管线一致：中文公司/行业新闻走腾讯新闻（最快），美股竞品新闻/earnings 走 Yahoo Finance。两者都在 `scripts/search_gateway.py`，子代理用 Bash 调用。
+
+**腾讯新闻搜索（实时中文新闻，0.7s 出结果）**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import tencent_news_search
+result = tencent_news_search('公司名 融资', max_results=5)
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+| 场景 | 查询示例 |
+|------|---------|
+| 公司融资/投资新闻 | `{公司名} 融资 投资 轮次` |
+| 产品发布/合作动态 | `{公司名} 产品 发布 合作 签约` |
+| 高管人事变动 | `{公司名} CEO 任命 离职 加入` |
+| 行业政策/监管动态 | `{行业名} 政策 监管 新规` |
+| 早期公司报道 | `{公司名} 创业 获投` |
+
+- 返回 title + url + content(摘要) + publishedDate(精确到秒) + source(媒体名)
+- 优势：0.7s，覆盖 7×24 实时中文新闻；局限：纯中文，不支持结构化金融数据
+
+**Yahoo Finance 搜索（美股新闻 + quote）**
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import _yahoo_search
+result = _yahoo_search('NVDA earnings revenue', max_results=5)
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+- 返回：新闻标题 + Yahoo Finance URL + quote 页面链接
+- 适合：美股竞品新闻、earnings 报道、行业趋势
+- 局限：不支持中文查询；非金融查询返回空
+
+**工具优先级（新闻类）**
+
+| 你要查什么 | 首选 | 兜底 |
+|-----------|------|------|
+| 中文公司/行业新闻（融资/产品/人事/政策） | 腾讯新闻 `tencent_news_search` | NeoData(doc) → WebSearch |
+| 美股竞品新闻/earnings | Yahoo `_yahoo_search` | WebSearch |
 
 ## PDF 提取器选择
 
@@ -170,8 +216,8 @@ WebSearch → WebFetch 爬取
 | 角色 | 可以做 | 禁止做 |
 |------|--------|--------|
 | academic_scout | 搜论文 (arXiv/DBLP/PMC/Crossref, 4源必用) | 搜研报/新闻/企业信息/下载全文 |
-| industry_scout | 搜研报/报告/新闻 (NeoData/WebSearch) | 搜论文/企业信息 |
-| enterprise_scout | 企业尽调 (TYC + NeoData/yfinance + SEC/WebSearch) | 搜论文/研报 |
+| industry_scout | 搜研报/报告/新闻 (NeoData/腾讯新闻/Yahoo/WebSearch) | 搜论文/企业信息 |
+| enterprise_scout | 企业尽调 (TYC + NeoData/yfinance + 腾讯新闻 + Yahoo + SEC/WebSearch) | 搜论文/研报 |
 | deep_reader | 读全文+压缩笔记 | 搜新文档 |
 | tech_decomposition | 快速预搜+拆解方向 | 下载全文/深度阅读 |
 | tech_strategist | 读笔记+分析 | 搜任何外部数据 |
