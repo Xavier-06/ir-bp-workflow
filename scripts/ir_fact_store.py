@@ -166,7 +166,8 @@ def write_fact_store(store: FactStore, tasks_dir: Path = TASKS_DIR) -> str:
     tasks_dir = Path(tasks_dir)
     tasks_dir.mkdir(parents=True, exist_ok=True)
     path = fact_store_path(store.task_id, tasks_dir)
-    path.write_text(json.dumps(store.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    from scripts.bp_file_lock import atomic_write
+    atomic_write(path, json.dumps(store.to_dict(), ensure_ascii=False, indent=2) + "\n")
     return str(path)
 
 
@@ -231,7 +232,8 @@ def write_fact_store_index(store: FactStore, tasks_dir: Path = TASKS_DIR) -> str
         index["facts_by_type"][fact.fact_type] = index["facts_by_type"].get(fact.fact_type, 0) + 1
         index["facts_by_source_tier"][fact.source_tier] = index["facts_by_source_tier"].get(fact.source_tier, 0) + 1
     path = fact_store_index_path(store.task_id, tasks_dir)
-    path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    from scripts.bp_file_lock import atomic_write
+    atomic_write(path, json.dumps(index, ensure_ascii=False, indent=2) + "\n")
     return str(path)
 
 

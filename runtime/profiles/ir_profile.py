@@ -1317,3 +1317,46 @@ class IRProfile(PipelineProfile):
             },
         )
         self.runtime_root = runtime_root
+
+    def phase_prerequisites(self) -> dict[str, list[str]]:
+        """声明 phase 间的关键产物依赖（对标 BP bp_profile.py）。
+
+        kernel 在 start_phase 跳过前置 phase 时，自动回填缺失产物。
+        """
+        return {
+            "phase06_fact_store_bootstrap": ["{task_id}-research_plan.json"],
+            "phase07_precompute": ["{task_id}-ir_company_verify.json"],
+            "phase08_dispatch_prepare": ["{task_id}-research_plan.json"],
+            "phase10_fact_store_merge": ["{task_id}-research_plan.json"],
+            "phase11_section_package_validation": ["{task_id}-research_plan.json", "{task_id}-fact_store.json"],
+            "phase12_debate_review": ["{task_id}-section_packages.json"],
+            "phase13_synthesis_prepare": ["{task_id}-research_plan.json"],
+            "phase14_final_assembly": ["{task_id}-section_packages.json", "{task_id}-debate_review.json"],
+        }
+
+    def phase_outputs(self) -> dict[str, list[str]]:
+        """声明每个 phase 产出的关键文件（相对 task_dir）。
+
+        kernel 用它构建反查表 file → producer_phase，
+        在依赖缺失时精准回填到产出该文件的 phase。
+        """
+        return {
+            "phase01_preflight": [],
+            "phase02_company_verify": ["{task_id}-ir_company_verify.json"],
+            "phase03_research_plan": ["{task_id}-ir_research_plan_skeleton.json"],
+            "phase03_research_plan_collect": ["{task_id}-research_plan.json"],
+            "phase04_presearch": [],
+            "phase05_extract": [],
+            "phase06_fact_store_bootstrap": ["{task_id}-fact_store.json"],
+            "phase07_precompute": [],
+            "phase08_dispatch_prepare": [],
+            "phase09_dispatch_collect": [],
+            "phase09_wave_evidence_gate": [],
+            "phase10_fact_store_merge": ["{task_id}-fact_store.json", "{task_id}-fact_store_index.json"],
+            "phase11_section_package_validation": ["{task_id}-section_packages.json", "{task_id}-section_gate.json"],
+            "phase12_debate_review": ["{task_id}-debate_review.json"],
+            "phase13_synthesis_prepare": ["{task_id}-synthesis_manifest.json"],
+            "phase13_synthesis_collect": ["{task_id}-synthesis.md"],
+            "phase14_final_assembly": ["{task_id}-final_report.md", "{task_id}-final_assembly.json"],
+            "phase15_delivery": [],
+        }

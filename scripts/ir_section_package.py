@@ -158,7 +158,8 @@ def write_section_package_index(task_id: str, tasks_dir: Path = TASKS_DIR) -> st
         "packages": packages,
     }
     output = tasks_dir / f"{task_id}-section_packages.json"
-    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    from scripts.bp_file_lock import atomic_write
+    atomic_write(output, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
     return str(output)
 
 
