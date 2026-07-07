@@ -116,7 +116,7 @@ def _run_scope_definition(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     return {
         "ok": True,
         "mode": "scope_definition",
-        "phase": "phase0_scope_definition",
+        "phase": "phase01_scope_definition",
         "job_id": job_ctx.job_id,
         "result": scope_data,
     }
@@ -143,7 +143,7 @@ def _run_multi_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[s
         return {
             "ok": True,
             "mode": "skipped",
-            "phase": "phase05_multi_company_verify",
+            "phase": "phase02_multi_company_verify",
             "job_id": job_ctx.job_id,
             "result": {"message": "No companies to verify", "verified_count": 0},
         }
@@ -170,7 +170,7 @@ def _run_multi_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[s
     return {
         "ok": True,
         "mode": "multi_company_verify",
-        "phase": "phase05_multi_company_verify",
+        "phase": "phase02_multi_company_verify",
         "job_id": job_ctx.job_id,
         "result": {"verified_count": len(verified), "companies": verified},
     }
@@ -185,11 +185,11 @@ def _run_industry_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str
     if os.environ.get("IRBP_BG_CHILD") == "1":
         return _run_industry_presearch_inner(runtime_root, job_ctx)
     from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase04_presearch")
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase03_presearch")
     if cached is not None:
         print(f"  📦 [ic] 使用缓存的 presearch 结果", flush=True)
         return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase04_presearch", pipeline="ic")
+    return launch_heavy_phase(runtime_root, job_ctx, "phase03_presearch", pipeline="ic")
 
 
 def _run_industry_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
@@ -205,7 +205,7 @@ def _run_industry_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> di
     return {
         "ok": True,
         "mode": "ic_presearch",
-        "phase": "phase04_presearch",
+        "phase": "phase03_presearch",
         "job_id": job_ctx.job_id,
         "result": result,
     }
@@ -231,7 +231,7 @@ def _run_extract(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     return {
         "ok": ok_count > 0,
         "mode": "legacy_wrapped",
-        "phase": "phase15_extract",
+        "phase": "phase04_extract",
         "job_id": job_ctx.job_id,
         "result": {"total_urls": total, "ok_count": ok_count},
     }
@@ -267,7 +267,7 @@ def _run_industry_precompute(runtime_root: Path, job_ctx: JobContext) -> dict[st
         return {
             "ok": False,
             "mode": "precompute",
-            "phase": "phase12_precompute",
+            "phase": "phase05_precompute",
             "job_id": job_ctx.job_id,
             "result": {"error": f"ic_precompute.py not found at {ic_script}"},
         }
@@ -345,7 +345,7 @@ def _run_industry_precompute(runtime_root: Path, job_ctx: JobContext) -> dict[st
     return {
         "ok": all_ok,
         "mode": "precompute",
-        "phase": "phase12_precompute",
+        "phase": "phase05_precompute",
         "job_id": job_ctx.job_id,
         "result": {
             "entity": entity,
@@ -390,7 +390,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
             "needs_dispatch": False,
             "has_more": False,
             "mode": "wave_orchestration",
-            "phase": "phase4_dispatch_prepare",
+            "phase": "phase06_dispatch_prepare",
             "job_id": job_ctx.job_id,
             "result": {
                 "message": "All waves already completed, proceed to collect",
@@ -410,7 +410,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
                 "needs_dispatch": True,
                 "has_more": False,
                 "mode": "wave_orchestration",
-                "phase": "phase4_dispatch_prepare",
+                "phase": "phase06_dispatch_prepare",
                 "job_id": job_ctx.job_id,
                 "result": {
                     "message": "当前 wave 所有 step 被依赖阻塞，等待前序 step 完成后重试",
@@ -423,7 +423,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
             "ok": False,
             "has_more": False,
             "mode": "wave_orchestration",
-            "phase": "phase4_dispatch_prepare",
+            "phase": "phase06_dispatch_prepare",
             "job_id": job_ctx.job_id,
             "result": {"error": "No steps dispatched in wave", "wave_result": wave_result},
         }
@@ -433,7 +433,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
         "needs_dispatch": True,
         "has_more": has_more,
         "mode": "wave_orchestration",
-        "phase": "phase4_dispatch_prepare",
+        "phase": "phase06_dispatch_prepare",
         "job_id": job_ctx.job_id,
         "result": {
             "wave_index": wave_result.get('wave_index'),
@@ -487,7 +487,7 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     return {
         "ok": not circuit_break,
         "mode": "wave_orchestration",
-        "phase": "phase4_dispatch_collect",
+        "phase": "phase07_dispatch_collect",
         "job_id": job_ctx.job_id,
         "result": {
             "completed": len(completed_steps),
@@ -510,11 +510,11 @@ def _run_delivery(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     if os.environ.get("IRBP_BG_CHILD") == "1":
         return _run_delivery_inner(runtime_root, job_ctx)
     from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase5_delivery")
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase08_delivery")
     if cached is not None:
         print(f"  📦 [ic] 使用缓存的 delivery 结果", flush=True)
         return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase5_delivery", pipeline="ic")
+    return launch_heavy_phase(runtime_root, job_ctx, "phase08_delivery", pipeline="ic")
 
 
 def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
@@ -537,7 +537,7 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
     return {
         "ok": True,
         "mode": "legacy_wrapped",
-        "phase": "phase5_delivery",
+        "phase": "phase08_delivery",
         "job_id": job_ctx.job_id,
         "result": {
             "verification_verdict": verification_verdict,
@@ -557,14 +557,14 @@ class ICProfile(PipelineProfile):
             name="ic",
             job_type="industry_coverage",
             phase_handlers={
-                "phase0_scope_definition": lambda job_ctx: _run_scope_definition(runtime_root, job_ctx),
-                "phase05_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
-                "phase04_presearch": lambda job_ctx: _run_industry_presearch(runtime_root, job_ctx),
-                "phase15_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
-                "phase12_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
-                "phase4_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
-                "phase4_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-                "phase5_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
+                "phase01_scope_definition": lambda job_ctx: _run_scope_definition(runtime_root, job_ctx),
+                "phase02_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
+                "phase03_presearch": lambda job_ctx: _run_industry_presearch(runtime_root, job_ctx),
+                "phase04_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
+                "phase05_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
+                "phase06_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
+                "phase07_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
+                "phase08_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
             },
         )
         self.runtime_root = runtime_root

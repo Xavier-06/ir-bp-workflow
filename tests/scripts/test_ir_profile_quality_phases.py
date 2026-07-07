@@ -15,12 +15,12 @@ def test_ir_profile_registers_quality_production_phases(tmp_path):
 
     phases = profile.phases()
     assert "phase03_research_plan" in phases
-    assert "phase2_fact_store_bootstrap" in phases
-    assert "phase35_fact_store_merge" in phases
+    assert "phase06_fact_store_bootstrap" in phases
+    assert "phase10_fact_store_merge" in phases
     assert phases.index("phase03_research_plan") < phases.index("phase04_presearch")
-    assert phases.index("phase2_fact_store_bootstrap") < phases.index("phase4_dispatch_prepare")
-    assert phases.index("phase4_dispatch_collect") < phases.index("phase35_fact_store_merge")
-    assert phases.index("phase35_fact_store_merge") < phases.index("phase45_section_package_validation")
+    assert phases.index("phase06_fact_store_bootstrap") < phases.index("phase08_dispatch_prepare")
+    assert phases.index("phase09_dispatch_collect") < phases.index("phase10_fact_store_merge")
+    assert phases.index("phase10_fact_store_merge") < phases.index("phase11_section_package_validation")
 
 
 def test_run_research_plan_writes_generic_plan(tmp_path):

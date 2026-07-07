@@ -297,18 +297,31 @@ def create_task(target: str, task_type: str = '专题研究类') -> dict:
 # ═══════════════════════════════════════════════════════
 def _normalize_start_phase(phase: str) -> str:
     phase_map = {
-        '0': 'phase0_preflight',
+        # 新连续编号（推荐）
+        '1': 'phase01_preflight',
+        '2': 'phase02_company_verify',
+        '3': 'phase03_research_plan',
+        '4': 'phase04_presearch',
+        '5': 'phase05_extract',
+        '6': 'phase06_fact_store_bootstrap',
+        '7': 'phase07_precompute',
+        '8': 'phase08_dispatch_prepare',
+        '9': 'phase09_dispatch_collect',
+        '10': 'phase10_fact_store_merge',
+        '11': 'phase11_section_package_validation',
+        '12': 'phase12_debate_review',
+        '13': 'phase13_final_assembly',
+        '14': 'phase14_delivery',
+        # 兼容旧编号
+        '0': 'phase01_preflight',
         '0.5': 'phase02_company_verify',
-        '1': 'phase03_research_plan',
-        '1.5': 'phase15_extract',
-        '2': 'phase2_fact_store_bootstrap',
-        '3': 'phase35_fact_store_merge',
-        '4': 'phase4_dispatch_prepare',
-        '4b': 'phase4_dispatch_collect',
-        '4.5': 'phase45_section_package_validation',
-        '4.6': 'phase46_debate_review',
-        '4.7': 'phase47_final_assembly',
-        '5': 'phase5_delivery',
+        '1.5': 'phase05_extract',
+        '4': 'phase08_dispatch_prepare',
+        '4b': 'phase09_dispatch_collect',
+        '4.5': 'phase11_section_package_validation',
+        '4.6': 'phase12_debate_review',
+        '4.7': 'phase13_final_assembly',
+        '5': 'phase14_delivery',
     }
     return phase_map.get(str(phase), str(phase))
 

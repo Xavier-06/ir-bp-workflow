@@ -62,8 +62,8 @@ def test_build_execution_audit_reads_workspace_phase_state_and_step_receipts(tmp
     task_id = "TASK-EXEC"
     state_dir = tmp_path / "jobs" / task_id / "state"
     state_dir.mkdir(parents=True)
-    (state_dir / "phase4_dispatch_collect.json").write_text(
-        json.dumps({"phase": "phase4_dispatch_collect", "status": "completed", "attempt": 2}),
+    (state_dir / "phase09_dispatch_collect.json").write_text(
+        json.dumps({"phase": "phase09_dispatch_collect", "status": "completed", "attempt": 2}),
         encoding="utf-8",
     )
     (tmp_path / f"{task_id}-step4_finance-spawn.json").write_text(

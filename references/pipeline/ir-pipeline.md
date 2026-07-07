@@ -1,23 +1,24 @@
 # IR 管线详细流程
 
-## 管线阶段
+## 管线阶段（14 phases，连续编号 phase01-14）
 
 ```
-phase0_preflight                  — 环境检测 + 任务注册 + NeoData token 预检
-phase02_company_verify            — 公司验证 + 估值数据 (NeoData优先 + yfinance交叉验证)
-phase03_research_plan              — Research Plan Gate：脚本骨架 + 主控增强 strategic_questions + ready 校验
-phase04_presearch                  — 10 step 预搜索 (NeoData Layer 0 + SearchGateway/SearXNG)
-phase15_extract                   — URL 内容提取 (Scrapling 三层递进)
-phase12_precompute                — 预计算引擎: financial_metrics + sector_benchmarks
+01 phase01_preflight               — 环境检测 + 任务注册 + NeoData token 预检
+02 phase02_company_verify          — 公司验证 + 估值数据 (NeoData优先 + yfinance交叉验证) [heavy_bg]
+03 phase03_research_plan           — Research Plan Gate：脚本骨架 + 主控增强 strategic_questions + ready 校验
+04 phase04_presearch               — 10 step 预搜索 (NeoData Layer 0 + SearchGateway/SearXNG) [heavy_bg]
+05 phase05_extract                 — URL 内容提取 (Scrapling 三层递进)
+06 phase06_fact_store_bootstrap    — 初始化 Fact Store，沉淀可追溯事实和候选事实
+07 phase07_precompute              — 预计算引擎: financial_metrics + sector_benchmarks
 │   └── 输出写入 data/tasks/{TASK_ID}_precompute_{engine}.json 供子代理使用
-phase2_fact_store_bootstrap       — 初始化 Fact Store，沉淀可追溯事实和候选事实
-phase4_dispatch_prepare           — launch_next_wave() 发射第一个 wave，返回 needs_dispatch
+08 phase08_dispatch_prepare        — launch_next_wave() 发射第一个 wave，返回 needs_dispatch
 │   └── kernel 暂停，coordinator 循环 launch_next_wave() 推进所有 wave
-phase4_dispatch_collect           — 检查子代理输出 + 初步质量门禁
-phase45_section_package_validation— 抽取并校验各 step 的 Section Package
-phase46_debate_review             — 中途批判复盘：证据不足、无反证、弱来源高置信等
-phase47_final_assembly            — 只组装通过校验的 Section Package，不新增事实
-phase5_delivery                   — 对抗验证 + DOCX + 交付（最终保险丝）
+09 phase09_dispatch_collect        — 检查子代理输出 + 初步质量门禁
+10 phase10_fact_store_merge        — 合并各 step 的 fact sidecar 到 Fact Store
+11 phase11_section_package_validation — 抽取并校验各 step 的 Section Package
+12 phase12_debate_review           — 中途批判复盘：证据不足、无反证、弱来源高置信等
+13 phase13_final_assembly          — 只组装通过校验的 Section Package，不新增事实
+14 phase14_delivery                — 对抗验证 + DOCX + 交付（最终保险丝）[heavy_bg]
 ```
 
 > 新质量协议详见 `references/ir-quality-production-pipeline.md`。Coordinator 必须按完整链路推进，不能把 delivery gate 当成唯一质量来源。
@@ -114,9 +115,9 @@ cat {IR_RUNTIME}/data/tasks/{TASK_ID}_precompute_financial_metrics.md
 ## 执行伪代码（Coordinator 循环）
 
 ```python
-# Phase 0-1.5: 管线自动跑 preflight → company_verify → presearch → extract
+# Phase 01-05: 管线自动跑 preflight → company_verify → presearch → extract → fact_store → precompute
 python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
-# → 管线在 phase4_dispatch_prepare 暂停，返回 needs_dispatch=True + task_tool_instructions
+# → 管线在 phase08_dispatch_prepare 暂停，返回 needs_dispatch=True + task_tool_instructions
 
 # Phase 4: Coordinator 用 team 异步模式发射 wave
 MAX_RETRIES = 2
@@ -166,14 +167,14 @@ while True:
 # 清理 team
 team_delete()
 
-# Phase 4.5-4.7: 质量生产链继续推进
-# section_package_validation → debate_review → final_assembly
-cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase45_section_package_validation
-cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase46_debate_review
-cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase47_final_assembly
+# Phase 10-13: 质量生产链继续推进
+# fact_store_merge → section_package_validation → debate_review → final_assembly
+cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase11_section_package_validation
+cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase12_debate_review
+cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase13_final_assembly
 
-# Phase 5: 全自动交付
-result = finalize_pipeline(task_id, entity, market)
+# Phase 14: 全自动交付
+cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase14_delivery
 ```
 
 ## IR 子代理派发规则

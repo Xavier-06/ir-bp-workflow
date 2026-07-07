@@ -9,12 +9,12 @@ def test_kernel_keeps_next_phase_on_dispatch_prepare_when_has_more_steps():
         name="ir",
         job_type="investment_research",
         phase_handlers={
-            "phase4_dispatch_prepare": lambda job_ctx: {
+            "phase08_dispatch_prepare": lambda job_ctx: {
                 "ok": True,
                 "needs_dispatch": True,
                 "result": {"has_more": True, "task_tool_instructions": [{"step": "step2_industry"}]},
             },
-            "phase4_dispatch_collect": lambda job_ctx: {"ok": True},
+            "phase09_dispatch_collect": lambda job_ctx: {"ok": True},
         },
     )
 
@@ -23,7 +23,7 @@ def test_kernel_keeps_next_phase_on_dispatch_prepare_when_has_more_steps():
         JobContext(job_id="TASK-DISPATCH-HAS-MORE"),
     )
 
-    assert result["next_phase"] == "phase4_dispatch_prepare"
+    assert result["next_phase"] == "phase08_dispatch_prepare"
 
 
 def test_kernel_keeps_current_phase_when_top_level_dispatch_info_pairs_with_legacy_has_more():
@@ -31,13 +31,13 @@ def test_kernel_keeps_current_phase_when_top_level_dispatch_info_pairs_with_lega
         name="ir",
         job_type="investment_research",
         phase_handlers={
-            "phase4_dispatch_prepare": lambda job_ctx: {
+            "phase08_dispatch_prepare": lambda job_ctx: {
                 "ok": True,
                 "needs_dispatch": True,
                 "dispatch_info": {"manifests": ["/tmp/manifest.json"], "roles": ["step2_industry"]},
                 "result": {"has_more": True, "task_tool_instructions": [{"step": "step2_industry"}]},
             },
-            "phase4_dispatch_collect": lambda job_ctx: {"ok": True},
+            "phase09_dispatch_collect": lambda job_ctx: {"ok": True},
         },
     )
 
@@ -46,7 +46,7 @@ def test_kernel_keeps_current_phase_when_top_level_dispatch_info_pairs_with_lega
         JobContext(job_id="TASK-DISPATCH-MIXED-HAS-MORE"),
     )
 
-    assert result["next_phase"] == "phase4_dispatch_prepare"
+    assert result["next_phase"] == "phase08_dispatch_prepare"
     assert result["dispatch_info"]["manifests"] == ["/tmp/manifest.json"]
 
 

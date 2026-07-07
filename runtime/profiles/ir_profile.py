@@ -89,7 +89,7 @@ def _run_preflight(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     return {
         "ok": bool(result.get("passed", False)),
         "mode": "legacy_wrapped",
-        "phase": "phase0_preflight",
+        "phase": "phase01_preflight",
         "job_id": job_ctx.job_id,
         "result": result,
         "metadata_used": {
@@ -204,7 +204,7 @@ def _run_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dict[s
     return {
         "ok": True,
         "mode": "quality_production",
-        "phase": "phase2_fact_store_bootstrap",
+        "phase": "phase06_fact_store_bootstrap",
         "job_id": job_ctx.job_id,
         "result": {"output_path": output_path, "facts_seeded": seeded},
     }
@@ -290,7 +290,7 @@ def _run_extract(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     return {
         "ok": ok_count > 0,
         "mode": "legacy_wrapped",
-        "phase": "phase15_extract",
+        "phase": "phase05_extract",
         "job_id": job_ctx.job_id,
         "result": {
             "total_urls": total,
@@ -431,7 +431,7 @@ def _run_precompute(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     return {
         "ok": all_ok,
         "mode": "precompute",
-        "phase": "phase12_precompute",
+        "phase": "phase07_precompute",
         "job_id": job_ctx.job_id,
         "result": {
             "ticker": ticker,
@@ -485,7 +485,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
             "needs_dispatch": False,
             "has_more": False,
             "mode": "wave_orchestration",
-            "phase": "phase4_dispatch_prepare",
+            "phase": "phase08_dispatch_prepare",
             "job_id": job_ctx.job_id,
             "result": {
                 "message": "All waves already completed, proceed to collect",
@@ -505,7 +505,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
                 "needs_dispatch": True,
                 "has_more": False,
                 "mode": "wave_orchestration",
-                "phase": "phase4_dispatch_prepare",
+                "phase": "phase08_dispatch_prepare",
                 "job_id": job_ctx.job_id,
                 "result": {
                     "message": "当前 wave 所有 step 被依赖阻塞，等待前序 step 完成后重试",
@@ -516,7 +516,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
         return {
             "ok": False,
             "mode": "wave_orchestration",
-            "phase": "phase4_dispatch_prepare",
+            "phase": "phase08_dispatch_prepare",
             "job_id": job_ctx.job_id,
             "result": {"error": "No steps dispatched in wave", "wave_result": wave_result},
         }
@@ -526,7 +526,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
         "needs_dispatch": True,
         "has_more": has_more,
         "mode": "wave_orchestration",
-        "phase": "phase4_dispatch_prepare",
+        "phase": "phase08_dispatch_prepare",
         "job_id": job_ctx.job_id,
         "result": {
             "wave_index": wave_result.get('wave_index'),
@@ -566,7 +566,7 @@ def _run_fact_store_merge(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     return {
         "ok": result.get("invalid_count", 0) == 0,
         "mode": "quality_production",
-        "phase": "phase35_fact_store_merge",
+        "phase": "phase10_fact_store_merge",
         "job_id": job_ctx.job_id,
         "result": result,
     }
@@ -629,7 +629,7 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     return {
         "ok": not circuit_break and step_gate.get("passed", False),
         "mode": "wave_orchestration",
-        "phase": "phase4_dispatch_collect",
+        "phase": "phase09_dispatch_collect",
         "job_id": job_ctx.job_id,
         "result": {
             "completed": len(completed_steps),
@@ -668,7 +668,7 @@ def _run_section_package_validation(runtime_root: Path, job_ctx: JobContext) -> 
     return {
         "ok": summary.get("failed", 0) == 0 and summary.get("total", 0) > 0 and section_gate.get("passed", False),
         "mode": "quality_production",
-        "phase": "phase45_section_package_validation",
+        "phase": "phase11_section_package_validation",
         "job_id": job_ctx.job_id,
         "result": {"output_path": output_path, "summary": summary, "section_gate": section_gate},
     }
@@ -690,7 +690,7 @@ def _run_debate_review_phase(runtime_root: Path, job_ctx: JobContext) -> dict[st
     return {
         "ok": verdict in ("PASS", "WARN"),
         "mode": "quality_production",
-        "phase": "phase46_debate_review",
+        "phase": "phase12_debate_review",
         "job_id": job_ctx.job_id,
         "result": {"output_path": output_path, "verdict": verdict, "issues": payload.get("issues", [])},
     }
@@ -714,7 +714,7 @@ def _run_final_assembly_phase(runtime_root: Path, job_ctx: JobContext) -> dict[s
     return {
         "ok": bool(payload.get("ok", False)),
         "mode": "quality_production",
-        "phase": "phase47_final_assembly",
+        "phase": "phase13_final_assembly",
         "job_id": job_ctx.job_id,
         "result": payload,
     }
@@ -728,11 +728,11 @@ def _run_delivery(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     if os.environ.get("IRBP_BG_CHILD") == "1":
         return _run_delivery_inner(runtime_root, job_ctx)
     from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase5_delivery")
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase14_delivery")
     if cached is not None:
         print(f"  📦 [ir] 使用缓存的 delivery 结果", flush=True)
         return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase5_delivery", pipeline="ir")
+    return launch_heavy_phase(runtime_root, job_ctx, "phase14_delivery", pipeline="ir")
 
 
 def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
@@ -849,7 +849,7 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
     return {
         "ok": delivery_phase_ok,
         "mode": "legacy_wrapped",
-        "phase": "phase5_delivery",
+        "phase": "phase14_delivery",
         "job_id": job_ctx.job_id,
         "result": {
             "verification_verdict": verification_verdict,
@@ -876,20 +876,20 @@ class IRProfile(PipelineProfile):
             name="ir",
             job_type="investment_research",
             phase_handlers={
-                "phase0_preflight": lambda job_ctx: _run_preflight(runtime_root, job_ctx),
+                "phase01_preflight": lambda job_ctx: _run_preflight(runtime_root, job_ctx),
                 "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),
                 "phase03_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
                 "phase04_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),
-                "phase15_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
-                "phase2_fact_store_bootstrap": lambda job_ctx: _run_fact_store_bootstrap(runtime_root, job_ctx),
-                "phase12_precompute": lambda job_ctx: _run_precompute(runtime_root, job_ctx),
-                "phase4_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
-                "phase4_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-                "phase35_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
-                "phase45_section_package_validation": lambda job_ctx: _run_section_package_validation(runtime_root, job_ctx),
-                "phase46_debate_review": lambda job_ctx: _run_debate_review_phase(runtime_root, job_ctx),
-                "phase47_final_assembly": lambda job_ctx: _run_final_assembly_phase(runtime_root, job_ctx),
-                "phase5_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
+                "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
+                "phase06_fact_store_bootstrap": lambda job_ctx: _run_fact_store_bootstrap(runtime_root, job_ctx),
+                "phase07_precompute": lambda job_ctx: _run_precompute(runtime_root, job_ctx),
+                "phase08_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
+                "phase09_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
+                "phase10_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
+                "phase11_section_package_validation": lambda job_ctx: _run_section_package_validation(runtime_root, job_ctx),
+                "phase12_debate_review": lambda job_ctx: _run_debate_review_phase(runtime_root, job_ctx),
+                "phase13_final_assembly": lambda job_ctx: _run_final_assembly_phase(runtime_root, job_ctx),
+                "phase14_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
             },
         )
         self.runtime_root = runtime_root

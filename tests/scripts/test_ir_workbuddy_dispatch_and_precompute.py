@@ -127,7 +127,7 @@ def test_launch_step_blocks_direct_dispatch_when_research_plan_is_not_ready(tmp_
 def test_ir_profile_runs_fact_store_bootstrap_before_precompute(tmp_path):
     phases = IRProfile(runtime_root=tmp_path).phases()
 
-    assert phases.index("phase2_fact_store_bootstrap") < phases.index("phase12_precompute")
+    assert phases.index("phase06_fact_store_bootstrap") < phases.index("phase07_precompute")
 
 
 def test_preflight_writes_mvp_research_plan_for_registered_task(tmp_path, monkeypatch):

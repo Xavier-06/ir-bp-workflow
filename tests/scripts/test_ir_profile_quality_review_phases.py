@@ -9,11 +9,11 @@ from runtime.profiles.ir_profile import IRProfile, _run_debate_review_phase, _ru
 def test_ir_profile_registers_quality_review_phases(tmp_path):
     phases = IRProfile(runtime_root=tmp_path).phases()
 
-    assert "phase45_section_package_validation" in phases
-    assert "phase46_debate_review" in phases
-    assert "phase47_final_assembly" in phases
-    assert phases.index("phase4_dispatch_collect") < phases.index("phase45_section_package_validation")
-    assert phases.index("phase47_final_assembly") < phases.index("phase5_delivery")
+    assert "phase11_section_package_validation" in phases
+    assert "phase12_debate_review" in phases
+    assert "phase13_final_assembly" in phases
+    assert phases.index("phase09_dispatch_collect") < phases.index("phase11_section_package_validation")
+    assert phases.index("phase13_final_assembly") < phases.index("phase14_delivery")
 
 
 def test_run_section_package_validation_writes_index(tmp_path):

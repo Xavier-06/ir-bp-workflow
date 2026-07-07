@@ -91,7 +91,7 @@ class StateStore:
             "status": "进行中",
             "owner": "IR Orchestrator",
             "recipient": "internal",
-            "next_action": "phase0_preflight",
+            "next_action": "phase01_preflight",
             "blocked_reason": "",
             "output_path": str(workspace.delivery_dir),
             "notes": f"market={job_ctx.market} query={job_ctx.query}",

@@ -38,11 +38,17 @@ from typing import Any
 PHASE_RUNNER = Path(__file__).resolve().parent / "phase_runner.py"
 
 PHASE_TIMEOUTS = {
+    # BP phases
     "phase02_company_verify": 600,
     "phase04_presearch": 900,
     "phase33_delivery": 600,
-    "phase5_delivery": 600,
-    "phase15_extract": 900,
+    # IR phases (continuous numbering phase01-14)
+    "phase14_delivery": 600,
+    "phase05_extract": 900,
+    # IC phases (continuous numbering phase01-08)
+    "phase03_presearch": 900,
+    "phase04_extract": 900,
+    "phase08_delivery": 600,
 }
 
 
