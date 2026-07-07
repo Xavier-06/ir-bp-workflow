@@ -219,25 +219,69 @@ def deps_ready(task_id: str, step: str) -> tuple[bool, list[str]]:
     return len(missing) == 0, missing
 
 
+# ── Instruction Store Cache (module-level, mtime detection) ──
+# 对标 Lit 管线的 _load_instruction_prompts() 模式
+_INSTRUCTION_INDEX_CACHE: dict = {}
+_INSTRUCTION_INDEX_MTIME: float = 0
+_INSTRUCTION_ROLE_CACHE: dict[str, tuple[str, float]] = {}  # role_name → (content, mtime)
+_PROTOCOL_CACHE: str = ""
+_PROTOCOL_MTIME: float = 0
+
+
+def _load_index() -> dict:
+    """Load instruction_store_ir/index.json with mtime cache."""
+    global _INSTRUCTION_INDEX_CACHE, _INSTRUCTION_INDEX_MTIME
+    index_path = INSTRUCTION_STORE / 'index.json'
+    if not index_path.exists():
+        return _INSTRUCTION_INDEX_CACHE
+    current_mtime = index_path.stat().st_mtime
+    if _INSTRUCTION_INDEX_CACHE and current_mtime == _INSTRUCTION_INDEX_MTIME:
+        return _INSTRUCTION_INDEX_CACHE
+    try:
+        _INSTRUCTION_INDEX_CACHE = json.loads(index_path.read_text(encoding='utf-8'))
+        _INSTRUCTION_INDEX_MTIME = current_mtime
+    except Exception:
+        pass
+    return _INSTRUCTION_INDEX_CACHE
+
+
+def _load_role_file(role_name: str) -> str:
+    """Load a single role .md file with mtime cache."""
+    global _INSTRUCTION_ROLE_CACHE
+    role_file = INSTRUCTION_STORE / f'{role_name}.md'
+    if not role_file.exists():
+        return f'Role instructions for {role_name} not found.'
+    current_mtime = role_file.stat().st_mtime
+    cached = _INSTRUCTION_ROLE_CACHE.get(role_name)
+    if cached and cached[1] == current_mtime:
+        return cached[0]
+    content = role_file.read_text(encoding='utf-8')
+    _INSTRUCTION_ROLE_CACHE[role_name] = (content, current_mtime)
+    return content
+
+
 def load_instruction(role_key: str) -> str:
-    """加载角色指令（从 instruction_store_ir/index.json 映射）"""
-    index = json.loads((INSTRUCTION_STORE / 'index.json').read_text(encoding='utf-8'))
+    """加载角色指令（从 instruction_store_ir/index.json 映射，带 mtime cache）"""
+    index = _load_index()
     bindings = index.get('pipeline_bindings', {}).get('ir', {})
     role_name = bindings.get(role_key, role_key)
-    role_file = INSTRUCTION_STORE / f'{role_name}.md'
-    if role_file.exists():
-        return role_file.read_text(encoding='utf-8')
-    return f'Role instructions for {role_key} not found.'
+    return _load_role_file(role_name)
 
 
 def load_shared_output_protocol() -> str:
-    """加载所有 IR 子代理共享的结构化输出协议。"""
+    """加载所有 IR 子代理共享的结构化输出协议（带 mtime cache）。"""
+    global _PROTOCOL_CACHE, _PROTOCOL_MTIME
     protocol_file = INSTRUCTION_STORE / '_shared_output_protocol.md'
-    if protocol_file.exists():
-        return protocol_file.read_text(encoding='utf-8')
-    return (
-        '你不是直接写最终研报。请输出结构化 Section Package，并确保关键数字绑定来源与 fact_id。'
-    )
+    if not protocol_file.exists():
+        return _PROTOCOL_CACHE or (
+            '你不是直接写最终研报。请输出结构化 Section Package，并确保关键数字绑定来源与 fact_id。'
+        )
+    current_mtime = protocol_file.stat().st_mtime
+    if _PROTOCOL_CACHE and current_mtime == _PROTOCOL_MTIME:
+        return _PROTOCOL_CACHE
+    _PROTOCOL_CACHE = protocol_file.read_text(encoding='utf-8')
+    _PROTOCOL_MTIME = current_mtime
+    return _PROTOCOL_CACHE
 
 
 def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '') -> str:
@@ -340,11 +384,41 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'**工具优先级总结：**',
         f'| 查什么 | 首选工具 | 兜底 |',
         f'|--------|---------|------|',
-        f'| A/HK 股行情/财报 | search_gateway (prefer=auto) | web_search |',
-        f'| 美股估值/可比公司 | yfinance enrich_with_yahoo | search_gateway |',
-        f'| 企业工商/司法/专利 | TYC 天眼查（search_companies → call_tool） | web_search |',
-        f'| 新闻/行业报告/通用 | search_gateway (prefer=multi) | web_search |',
+        f'| A/HK 股行情/财报/估值 | NeoData api → yfinance 交叉 | web_search |',
+        f'| 美股行情/估值/分红 | yfinance | NeoData → web_search |',
+        f'| 券商研报/行业深度 | NeoData doc (按日期降序) | web_search |',
+        f'| **新闻/产品发布/技术动态** | web_search + 时效锚定(含年月) | search_gateway |',
+        f'| 企业工商/司法/专利 | 天眼查 MCP (已配置) | web_search |',
+        f'| 技术论文/arxiv | web_search + 年份 | web_fetch 读论文 |',
+        f'| 开源项目/GitHub/HF | web_search + 年份 | web_fetch 读 README |',
         f'| 读某个 URL 正文 | web_fetch | — |',
+        f'',
+        f'### ⏰ 数据时效性硬要求（最高优先级，违反即任务失败）',
+        f'',
+        f'**第零轮搜索（在所有广度搜索之前必须执行，不可跳过）：**',
+        f'1. web_search("{entity} {{YYYY}}年{{M}}月 最新动态") — 锁定标的当前状态',
+        f'2. web_search("{entity} latest news {{YYYY}}") — 英文视角补充',
+        f'3. 如涉及产品/技术: web_search("{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
+        f'',
+        f'**搜索 query 必须含时间锚点：**',
+        f'- ❌ "腾讯 AI 大模型" → ✅ "腾讯 混元 最新模型 2026年7月"',
+        f'- ❌ "优必选 机器人" → ✅ "优必选 超仿真机器人 2026 最新发布"',
+        f'- ❌ "行业市场规模" → ✅ "行业市场规模 2025 2026 最新数据"',
+        f'',
+        f'**引用数据必须标注日期 + 时效等级：**',
+        f'- 3 个月内: 正常引用 | 6 个月内: 正常引用 | 6-12 个月: ⚠️ 标注 | >12 个月: ❌ 必须补搜最新版',
+        f'',
+        f'**产品/技术版本验证（AI/科技公司必查）：**',
+        f'- 搜索: "{{product}} latest version release date {{YYYY}}"',
+        f'- 确认引用的是最新版本，如有更新版本必须用最新数据',
+        f'- 禁止引用已淘汰/被替代的旧版本而不标注',
+        f'- 示例: 分析腾讯 AI 时必须搜 "腾讯 混元 最新模型 2026年7月"，如果最新是 HY3 就绝不能引用 HY1',
+        f'',
+        f'**新闻/动态类搜索：**',
+        f'- 查询必须包含当前年月（如 2026年7月）',
+        f'- 优先引用最近 30 天的信息',
+        f'- 超过 3 个月的新闻需验证是否有更新报道',
+        f'- 禁止引用 1 年前的新闻作为"最新动态"',
         f'',
         f'### 搜索深度硬要求（宁滥勿缺）',
         f'',
@@ -355,12 +429,17 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'- ≥ 3 个实际深读过的 URL（web_fetch 或 search_deep 抓到的正文，不是只看 snippet）',
         f'- ≥ 3 个独立来源域名（不能全是同一个站点的页面）',
         f'',
-        f'**搜索策略（必须执行）：**',
-        f'1. **第一轮：广度扫描** — 用 search_gateway prefer=multi 或 search_many 多关键词并行搜索',
+        f'**搜索策略（必须按顺序执行）：**',
+        f'0. **第零轮：时效锚定（最先执行，不可跳过）**',
+        f'   - NeoData doc: neodata_search(\'{entity} 最新动态\', data_type=\'doc\') — 拿深度分析文章',
+        f'   - web_search: "{entity} {{当前年月}} 最新动态" — 锁定突发新闻',
+        f'   - 如涉及产品/技术: web_search("{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
+        f'   - 目的: 先知道"最新"是什么，后续分析才不会引用过期信息',
+        f'1. **第一轮：广度扫描** — NeoData doc 拿研报/分析 + search_gateway prefer=multi 多关键词并行',
         f'2. **第二轮：深度验证** — 对第一轮发现的关键 claim，用 web_fetch 或 search_deep 读全文验证',
         f'3. **第三轮：交叉验证/反证** — 搜竞品对比、负面信息、行业报告、分析师观点',
         f'4. **TYC 天眼查必查项**（如标的涉及中国大陆企业）：工商信息、司法诉讼、专利、资质',
-        f'5. **金融数据必查**：用 search_gateway 或 yfinance 拉行情/财报/估值数据',
+        f'5. **金融数据必查**：NeoData api → yfinance 交叉验证',
         f'',
         f'**输出必须包含搜索审计（search_audit）：**',
         f'在你的 Markdown 输出末尾加一个 `## 搜索审计` 章节，记录：',
@@ -449,10 +528,18 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
         f"3. Only mark as '待核实' after 3 rounds of supplementary search still yield nothing\n"
         f"Do NOT return to the coordinator for search instructions — you ARE the search agent.\n\n"
         f"DATA SOURCE PRIORITY:\n"
-        f"- A/HK stocks: NeoData (via search_gateway, auto-invoked) → yfinance (cross-validation) → web_search\n"
-        f"- US stocks: yfinance → web_search\n"
-        f"- NeoData covers: real-time quotes, financials, sector data, analyst reports\n"
-        f"- search_gateway automatically routes financial queries to NeoData Layer 0\n\n"
+        f"- A/HK financials: NeoData api → yfinance → web_search\n"
+        f"- US stocks: yfinance → NeoData → web_search\n"
+        f"- News/analysis/reports: NeoData doc (深度分析, 首选!) → web_search (突发新闻补充)\n"
+        f"- Product/tech launches: NeoData doc + web_search (必须含当前年月)\n"
+        f"- Company registry/legal: TYC MCP (已在 manifest 配置) → web_search\n"
+        f"- search_gateway auto-routes financial queries to NeoData Layer 0\n\n"
+        f"TEMPORAL ANCHORING (CRITICAL):\n"
+        f"- Step 0: NeoData doc search '{entity} 最新动态' + web_search '{entity} YYYY年M月 最新动态'\n"
+        f"- ALL search queries MUST include current year/month\n"
+        f"- Product/tech version: search '{{product}} latest version YYYY' before citing\n"
+        f"- Data >12 months old → mark ❌ and search for latest replacement\n"
+        f"- NEVER cite an outdated product/model version when a newer one exists\n\n"
         f"- Required fields coverage ≥ 70%\n"
         f"- ≥ 3 independent sources\n"
         f"- ≥ 3 ## level sections\n"
@@ -484,12 +571,22 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             'edition of the report. Search "{report} {year} latest edition" before citing.\n'
             '3. REGULATORY STATUS: For regulated industries, verify current policy status before citing '
             'policy-driven market assumptions. Search "{policy} 现行 有效 最新政策".\n'
+            '4. PRODUCT/TECH CURRENCY (AI/TECH COMPANIES): When analyzing products, models, '
+            'or technologies, ALWAYS verify you are referencing the LATEST version. '
+            'Search "{product} latest version {year}" and "{product} release date". '
+            'Use NeoData doc for depth analysis + web_search with current year/month for breaking news. '
+            'If a newer version exists, use the newer data. '
+            'NEVER cite an older model/version when a newer one has been released.\n'
         ),
         'step3_biz': (
             'ANTI-DEFECT RULES:\n'
             '1. COMPETITOR MOAT VERIFICATION: When scoring competitor moat dimensions, each score must be '
             'based on SEARCH-VERIFIED current data, not model training data. A competitor\'s capability '
             'may have changed significantly since training cutoff.\n'
+            '2. PRODUCT LINE CURRENCY: For each product/service mentioned, verify it is '
+            'currently active and the latest iteration. Use NeoData doc for depth + '
+            'web_search "{product} latest {year}" for breaking news. '
+            'Deprecated or superseded products must be noted as such.\n'
         ),
         'step4_finance': (
             'ANTI-DEFECT RULES:\n'
@@ -516,6 +613,11 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             'ANTI-DEFECT RULES:\n'
             '1. COMPETITOR DATA CURRENCY: When citing competitor data from prior steps, verify it is current. '
             'If prior steps used stale competitor data, note this as a limitation.\n'
+            '2. PRODUCT/TECH CATALYST CURRENCY: When identifying investment catalysts related to '
+            'product launches or tech milestones, verify you have the LATEST product/version info. '
+            'Use NeoData doc for depth + web_search with current year/month. '
+            'A catalyst based on outdated product info (e.g. citing model v1 when v3 exists) '
+            'invalidates the entire investment thesis.\n'
         ),
         'step6b_valuation': (
             'ANTI-DEFECT RULES:\n'
@@ -650,6 +752,7 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
         'output_path': str(output_path),
         'timeout': timeout,
         'thinking': 'high',
+        'connectorIds': ['tyc-mcp'],  # 天眼查 MCP — 工商/股东/司法/专利查询
         'created_at': datetime.now().isoformat(timespec='seconds'),
         'status': 'pending',  # pending → running → completed/failed
     }
@@ -1317,10 +1420,11 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             'dispatch_mode': 'team_async',
             'subagent_type': 'general-purpose',
             'name': step,
+            'description': f'IR {step}: {role}',
             'team_name_template': 'ir-{task_id}',
             'team_name': team_name,
             'mode': 'bypassPermissions',
-            'run_in_background': True,
+            'connectorIds': ['tyc-mcp'],  # 天眼查 MCP
             'prompt': prompt_body,
             'brief_path': brief_path,
             'output_path': output_path,

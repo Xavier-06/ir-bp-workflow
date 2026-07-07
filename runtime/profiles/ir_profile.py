@@ -692,19 +692,36 @@ def _run_fact_store_merge(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     }
 
 
-def _run_shared_state_refresh(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+def _run_shared_state_refresh(runtime_root: Path, job_ctx: JobContext,
+                                after_wave: int | None = None) -> dict[str, Any]:
     """Phase 10 refresh: 构建跨 Wave 共享状态摘要页。
 
     在 fact_store_merge 之后运行，汇总所有已完成 step 的 fact、gap、progress。
     输出 shared_state.json + shared_state_page.md，供后续 phase 子代理 brief 注入。
+
+    after_wave: 指定刷新到哪个 wave（0-indexed）。
+      - None = 自动检测最后一个有输出的 wave
+      - 显式值 = 用于 per-wave 刷新（Batch3 evidence gate 拆分后使用）
     """
     from scripts.ir_shared_state import write_ir_shared_state
 
     tasks_dir = runtime_root / "data" / "tasks"
+
+    # 自动检测：找最后一个有 step 输出的 wave index
+    if after_wave is None:
+        from scripts.ir_subagent_launcher_wb import step_output_path
+        after_wave = 0
+        for wi, wave_steps in enumerate(LAUNCH_WAVES):
+            if any(
+                step_output_path(job_ctx.job_id, s).exists()
+                for s in wave_steps
+            ):
+                after_wave = wi
+
     json_path = write_ir_shared_state(
         task_id=job_ctx.job_id,
         tasks_dir=tasks_dir,
-        after_wave=len(LAUNCH_WAVES) - 1,
+        after_wave=after_wave,
         entity=job_ctx.entity,
     )
 
@@ -745,6 +762,12 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     """Phase 4b: 检查子代理输出是否完成，做质量门禁。
 
     Coordinator 在所有 wave 的 task 子代理完成后调用此 phase。
+    
+    **4层防线** (对齐 BP/Lit):
+    - L1 软约束: 三文件指令 (.md + -facts.json + -section.json)
+    - L2 硬约束: 三文件齐全 + JSON 合法性 + file_stable (8秒稳定性)
+    - L2.5 缓冲: collect_with_retry (10次×30秒=300秒)
+    - L3 半自动: 不完整 step 返回 needs_dispatch 重派发
     """
     from scripts.ir_subagent_launcher_wb import (
         check_step_quality,
@@ -762,20 +785,117 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     pipeline_status = get_pipeline_status(job_ctx.job_id)
 
     completed_steps: list[str] = []
+    incomplete_steps: list[dict] = []  # {step, missing_files, issue}
     step_quality: dict[str, dict[str, Any]] = {}
 
+    # ── 4层防线: 逐 step 验证三文件完整性 ──
     for step_name in STEP_DEPS:
-        output_path = step_output_path(job_ctx.job_id, step_name)
-        if output_path.exists() and output_path.stat().st_size > 100:
+        md_path = step_output_path(job_ctx.job_id, step_name)
+        facts_path = Path(str(md_path).replace(".md", "-facts.json"))
+        section_path = Path(str(md_path).replace(".md", "-section.json"))
+        
+        # L2 硬约束: 三文件检查
+        missing_files = []
+        if not md_path.exists() or md_path.stat().st_size < 100:
+            missing_files.append(".md (主报告)")
+        if not facts_path.exists() or facts_path.stat().st_size < 10:
+            missing_files.append("-facts.json")
+        if not section_path.exists() or section_path.stat().st_size < 10:
+            missing_files.append("-section.json")
+        
+        if missing_files:
+            incomplete_steps.append({
+                "step": step_name,
+                "missing_files": missing_files,
+                "issue": "incomplete_output",
+            })
+            continue
+        
+        # L2 硬约束: JSON 合法性 + file_stable (8秒稳定性)
+        try:
+            facts_data = json.loads(facts_path.read_text(encoding="utf-8"))
+            section_data = json.loads(section_path.read_text(encoding="utf-8"))
+            
+            # file_stable: 检查文件大小在 8 秒内无变化
+            size1 = facts_path.stat().st_size
+            time.sleep(8)
+            size2 = facts_path.stat().st_size
+            if size1 != size2:
+                incomplete_steps.append({
+                    "step": step_name,
+                    "missing_files": [],
+                    "issue": "file_unstable (子代理仍在写入)",
+                })
+                continue
+            
             completed_steps.append(step_name)
-            _sync_step_to_workspace(job_ctx, step_name, output_path)
+            _sync_step_to_workspace(job_ctx, step_name, md_path)
             quality = check_step_quality(job_ctx.job_id, step_name)
             step_quality[step_name] = quality
+            
+        except (json.JSONDecodeError, Exception) as e:
+            incomplete_steps.append({
+                "step": step_name,
+                "missing_files": [],
+                "issue": f"JSON invalid: {e}",
+            })
 
     total_expected = len(STEP_DEPS)
     completion_rate = len(completed_steps) / max(total_expected, 1)
     circuit_break = completion_rate < 0.5
 
+    # ── L3 半自动: 不完整 step 返回 needs_dispatch ──
+    if incomplete_steps:
+        # 构建 re-dispatch manifest
+        tasks_dir = runtime_root / "data" / "tasks"
+        manifests = []
+        for item in incomplete_steps:
+            step_name = item["step"]
+            manifest_path = tasks_dir / f"{job_ctx.job_id}-redispatch-{step_name}.json"
+            manifest = {
+                "step": step_name,
+                "action": "complete_missing_files",
+                "missing_files": item["missing_files"],
+                "issue": item["issue"],
+                "output_path": str(step_output_path(job_ctx.job_id, step_name)),
+                "instruction": (
+                    f"子代理 {step_name} 输出不完整: {item['issue']}\n"
+                    f"缺失文件: {', '.join(item['missing_files']) if item['missing_files'] else 'JSON 损坏'}\n"
+                    f"请重新派发子代理完成缺失文件。"
+                ),
+            }
+            manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            manifests.append(str(manifest_path))
+        
+        return {
+            "ok": True,
+            "needs_dispatch": True,
+            "has_more": len(manifests) > 1,
+            "mode": "wave_orchestration",
+            "phase": "phase09_dispatch_collect",
+            "job_id": job_ctx.job_id,
+            "dispatch_info": {
+                "manifests": [manifests[0]] if manifests else [],
+                "roles": ["ir_redispatch"],
+                "task_dir": str(tasks_dir),
+            },
+            "instruction": (
+                f"Read manifest: {manifests[0]}\n"
+                f"Dispatch ONE sub-agent to complete missing files.\n"
+                f"⚠️ 禁止在单条消息中派发多个 Agent。\n"
+                f"修复完成后用 start_phase='phase09_dispatch_collect' 恢复管线。"
+                + (f"\n\n还有 {len(manifests) - 1} 个 incomplete step 待处理。" if len(manifests) > 1 else "")
+            ),
+            "result": {
+                "completed": len(completed_steps),
+                "incomplete": len(incomplete_steps),
+                "incomplete_steps": incomplete_steps,
+                "total_expected": total_expected,
+                "completion_rate": round(completion_rate, 2),
+            },
+        }
+
+    # ── 所有 step 完成，跑质量门禁 ──
     rewrite_dispatched: list[str] = []
     for step_name, quality in step_quality.items():
         if quality.get("verdict") == "fail" and quality.get("score", 0) > 0:
@@ -1114,8 +1234,15 @@ def _run_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str,
 
 
 def _run_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 13 collect: 验证统稿输出完整性。"""
-    from scripts.ir_subagent_launcher_wb import step_output_path
+    """Phase 13 collect: 验证统稿输出完整性 + 脚注密度 repair。
+
+    对标 BP `_run_bp_synthesis_collect()` 的 repair 机制：
+    1. 脚注密度不达标 → 检查 repair 历史次数
+    2. 未超过 1 次 → 生成 repair manifest，返回 needs_dispatch
+    3. 超过 1 次 → repair_exhausted=True，降级 PASS_WITH_WARNINGS
+    """
+    from scripts.ir_subagent_launcher_wb import step_output_path, STEP_ROLE
+    from scripts.bp_utils import read_attempt_count
 
     tasks_dir = runtime_root / "data" / "tasks"
 
@@ -1129,26 +1256,124 @@ def _run_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str,
             except Exception:
                 pass
 
-        # 脚注密度检查
+        # ── 脚注密度检查 ──
         text = synthesis_path.read_text(encoding="utf-8")
         footnote_count = text.count("[^")
         char_count = len(text)
-        # 动态阈值：每 2000 字至少 3 个脚注
         min_footnotes = max(3, (char_count // 2000) * 3)
         footnote_ok = footnote_count >= min_footnotes
+
+        quality = {
+            "synthesis_path": str(synthesis_path),
+            "char_count": char_count,
+            "footnote_count": footnote_count,
+            "min_footnotes": min_footnotes,
+            "footnote_ok": footnote_ok,
+        }
+
+        # ── Repair 机制：脚注密度不达标 → 派发修复子代理 ──
+        if not footnote_ok:
+            prior_attempt = read_attempt_count(
+                job_ctx.job_id, "synthesis_repair", tasks_dir=tasks_dir
+            )
+
+            if prior_attempt < 1:
+                # 构建 repair manifest
+                step_outs = {}
+                for s_name in STEP_ROLE:
+                    if s_name == "step8_master":
+                        continue
+                    s_path = step_output_path(job_ctx.job_id, s_name)
+                    if s_path.exists():
+                        step_outs[s_name] = str(s_path)
+
+                repair_prompt_lines = [
+                    "你是 IR 统稿脚注修复专员。当前统稿脚注密度不达标：",
+                    f"- 当前: {footnote_count} 个脚注 / {char_count} 字",
+                    f"- 要求: 每 2000 字至少 3 个脚注 (需 {min_footnotes} 个以上)",
+                    "",
+                    "任务：",
+                    "1. 读取统稿 synthesis.md",
+                    "2. 读取各 step 输出的 -facts.json，提取 fact_id 和 source_url",
+                    "3. 在统稿正文中为缺少脚注的关键数据点补充 [^N] 脚注标记",
+                    "4. 在末尾来源与参考章节补充对应脚注定义",
+                    f"5. 确保最终脚注数 >= {min_footnotes}",
+                    "",
+                    "禁止修改正文的分析内容，只补充脚注。",
+                    "使用 scripts.bp_file_lock.locked_read_modify_write 修改 synthesis.md。",
+                ]
+
+                repair_manifest = {
+                    "manifest_version": "1.0",
+                    "task_id": job_ctx.job_id,
+                    "role": "ir_synthesis_repair",
+                    "action": "fix_citation_density",
+                    "synthesis_path": str(synthesis_path),
+                    "min_required": min_footnotes,
+                    "current_count": footnote_count,
+                    "step_outputs": step_outs,
+                    "system_prompt": "\n".join(repair_prompt_lines),
+                    "connectorIds": ["tyc-mcp"],
+                    "subagent_type": "general-purpose",
+                    "team_name_template": "ir-{task_id}",
+                }
+
+                repair_manifest_path = tasks_dir / "ir_synthesis_repair_manifest.json"
+                repair_manifest_path.write_text(
+                    json.dumps(repair_manifest, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+
+                gate_data = {
+                    "attempt": prior_attempt + 1,
+                    "footnote_count": footnote_count,
+                    "min_required": min_footnotes,
+                    "gate_verdict": "REPAIR",
+                }
+                (tasks_dir / "ir_synthesis_repair_gate.json").write_text(
+                    json.dumps(gate_data, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+
+                quality["gate_verdict"] = "REPAIR"
+                quality["repair_attempt"] = prior_attempt + 1
+
+                return {
+                    "ok": True,
+                    "needs_dispatch": True,
+                    "has_more": False,
+                    "mode": "ir_synthesis_repair",
+                    "phase": "phase13_synthesis_collect",
+                    "job_id": job_ctx.job_id,
+                    "dispatch_info": {
+                        "manifests": [str(repair_manifest_path)],
+                        "roles": ["ir_synthesis_repair"],
+                        "task_dir": str(tasks_dir),
+                    },
+                    "instruction": (
+                        f"Read manifest: {repair_manifest_path}\n"
+                        f"Dispatch ONE repair sub-agent using Agent tool.\n"
+                        f"⚠️ 禁止在单条消息中派发多个 Agent。\n"
+                        f"修复完成后用 start_phase='phase13_synthesis_collect' 恢复管线。"
+                    ),
+                    "result": quality,
+                }
+
+            else:
+                # 降级放行
+                quality["repair_exhausted"] = True
+                quality["gate_verdict"] = "PASS_WITH_WARNINGS"
+                quality["repair_attempt"] = prior_attempt
+
+        else:
+            quality["gate_verdict"] = "PASS"
 
         return {
             "ok": True,
             "mode": "synthesis",
             "phase": "phase13_synthesis_collect",
             "job_id": job_ctx.job_id,
-            "result": {
-                "synthesis_path": str(synthesis_path),
-                "char_count": char_count,
-                "footnote_count": footnote_count,
-                "min_footnotes": min_footnotes,
-                "footnote_ok": footnote_ok,
-            },
+            "result": quality,
         }
 
     # 输出缺失
@@ -1186,6 +1411,194 @@ def _run_final_assembly_phase(runtime_root: Path, job_ctx: JobContext) -> dict[s
         "phase": "phase14_final_assembly",
         "job_id": job_ctx.job_id,
         "result": payload,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 14.5: Readability Review — 可读性审查（对标 BP phase31）
+# ═══════════════════════════════════════════════════════════
+
+def _run_readability_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """对 IR 最终报告做可读性审查（机器ID泄漏、长段落、脚注完整性等）。
+
+    从 bp_readability_reviewer.py 移植，裁剪 BP 专用检查项，保留通用规则。
+    FAIL 不阻断管线（记录到 deferred_fixes），MEDIUM/LOW 只记录。
+    """
+    from scripts.ir_readability_reviewer import write_ir_readability_review
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    task_dir = tasks_dir  # IR 的 task_dir 就是 tasks_dir
+
+    result = write_ir_readability_review(task_dir)
+    verdict = result.get("verdict", "UNKNOWN")
+
+    ws = _workspace_for(job_ctx)
+    if ws is not None:
+        try:
+            review_path = task_dir / "ir_readability_review.json"
+            if review_path.exists():
+                shutil.copy2(review_path, ws.outputs_dir / "ir_readability_review.json")
+        except Exception:
+            pass
+
+    return {
+        "ok": True,  # readability FAIL 不阻断管线
+        "mode": "quality_production",
+        "phase": "phase14_readability_review",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "verdict": verdict,
+            "issue_count": result.get("issue_count", 0),
+            "fail_count": result.get("fail_count", 0),
+            "medium_count": result.get("medium_count", 0),
+            "issues": result.get("issues", []),
+            "review_path": result.get("review_path", ""),
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 14.6: Cross-Dimension Gate — 跨维度一致性检查（对标 BP phase25）
+# ═══════════════════════════════════════════════════════════
+
+def _run_cross_dimension_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """检查不同 step 之间的关键指标一致性和逻辑矛盾。
+
+    从 bp_cross_dimension_gate.py 移植，适配 IR 10 step 结构。
+    所有 issue 降级为 WARN，不阻断管线。
+    """
+    from scripts.ir_cross_dimension_gate import write_ir_cross_dimension_gate
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    task_dir = tasks_dir
+
+    result = write_ir_cross_dimension_gate(task_dir)
+    verdict = result.get("gate_verdict", "UNKNOWN")
+
+    ws = _workspace_for(job_ctx)
+    if ws is not None:
+        try:
+            gate_path = task_dir / "ir_cross_dimension_gate.json"
+            if gate_path.exists():
+                shutil.copy2(gate_path, ws.outputs_dir / "ir_cross_dimension_gate.json")
+        except Exception:
+            pass
+
+    return {
+        "ok": True,  # cross-dimension 不阻断
+        "mode": "quality_production",
+        "phase": "phase14_cross_dimension_gate",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "gate_verdict": verdict,
+            "issues": result.get("issues", []),
+            "summary": result.get("summary", {}),
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 14.7: Delivery Gate — 交付门禁（对标 BP phase33 delivery gate）
+# ═══════════════════════════════════════════════════════════
+
+def _run_delivery_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """聚合所有上游 gate 状态，做最终交付门禁检查。
+
+    检查项: final_assembly / readability / debate / cross_dimension / section_package / synthesis
+    FAIL → 记录到 deferred_fixes，不阻断交付。
+    """
+    tasks_dir = runtime_root / "data" / "tasks"
+    task_dir = tasks_dir
+
+    checks: list[dict[str, Any]] = []
+    deferred_fixes: list[dict[str, Any]] = []
+
+    def _check(name: str, path: Path, ok_field: str = "ok", pass_values: tuple = (True, "PASS")) -> None:
+        data = {}
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        val = data.get(ok_field, None)
+        passed = val in pass_values if val is not None else False
+        status = "PASS" if passed else ("FAIL" if val is not None else "MISSING")
+        checks.append({"name": name, "status": status, "value": val, "path": str(path)})
+        if not passed:
+            deferred_fixes.append({
+                "check": name,
+                "status": status,
+                "suggestion": f"检查 {path.name} 并修复",
+            })
+
+    # 逐项检查
+    _check("final_assembly", task_dir / f"{job_ctx.job_id}-final_assembly.json")
+    _check("readability", task_dir / "ir_readability_review.json",
+           ok_field="verdict", pass_values=("PASS", "PASS_WITH_WARNINGS"))
+    _check("debate_review", task_dir / f"{job_ctx.job_id}-debate_review.json",
+           ok_field="passed", pass_values=(True,))
+    _check("cross_dimension", task_dir / "ir_cross_dimension_gate.json",
+           ok_field="gate_verdict", pass_values=("PASS", "PASS_WITH_WARNINGS"))
+    _check("section_packages", task_dir / f"{job_ctx.job_id}-section_gate.json",
+           ok_field="passed", pass_values=(True,))
+    _check("synthesis_footnotes", task_dir / f"{job_ctx.job_id}-synthesis.md",
+           ok_field="__exists__", pass_values=(True,))
+    # synthesis 特殊处理：只检查文件存在且够大
+    synth_path = task_dir / f"{job_ctx.job_id}-synthesis.md"
+    synth_ok = synth_path.exists() and synth_path.stat().st_size > 500
+    for c in checks:
+        if c["name"] == "synthesis_footnotes":
+            c["status"] = "PASS" if synth_ok else "FAIL"
+            c["value"] = synth_ok
+            if not synth_ok:
+                deferred_fixes.append({
+                    "check": "synthesis_footnotes",
+                    "status": "FAIL",
+                    "suggestion": "synthesis.md 缺失或内容不足",
+                })
+
+    fail_count = sum(1 for c in checks if c["status"] == "FAIL")
+    missing_count = sum(1 for c in checks if c["status"] == "MISSING")
+    verdict = "PASS" if fail_count == 0 and missing_count == 0 else (
+        "PASS_WITH_WARNINGS" if fail_count <= 1 else "FAIL"
+    )
+
+    # 写入 deferred_fixes
+    if deferred_fixes:
+        fixes_path = task_dir / "ir_delivery_deferred_fixes.json"
+        fixes_path.write_text(
+            json.dumps({"fixes": deferred_fixes, "verdict": verdict}, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    result = {
+        "gate_verdict": verdict,
+        "checks": checks,
+        "deferred_fixes": deferred_fixes,
+        "fail_count": fail_count,
+        "missing_count": missing_count,
+    }
+
+    # 写入 gate 结果
+    gate_path = task_dir / "ir_delivery_gate.json"
+    gate_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    ws = _workspace_for(job_ctx)
+    if ws is not None:
+        for fname in ("ir_delivery_gate.json", "ir_delivery_deferred_fixes.json"):
+            src = task_dir / fname
+            if src.exists():
+                try:
+                    shutil.copy2(src, ws.outputs_dir / fname)
+                except Exception:
+                    pass
+
+    return {
+        "ok": True,  # delivery gate 不阻断
+        "mode": "quality_production",
+        "phase": "phase14_delivery_gate",
+        "job_id": job_ctx.job_id,
+        "result": result,
     }
 
 
@@ -1363,6 +1776,9 @@ class IRProfile(PipelineProfile):
                 "phase13_synthesis_prepare": lambda job_ctx: _run_synthesis_prepare(runtime_root, job_ctx),
                 "phase13_synthesis_collect": lambda job_ctx: _run_synthesis_collect(runtime_root, job_ctx),
                 "phase14_final_assembly": lambda job_ctx: _run_final_assembly_phase(runtime_root, job_ctx),
+                "phase14_readability_review": lambda job_ctx: _run_readability_review(runtime_root, job_ctx),
+                "phase14_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
+                "phase14_delivery_gate": lambda job_ctx: _run_delivery_gate(runtime_root, job_ctx),
                 "phase15_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
             },
         )
@@ -1378,10 +1794,14 @@ class IRProfile(PipelineProfile):
             "phase07_precompute": ["{task_id}-ir_company_verify.json"],
             "phase08_dispatch_prepare": ["{task_id}-research_plan.json"],
             "phase10_fact_store_merge": ["{task_id}-research_plan.json"],
+            "phase10_shared_state_refresh": ["{task_id}-fact_store.json"],
             "phase11_section_package_validation": ["{task_id}-research_plan.json", "{task_id}-fact_store.json"],
             "phase12_debate_review": ["{task_id}-section_packages.json"],
             "phase13_synthesis_prepare": ["{task_id}-research_plan.json"],
             "phase14_final_assembly": ["{task_id}-section_packages.json", "{task_id}-debate_review.json"],
+            "phase14_readability_review": ["{task_id}-final_report.md"],
+            "phase14_cross_dimension_gate": ["{task_id}-final_report.md"],
+            "phase14_delivery_gate": ["ir_readability_review.json", "ir_cross_dimension_gate.json", "{task_id}-final_assembly.json"],
         }
 
     def phase_outputs(self) -> dict[str, list[str]]:
@@ -1409,5 +1829,8 @@ class IRProfile(PipelineProfile):
             "phase13_synthesis_prepare": ["{task_id}-synthesis_manifest.json"],
             "phase13_synthesis_collect": ["{task_id}-synthesis.md"],
             "phase14_final_assembly": ["{task_id}-final_report.md", "{task_id}-final_assembly.json"],
+            "phase14_readability_review": ["{task_id}-ir_readability_review.json"],
+            "phase14_cross_dimension_gate": ["{task_id}-ir_cross_dimension_gate.json"],
+            "phase14_delivery_gate": ["{task_id}-ir_delivery_gate.json", "{task_id}-ir_delivery_deferred_fixes.json"],
             "phase15_delivery": [],
         }
