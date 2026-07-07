@@ -15,24 +15,112 @@ def test_ir_profile_registers_quality_production_phases(tmp_path):
 
     phases = profile.phases()
     assert "phase03_research_plan" in phases
+    assert "phase03c_research_plan_collect" in phases
     assert "phase06_fact_store_bootstrap" in phases
     assert "phase10_fact_store_merge" in phases
-    assert phases.index("phase03_research_plan") < phases.index("phase04_presearch")
+    assert phases.index("phase03_research_plan") < phases.index("phase03c_research_plan_collect")
+    assert phases.index("phase03c_research_plan_collect") < phases.index("phase04_presearch")
     assert phases.index("phase06_fact_store_bootstrap") < phases.index("phase08_dispatch_prepare")
     assert phases.index("phase09_dispatch_collect") < phases.index("phase10_fact_store_merge")
     assert phases.index("phase10_fact_store_merge") < phases.index("phase11_section_package_validation")
 
 
-def test_run_research_plan_writes_generic_plan(tmp_path):
+def test_run_research_plan_writes_skeleton_and_returns_needs_dispatch(tmp_path):
     job_ctx = SimpleNamespace(job_id="TASK-GENERIC", entity="任意公司", query="写券商版研报", market="cn", metadata={}, workspace=None)
 
     result = _run_research_plan(tmp_path, job_ctx)
 
     assert result["ok"] is True
-    path = tmp_path / "data" / "tasks" / "TASK-GENERIC-research_plan.json"
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert result["needs_dispatch"] is True
+    assert result["has_more"] is False
+    # 骨架文件已写入
+    skeleton_path = tmp_path / "data" / "tasks" / "TASK-GENERIC-ir_research_plan_skeleton.json"
+    assert skeleton_path.exists()
+    payload = json.loads(skeleton_path.read_text(encoding="utf-8"))
     assert payload["entity"] == "任意公司"
+    assert payload["plan_status"] == "skeleton_ready"
+    assert payload["enrichment_status"] == "pending"
     assert len(payload["investment_questions"]) >= 5
+
+
+def test_run_research_plan_collect_merges_enrichment(tmp_path):
+    from runtime.profiles.ir_profile import _run_research_plan_collect
+
+    tasks_dir = tmp_path / "data" / "tasks"
+    tasks_dir.mkdir(parents=True)
+
+    # 先写骨架
+    from scripts.ir_research_planner import build_ir_research_plan_skeleton
+    skeleton = build_ir_research_plan_skeleton(
+        task_id="TASK-ENRICH", entity="测试公司", query="测试研究",
+    )
+    (tasks_dir / "TASK-ENRICH-ir_research_plan_skeleton.json").write_text(
+        json.dumps(skeleton, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+    # 写 enrichment delta
+    enrichment = {
+        "strategic_questions": [
+            {
+                "question_id": "ESQ1",
+                "question": "测试公司的核心壁垒是什么？",
+                "priority": "high",
+                "owner_section": "step3_biz",
+                "supporting_sections": ["step2_industry"],
+                "required_fact_keys": ["moat_evidence", "competitive_landscape"],
+                "decision_relevance": "决定长期竞争优势",
+            },
+            {
+                "question_id": "ESQ2",
+                "question": "收入增长驱动因素？",
+                "priority": "high",
+                "owner_section": "step1_data",
+                "required_fact_keys": ["revenue_trend", "growth_rate"],
+                "decision_relevance": "决定增长可持续性",
+            },
+            {
+                "question_id": "ESQ3",
+                "question": "估值隐含什么预期？",
+                "priority": "high",
+                "owner_section": "step6b_valuation",
+                "required_fact_keys": ["valuation_multiples", "dcf_inputs"],
+                "decision_relevance": "决定估值合理性",
+            },
+            {
+                "question_id": "ESQ4",
+                "question": "管理层执行力如何？",
+                "priority": "high",
+                "owner_section": "step5_mgmt",
+                "required_fact_keys": ["management_roster", "ownership"],
+                "decision_relevance": "决定治理判断",
+            },
+            {
+                "question_id": "ESQ5",
+                "question": "哪些风险会推翻结论？",
+                "priority": "high",
+                "owner_section": "step7_risk",
+                "required_fact_keys": ["bear_case", "risk_triggers"],
+                "decision_relevance": "决定反证充分性",
+            },
+        ],
+    }
+    (tasks_dir / "TASK-ENRICH-ir_research_plan_enrichment.json").write_text(
+        json.dumps(enrichment, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+    job_ctx = SimpleNamespace(job_id="TASK-ENRICH", entity="测试公司", query="测试研究", market="cn", metadata={}, workspace=None)
+    result = _run_research_plan_collect(tmp_path, job_ctx)
+
+    assert result["ok"] is True
+    assert result["result"]["plan_status"] == "ready"
+    assert result["result"]["enrichment_status"] == "enriched"
+
+    # 最终计划已写入
+    plan_path = tasks_dir / "TASK-ENRICH-research_plan.json"
+    assert plan_path.exists()
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    assert len(plan["strategic_questions"]) == 5
+    assert plan["strategic_questions"][0]["question_id"] == "ESQ1"
 
 
 def test_run_fact_store_bootstrap_writes_empty_generic_store_when_no_sources(tmp_path):

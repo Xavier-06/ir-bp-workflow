@@ -583,6 +583,116 @@ def write_research_plan(
     return str(path)
 
 
+# ═══════════════════════════════════════════════════════════
+# Phase03 Enrichment — 骨架 + 主 AI 增量合并（对标 BP v5.0）
+# ═══════════════════════════════════════════════════════════
+
+def build_ir_research_plan_skeleton(
+    task_id: str,
+    entity: str,
+    query: str,
+    market: str = "generic",
+    report_type: str = "broker_ir",
+) -> dict[str, Any]:
+    """生成确定性骨架计划（不调用 build_strategic_questions）。
+
+    与 prepare_research_plan 的区别：
+    - strategic_questions 留空，等待主 AI enrichment 填充
+    - plan_status="skeleton_ready"
+    - enrichment 合并后调用 apply_ir_enrichment() 得到最终计划
+    """
+    plan = build_research_plan(
+        entity=entity, query=query, market=market,
+        report_type=report_type, task_id=task_id,
+    )
+    # 用模板版 strategic_questions 作为 fallback（enrichment 失败时降级使用）
+    plan["_template_strategic_questions"] = build_strategic_questions(
+        entity=plan["entity"],
+        query=plan["query"],
+        research_type=plan["research_type"],
+    )
+    plan["strategic_questions"] = []
+    plan["plan_status"] = "skeleton_ready"
+    plan["enrichment_status"] = "pending"
+    return plan
+
+
+def apply_ir_enrichment(skeleton: dict[str, Any], enrichment: dict[str, Any]) -> dict[str, Any]:
+    """将主 AI 的 enrichment delta 合并到骨架计划，生成最终计划。
+
+    enrichment 结构（由 instruction_store_ir/ir_research_plan_enrichment.md 定义）:
+    - strategic_questions: 5 条针对标的的尖锐问题（替换模板版）
+    - core_question_priority_deltas: 调整 core_questions 优先级（可选）
+    - excluded_fact_keys: 按行业裁剪不相关的 fact_keys（可选）
+    - section_focus_deltas: 调整各 step 的 must_answer 补充问题（可选）
+    """
+    plan = dict(skeleton)
+
+    # 1. 替换 strategic_questions（如果 enrichment 提供了）
+    enriched_sq = enrichment.get("strategic_questions") or []
+    if enriched_sq:
+        plan["strategic_questions"] = enriched_sq
+    else:
+        # 降级：使用模板版
+        plan["strategic_questions"] = plan.pop("_template_strategic_questions", [])
+
+    # 2. 应用 core_question priority deltas（可选）
+    deltas = enrichment.get("core_question_priority_deltas") or []
+    if deltas:
+        q_index = {q["question_id"]: q for q in plan.get("core_questions", [])}
+        for delta in deltas:
+            qid = delta.get("question_id", "")
+            if qid in q_index:
+                q_index[qid]["priority"] = delta.get("new_priority", q_index[qid].get("priority", "high"))
+                q_index[qid]["_enrichment_reason"] = delta.get("reason", "")
+
+    # 3. 标记 excluded fact keys（可选）
+    excluded = enrichment.get("excluded_fact_keys") or []
+    if excluded:
+        plan["excluded_fact_keys"] = excluded
+        excluded_keys = {item.get("fact_key") for item in excluded if isinstance(item, dict)}
+        plan["fact_requirements"] = [
+            fr for fr in plan.get("fact_requirements", [])
+            if fr.get("fact_key") not in excluded_keys
+        ]
+
+    # 4. Section focus deltas: 给特定 step 补充 must_answer（可选）
+    section_deltas = enrichment.get("section_focus_deltas") or []
+    if section_deltas:
+        section_reqs = plan.get("section_requirements", {})
+        for delta in section_deltas:
+            step = delta.get("step", "")
+            if step in section_reqs:
+                extra = delta.get("additional_must_answer", [])
+                existing = section_reqs[step].get("must_answer", [])
+                section_reqs[step]["must_answer"] = existing + extra
+
+    # 5. 重建 coverage matrix（包含 enriched strategic_questions）
+    plan["coverage_matrix"] = {}
+    for question in plan.get("core_questions", []):
+        plan["coverage_matrix"][question["question_id"]] = {
+            "owner": question["owner_section"],
+            "supporting_sections": question.get("supporting_sections", []),
+            "required_fact_keys": question.get("required_fact_keys", []),
+        }
+    for sq in plan.get("strategic_questions", []):
+        plan["coverage_matrix"][sq["question_id"]] = {
+            "owner": sq.get("owner_section", "step6_insight"),
+            "supporting_sections": sq.get("supporting_sections", []),
+            "required_fact_keys": sq.get("required_fact_keys", []),
+        }
+
+    # 6. 标记 plan_status
+    plan["plan_status"] = "ready"
+    plan["enrichment_status"] = "enriched" if enriched_sq else "template_fallback"
+    plan["prepared_by"] = "script_skeleton_plus_ai_enrichment"
+    plan["validation"] = validate_research_plan_ready(plan)
+    if not plan["validation"]["ready"]:
+        plan["plan_status"] = "blocked"
+
+    return plan
+
+
 def load_research_plan(task_id: str, tasks_dir: Path = TASKS_DIR) -> dict[str, Any] | None:
     path = research_plan_path(task_id, tasks_dir)
     if not path.exists():
