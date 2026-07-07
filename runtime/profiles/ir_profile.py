@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.profiles.base import JobContext, PipelineProfile
+from scripts.ir_subagent_launcher_wb import IR_SUBAGENT_CONNECTOR_IDS
 
 
 def _not_implemented_phase(name: str):
@@ -1329,7 +1330,7 @@ def _run_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         "role": "ir_统稿",
         "step": "step8_master",
         "system_prompt": full_prompt,
-        "connectorIds": [],
+        "connectorIds": IR_SUBAGENT_CONNECTOR_IDS,
         "subagent_type": "general-purpose",
         "team_name_template": "ir-{task_id}",
         "task_dir": str(tasks_dir),
@@ -1448,7 +1449,7 @@ def _run_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str,
                     "current_count": footnote_count,
                     "step_outputs": step_outs,
                     "system_prompt": "\n".join(repair_prompt_lines),
-                    "connectorIds": ["tyc-mcp"],
+                    "connectorIds": IR_SUBAGENT_CONNECTOR_IDS,
                     "subagent_type": "general-purpose",
                     "team_name_template": "ir-{task_id}",
                 }

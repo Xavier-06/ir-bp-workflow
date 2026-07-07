@@ -7,15 +7,20 @@
 
 | 查什么 | 首选数据源 | 调用方式 | 兜底 |
 |--------|-----------|---------|------|
+| **A/HK/美股实时行情/财务/券商研报/板块/新闻** | **腾讯自选股 MCP (westock-mcp)** | `mcp__westock-mcp__data_quote` / `data_finance` / `data_report` / `data_sector` / `data_news` | NeoData → web_search |
+| A股 K线/选股/技术指标/行业链数据 | **通达信 MCP (tdx-connector)** | `mcp__tdx-connector__tdx_quotes` / `tdx_kline` / `tdx_screener` / `tdx_indicator_select` | NeoData → web_search |
 | A/HK 股行情/财报/估值 | NeoData `api` | `neodata_search('公司名 营收 净利润 市值', data_type='api')` | yfinance → web_search |
 | 美股行情/估值/分红 | yfinance | `yf.Ticker('AAPL').info` | NeoData → web_search |
-| **券商研报/行业深度/新闻分析** | **NeoData `doc`** | `neodata_search('公司名 最新动态', data_type='doc')` | web_search |
+| **券商研报/行业深度/新闻分析** | **NeoData `doc` + 腾讯自选股 `data_report`/`data_sector`** | `neodata_search('公司名 最新动态', data_type='doc')`；行业数据优先 `mcp__westock-mcp__data_sector` / `data_report` | web_search |
 | **突发新闻/实时动态（分钟级）** | **腾讯新闻 CLI** | `sh {SKILL_DIR}/scripts/run-cli.sh search "关键词" --limit 5` | web_search |
 | **产品发布/技术动态/新闻分析** | NeoData `doc` + 腾讯新闻补充 | NeoData doc 拿深度分析，腾讯新闻补实时动态 | web_search |
-| 企业工商/股东/司法/专利 | 天眼查 MCP | `mcp__tyc-mcp__search_companies` → `call_tool` | web_search |
+| 企业工商/股东/司法/专利（主源） | 天眼查 MCP | `mcp__tyc-mcp__search_companies` → `call_tool` | web_search |
+| 企业工商/股东/司法/专利（交叉验证第二源） | 企查查 MCP (qcc-company) | `mcp__qcc-company__get_company_basic_profile` / `search_companies` | 天眼查 → web_search |
 | 技术论文/arxiv | web_search | `web_search('arxiv {company} {technology} {YYYY}')` | web_fetch 读论文页 |
 | 开源项目/GitHub/HF | web_search | `web_search('github.com/{company} latest release {YYYY}')` | web_fetch 读 README |
 | 网页正文深度阅读 | web_fetch | 直接传 URL | search_deep |
+
+> ⚠️ **westock-mcp / tdx-connector / qcc-company 是已授权的 MCP connector，子代理可直接调用，无需 bash。行业数据、行情、财务、研报、板块、选股类查询必须优先走这些结构化源，禁止只用 web_search 兜底。**
 
 ### NeoData 能力细分
 
@@ -39,6 +44,34 @@
 - **不能拿**: 实时行情、财报、新闻
 - **注意**: 工商数据可能滞后 1-3 个月，重大变更需 web_search 交叉验证
 - 已在 manifest 中配置天眼查 MCP，可直接调用
+
+### 腾讯自选股 MCP (westock-mcp) 能力边界
+
+- **能拿**: A/HK/美股实时行情、财务数据、券商研报、板块/行业数据、公司新闻、选股/排名/策略
+- **不能拿**: 深度新闻分析正文（用 NeoData doc 补）、工商司法（用天眼查/企查查）
+- **工具前缀**: `mcp__westock-mcp__*`
+  - 行情: `data_quote`；财务: `data_finance`；研报: `data_report`；板块/行业: `data_sector`；新闻: `data_news`；搜索: `data_search`；K线: `data_kline`
+  - 选股/筛选: `tool_filter` / `tool_ranking` / `tool_strategy`
+- **用法**: 直接在子代理会话里调用 MCP 工具，无需 bash。行业规模/竞争格局/板块数据优先用 `data_sector` + `data_report`，不要只靠 web_search。
+- 已在 manifest 中配置腾讯自选股 MCP，可直接调用
+
+### 通达信 MCP (tdx-connector) 能力边界
+
+- **能拿**: A股/全球股票实时行情、K线、技术指标、选股/筛选、行业数据、财经问答
+- **不能拿**: 深度研报正文（用 NeoData doc / 腾讯自选股补）、工商司法
+- **工具前缀**: `mcp__tdx-connector__*`
+  - 行情: `tdx_quotes`；K线: `tdx_kline`；查股票: `tdx_lookup_stock`；选股: `tdx_screener`；指标: `tdx_indicator_select`；通用数据: `tdx_api_data`；问答: `wenda_*`
+- **用法**: A股-specific 数据、技术面、选股、行业链数据优先走通达信，不要只靠 web_search。
+- 已在 manifest 中配置通达信 MCP，可直接调用
+
+### 企查查 MCP (qcc-company) 能力边界
+
+- **能拿**: 企业工商注册、股东、董监高、司法风险、知识产权、资质、投标
+- **不能拿**: 实时行情、财报、新闻
+- **工具前缀**: `mcp__qcc-company__*`
+  - `get_company_basic_profile` / `search_companies` / `get_company_capabilities` / `get_company_people` / `get_company_capabilities`
+- **用法**: 作为天眼查的交叉验证第二来源（两个独立工商源互相印证），提升工商数据可信度。
+- 已在 manifest 中配置企查查 MCP，可直接调用
 
 ---
 

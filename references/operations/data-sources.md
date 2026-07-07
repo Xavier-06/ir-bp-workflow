@@ -4,12 +4,17 @@
 
 | 优先级 | 数据源 | 使用方式 |
 |-------|--------|---------|
-| 1 | NeoData 金融搜索 | A/HK 股行情、**最新季度财报**、板块、券商研报（search_gateway Layer 0 自动调用） |
-| 2 | yfinance (Python) | 估值指标、美股主力、A/HK 股交叉验证（PE/PS/市值/财报/key statistics） |
-| 3 | web_search | 实时搜索（东财/雪球/同花顺 行情、公告、行业报告、**财报新闻稿**） |
-| 4 | 天眼查 MCP | 国内公司工商信息、融资轮、诉讼、知产 |
-| 5 | RAG_search | 向量记忆知识库 |
-| 6 | tushare / yahoo skill | 补充金融数据 |
+| 1 | **腾讯自选股 MCP (westock-mcp)** | A/HK/美股实时行情、财务、券商研报、板块/行业数据、公司新闻、选股（结构化首选，已授权） |
+| 2 | **通达信 MCP (tdx-connector)** | A股/全球行情、K线、选股筛选、技术指标、行业链数据（已授权） |
+| 3 | NeoData 金融搜索 | A/HK 股行情、**最新季度财报**、板块、券商研报（search_gateway Layer 0 自动调用） |
+| 4 | yfinance (Python) | 估值指标、美股主力、A/HK 股交叉验证（PE/PS/市值/财报/key statistics） |
+| 5 | 天眼查 MCP | 国内公司工商信息、融资轮、诉讼、知产（已授权） |
+| 6 | **企查查 MCP (qcc-company)** | 企业工商注册，作为天眼查的交叉验证第二来源（已授权） |
+| 7 | web_search | 实时搜索（公告、行业报告、财报新闻稿）、突发新闻、长尾兜底 |
+| 8 | RAG_search | 向量记忆知识库 |
+| 9 | tushare / yahoo skill | 补充金融数据 |
+
+> ⚠️ westock-mcp / tdx-connector / qcc-company 为 MCP connector，子代理在 `connectorIds` 中已授权，可直接调用，无需 bash。行业/行情/财务/研报类查询必须优先走这些结构化源，web_search 仅作突发新闻与长尾兜底。
 
 ## 最新季度财报获取策略
 

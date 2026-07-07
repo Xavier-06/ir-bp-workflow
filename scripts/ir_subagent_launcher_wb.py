@@ -68,6 +68,15 @@ STEP_ROLE = {
     'step8_master': '投研_主笔_文档汇总',
 }
 
+# IR 子代理可调用的数据源 connector（对齐用户已连接的数据源）
+# tyc-mcp: 天眼查（工商/股东/司法/专利）
+# westock-mcp: 腾讯自选股（A/HK/美股实时行情/财务/券商研报/板块/新闻/选股）
+# tdx-connector: 通达信（A股/全球数据/K线/选股/技术指标/行业链）
+# qcc-company: 企查查（企业工商注册，天眼查的交叉验证第二来源）
+# ⚠️ 之前写死为 ['tyc-mcp']，导致 westock/tdx/qcc 从未授权给子代理，
+#   子代理只能用 neodata(bash) + web_search + 天眼查，金融数据源利用率极低。
+IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp', 'tdx-connector', 'qcc-company']
+
 # 步间依赖关系
 STEP_DEPS = {
     'step1_data': [],
@@ -382,15 +391,29 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'→ `web_fetch`（WorkBuddy 内置工具）— 给 URL 返回正文',
         f'→ `search_deep` — 搜索 + 自动抓 top N 正文，一步到位',
         f'',
+        f'**6. 腾讯自选股 MCP / 通达信 MCP / 企查查 MCP（结构化金融数据源，已授权）**',
+        f'- 这三个是已授权的 MCP connector，子代理**直接调用 MCP 工具**即可，无需 bash，也无需 web_search 兜底。',
+        f'- **腾讯自选股 MCP (westock-mcp)**：A/HK/美股实时行情、财务、券商研报、板块/行业数据、公司新闻、选股',
+        f'  - `mcp__westock-mcp__data_quote`（行情）/ `data_finance`（财务）/ `data_report`（研报）/ `data_sector`（板块·行业）/ `data_news`（新闻）/ `data_search`（搜索）/ `tool_ranking`（排名·选股）',
+        f'  - **行业数据（市场规模/竞争格局/板块）优先用 `data_sector` + `data_report`，禁止只用 web_search 搜行业报告**',
+        f'- **通达信 MCP (tdx-connector)**：A股/全球行情、K线、技术指标、选股筛选、行业链数据',
+        f'  - `mcp__tdx-connector__tdx_quotes` / `tdx_kline` / `tdx_screener`（选股）/ `tdx_indicator_select`（指标）/ `tdx_api_data` / `wenda_*`（财经问答）',
+        f'- **企查查 MCP (qcc-company)**：企业工商注册、股东、董监高、司法、知产——作为天眼查的**交叉验证第二来源**',
+        f'  - `mcp__qcc-company__get_company_basic_profile` / `search_companies` / `get_company_people`',
+        f'- ⚠️ 行业/行情/财务/研报类查询必须优先走上述 MCP 结构化源；web_search 只作为突发新闻和长尾兜底。',
+        f'',
         f'**工具优先级总结：**',
         f'| 查什么 | 首选工具 | 兜底 |',
         f'|--------|---------|------|',
+        f'| **A/HK/美股行情/财务/研报/板块/新闻** | **腾讯自选股 MCP (westock-mcp)** | NeoData → web_search |',
+        f'| **A股K线/选股/技术指标/行业链** | **通达信 MCP (tdx-connector)** | NeoData → web_search |',
         f'| A/HK 股行情/财报/估值 | NeoData api → yfinance 交叉 | web_search |',
         f'| 美股行情/估值/分红 | yfinance | NeoData → web_search |',
-        f'| 券商研报/行业深度 | NeoData doc (按日期降序) | web_search |',
+        f'| **券商研报/行业深度** | **NeoData doc + 腾讯自选股 data_report/data_sector** | web_search |',
         f'| **突发新闻/实时动态(分钟级)** | 腾讯新闻 CLI (sh run-cli.sh search) | web_search |',
         f'| **产品发布/技术动态/新闻分析** | NeoData doc + 腾讯新闻补充 | web_search |',
-        f'| 企业工商/司法/专利 | 天眼查 MCP (已配置) | web_search |',
+        f'| 企业工商/司法/专利（主源） | 天眼查 MCP (已配置) | web_search |',
+        f'| 企业工商/司法/专利（交叉验证） | 企查查 MCP (qcc-company) | 天眼查 → web_search |',
         f'| 技术论文/arxiv | web_search + 年份 | web_fetch 读论文 |',
         f'| 开源项目/GitHub/HF | web_search + 年份 | web_fetch 读 README |',
         f'| 读某个 URL 正文 | web_fetch | — |',
@@ -762,7 +785,7 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
         'output_path': str(output_path),
         'timeout': timeout,
         'thinking': 'high',
-        'connectorIds': ['tyc-mcp'],  # 天眼查 MCP — 工商/股东/司法/专利查询
+        'connectorIds': IR_SUBAGENT_CONNECTOR_IDS,  # 天眼查/腾讯自选股/通达信/企查查 — 全部已连接的数据源
         'created_at': datetime.now().isoformat(timespec='seconds'),
         'status': 'pending',  # pending → running → completed/failed
     }
@@ -1435,7 +1458,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             'team_name_template': 'ir-{task_id}',
             'team_name': team_name,
             'mode': 'bypassPermissions',
-            'connectorIds': ['tyc-mcp'],  # 天眼查 MCP
+            'connectorIds': IR_SUBAGENT_CONNECTOR_IDS,  # 天眼查/腾讯自选股/通达信/企查查
             'prompt': prompt_body,
             'brief_path': brief_path,
             'output_path': output_path,
