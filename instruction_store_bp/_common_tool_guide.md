@@ -215,7 +215,53 @@ print(v)
 **⚠️ 关键纪律：call_tool 的 tool_name 必须逐字复制 get_company_capabilities 返回表格中的真实名称，不能按中文含义猜测或翻译。**
 
 
-### 4. 通用网络搜索（新闻、行业报告、通用信息）
+### 4. 腾讯新闻搜索（实时中文新闻，BP 管线专用）
+
+**⚠️ 搜中文公司新闻的首选——速度最快（0.7s）、覆盖融资/产品/人事报道，NeoData doc 的新闻有时效延迟。**
+
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import tencent_news_search
+result = tencent_news_search('公司名 融资', max_results=5)
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+**适合搜什么：**
+
+| 场景 | 查询示例 |
+|------|---------|
+| 公司融资/投资新闻 | `{公司名} 融资 投资 轮次` |
+| 产品发布/合作动态 | `{公司名} 产品 发布 合作 签约` |
+| 高管人事变动 | `{公司名} CEO 任命 离职 加入` |
+| 行业政策/监管动态 | `{行业名} 政策 监管 新规` |
+| 早期公司报道 | `{公司名} 创业 获投` |
+
+- 返回：title + url + content(摘要) + publishedDate(精确到秒) + source(媒体名)
+- 优势：0.7s 出结果，有精确发布时间，覆盖 7×24 实时新闻
+- 局限：纯中文新闻源，英文查询噪声大；不支持结构化金融数据
+- **search_gateway auto 模式已自动集成**：中文查询自动补充腾讯新闻
+
+### 5. Yahoo Finance 搜索（美股新闻 + quote 页面）
+
+**适合搜美股竞品新闻和 quote 页面，免费无 API key，走 7897 代理。**
+
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import _yahoo_search
+result = _yahoo_search('NVDA earnings revenue', max_results=5)
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+- 返回：新闻标题 + Yahoo Finance URL + quote 页面链接
+- 适合：美股竞品新闻、earnings 报道、行业趋势
+- 局限：不支持中文查询；非金融查询返回空
+- **search_gateway auto/multi 模式已自动集成**：金融查询自动补充 Yahoo 新闻
+
+### 6. 通用网络搜索（新闻、行业报告、通用信息）
 
 **web_search（WorkBuddy 内置工具）**
 - 直接用，不需要 Bash
@@ -223,7 +269,7 @@ print(v)
 - 不适合：结构化金融数据（用 search_gateway）、结构化企业数据（用 TYC 天眼查）
 - 作为所有搜索的兜底手段
 
-### 5. 网页正文深度阅读
+### 7. 网页正文深度阅读
 
 **web_fetch（WorkBuddy 内置工具）**
 - 给一个 URL，返回正文内容
@@ -246,8 +292,10 @@ print(v)
 | 专利/商标/软著 | TYC `search_patents` / `search_trademarks` / `call_tool` | WebSearch |
 | 企业资质/招投标 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
 | **券商研报/行业深度报告** | **NeoData (`neodata_search` data_type=doc)** | WebSearch → WebFetch 深读 |
-| **财经新闻/行业动态/政策** | **NeoData (`neodata_search` data_type=doc)** | WebSearch → WebFetch 深读 |
-| **负面新闻/风险舆情** | **NeoData (`neodata_search` data_type=doc)** | WebSearch |
+| **中文公司新闻（融资/产品/人事）** | **腾讯新闻 (`tencent_news_search`) — 0.7s最快** | NeoData(doc) → WebSearch |
+| **财经新闻/行业动态/政策** | **腾讯新闻 (`tencent_news_search`)** | NeoData(doc) → WebSearch |
+| **负面新闻/风险舆情** | **腾讯新闻 (`tencent_news_search`)** | NeoData(doc) → WebSearch |
+| **美股竞品新闻/earnings** | **Yahoo Finance (`_yahoo_search`)** | WebSearch |
 | 通用网络搜索 | WebSearch → WebFetch 深读 | — |
 | 读某个 URL 的正文 | WebFetch | — |
 

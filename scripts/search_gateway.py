@@ -198,6 +198,10 @@ _FINANCE_KEYWORDS = (
     'stock price', 'market cap', 'earnings', 'revenue', 'valuation',
     'dividend', 'financial', 'balance sheet', 'income statement',
     '板块', '龙头股', '基金', 'ETF', '指数',
+    # 一级市场 / VC/PE（BP 管线高频词）
+    '融资', '投资', 'IPO', '并购', '退出', '轮次', '投后',
+    '天使轮', 'Pre-A', 'A轮', 'B轮', 'C轮', 'D轮', '战略投资',
+    'funding', 'venture', 'series A', 'series B', 'acquisition',
 )
 _STOCK_CODE_PATTERN = re.compile(
     r'\b(\d{6}|0\d{4})\b'  # A股6位/港股5位代码
