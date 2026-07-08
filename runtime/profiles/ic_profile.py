@@ -534,19 +534,137 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
 
 # ═══════════════════════════════════════════════════════════
-# Phase 5: Delivery
+# Phase 09: Evidence Gate — step 输出质量门禁
+# ═══════════════════════════════════════════════════════════
+
+def _run_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 09: 检查所有 completed step 的输出质量。
+
+    检查维度: citations/content_length/structure。
+    FAIL → 管线终止。WARN → 记录到 deferred_fixes。
+    """
+    from scripts.ic_evidence_gate import run_evidence_gate
+    from scripts.ic_subagent_launcher import wave_manifest_path, load_json, step_output_path
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    wm = load_json(wave_manifest_path(job_ctx.job_id))
+    step_deps = wm.get("step_deps", {}) if wm else {}
+
+    step_outputs: dict[str, Path] = {}
+    for step_name in step_deps:
+        out = step_output_path(job_ctx.job_id, step_name)
+        if out.exists():
+            step_outputs[step_name] = out
+
+    result = run_evidence_gate(
+        task_id=job_ctx.job_id,
+        step_outputs=step_outputs,
+        tasks_dir=tasks_dir,
+    )
+
+    overall = result.get("overall_verdict", "WARN")
+    return {
+        "ok": overall != "FAIL",
+        "mode": "ic_evidence_gate",
+        "phase": "phase09_evidence_gate",
+        "job_id": job_ctx.job_id,
+        "result": result,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 10: Claim Coverage — 研究计划 claim 覆盖校验
+# ═══════════════════════════════════════════════════════════
+
+def _run_claim_coverage(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 10: 校验 ic_research_plan.json claim_matrix 中各 claim 是否被 step 输出覆盖。"""
+    from scripts.ic_claim_coverage import run_claim_coverage
+    from scripts.ic_subagent_launcher import wave_manifest_path, load_json, step_output_path
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    plan_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan.json"
+
+    wm = load_json(wave_manifest_path(job_ctx.job_id))
+    step_deps = wm.get("step_deps", {}) if wm else {}
+
+    step_outputs: dict[str, Path] = {}
+    for step_name in step_deps:
+        out = step_output_path(job_ctx.job_id, step_name)
+        if out.exists():
+            step_outputs[step_name] = out
+
+    result = run_claim_coverage(
+        task_id=job_ctx.job_id,
+        research_plan_path=plan_path,
+        step_outputs=step_outputs,
+        tasks_dir=tasks_dir,
+    )
+
+    overall = result.get("overall_verdict", "WARN")
+    # Claim coverage FAIL is not blocking for IC (P2 quality gate, not blocking yet)
+    return {
+        "ok": True,
+        "mode": "ic_claim_coverage",
+        "phase": "phase10_claim_coverage",
+        "job_id": job_ctx.job_id,
+        "result": result,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 11: Debate Review — 跨维度对抗审查
+# ═══════════════════════════════════════════════════════════
+
+def _run_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 11: 跨 step 对抗审查 — 检测矛盾、数据不一致、缺失视角。"""
+    from scripts.ic_debate_review import run_debate_review
+    from scripts.ic_subagent_launcher import wave_manifest_path, load_json, step_output_path
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    plan_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan.json"
+
+    wm = load_json(wave_manifest_path(job_ctx.job_id))
+    step_deps = wm.get("step_deps", {}) if wm else {}
+
+    step_outputs: dict[str, Path] = {}
+    for step_name in step_deps:
+        out = step_output_path(job_ctx.job_id, step_name)
+        if out.exists():
+            step_outputs[step_name] = out
+
+    result = run_debate_review(
+        task_id=job_ctx.job_id,
+        step_outputs=step_outputs,
+        research_plan_path=plan_path,
+        tasks_dir=tasks_dir,
+    )
+
+    overall = result.get("overall_verdict", "WARN")
+    return {
+        "ok": overall != "FAIL",
+        "mode": "ic_debate_review",
+        "phase": "phase11_debate_review",
+        "job_id": job_ctx.job_id,
+        "result": result,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 12: Delivery
 # ═══════════════════════════════════════════════════════════
 
 def _run_delivery(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 5: 对抗验证 + DOCX + 交付"""
+    """Phase 12: 对抗验证 + DOCX + 交付"""
     if os.environ.get("IRBP_BG_CHILD") == "1":
         return _run_delivery_inner(runtime_root, job_ctx)
     from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase08_delivery")
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase12_delivery")
     if cached is not None:
         print(f"  📦 [ic] 使用缓存的 delivery 结果", flush=True)
         return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase08_delivery", pipeline="ic")
+    return launch_heavy_phase(runtime_root, job_ctx, "phase12_delivery", pipeline="ic")
 
 
 def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
@@ -569,7 +687,7 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
     return {
         "ok": True,
         "mode": "legacy_wrapped",
-        "phase": "phase08_delivery",
+        "phase": "phase12_delivery",
         "job_id": job_ctx.job_id,
         "result": {
             "verification_verdict": verification_verdict,
@@ -775,7 +893,10 @@ class ICProfile(PipelineProfile):
                 "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
                 "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
                 "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-                "phase09_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
+                "phase09_evidence_gate": lambda job_ctx: _run_evidence_gate(runtime_root, job_ctx),
+                "phase10_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
+                "phase11_debate_review": lambda job_ctx: _run_debate_review(runtime_root, job_ctx),
+                "phase12_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
             },
         )
         self.runtime_root = runtime_root
