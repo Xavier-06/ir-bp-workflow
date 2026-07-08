@@ -181,6 +181,7 @@ web_fetch: {搜索结果中的URL}
 | 产品参数/竞品 datasheet | WebSearch | 搜竞品产品参数、第三方评测 |
 | 上市客户财务体量 | NeoData (`neodata_search` data_type=api) | 营收/市值/利润结构化 |
 | **上市客户/合作方研报** | **NeoData (`neodata_search` data_type=doc)** | **客户深度研报、行业分析** |
+| **可比上市公司客户所在 板块/产业链/资金流** | **westock-mcp（`data_sector`/`data_industry_chain`/`data_fund_flow`）** | **客户行业格局、产业链位置、资金动向——结构化，比 WebSearch 精准** |
 | 产品官网/产品页 | WebFetch | 直接抓取 |
 
 ## 搜索策略（分步流程）

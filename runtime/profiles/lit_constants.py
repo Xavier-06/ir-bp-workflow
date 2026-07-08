@@ -53,13 +53,13 @@ LIT_ALL_SLUGS: list[str] = list(LIT_ALL_ROLE_SLUGS.values())
 
 # ── Connector IDs 按角色分配 ────────────────────────────────
 LIT_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
-    "tech_decomposition": [],       # 快速预搜 + JSON 输出，无需 MCP
-    "academic_scout": [],           # 纯学术 API 脚本，无需 MCP
-    "industry_scout": ['westock-mcp'],  # 板块/产业链/机构评级/券商研报（westock-mcp），补充 NeoData 行业研报
-    "enterprise_scout": LIT_QCC_CONNECTOR_IDS,  # 天眼查 MCP (tyc-mcp，经 LIT_QCC_CONNECTOR_IDS 别名)
-    "deep_reader": [],              # 读本地文件 + WebFetch
-    "tech_strategist": [],          # 纯分析，Read + Write
-    "report_writer": [],            # 纯写作，Read + Write
+    "tech_decomposition": ['westock-mcp'],       # 板块/产业链/机构评级/资金流（技术背景补充）
+    "academic_scout": ['westock-mcp'],           # 板块/产业链/机构评级（行业背景补充）
+    "industry_scout": ['westock-mcp'],           # 板块/产业链/机构评级/券商研报（westock-mcp），补充 NeoData 行业研报
+    "enterprise_scout": LIT_QCC_CONNECTOR_IDS + ['westock-mcp'],  # 天眼查 MCP + westock-mcp（板块/产业链/机构评级/资金流）
+    "deep_reader": ['westock-mcp'],              # 板块/产业链（按需查标的背景）
+    "tech_strategist": ['westock-mcp'],          # 板块/产业链/机构评级/资金流（补充技术路线行业背景）
+    "report_writer": ['westock-mcp'],            # 板块/产业链/机构评级（按需引用）
 }
 
 # ── Collect 重试参数 ─────────────────────────────────────────

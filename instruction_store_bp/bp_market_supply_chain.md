@@ -92,6 +92,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | **TYC 两阶段** | 见下方 bash | 供应商/客户工商/股东/招投标/资质 | 供应链验证 |
 | **WebSearch** | WorkBuddy 内置 | 行业报告/政策/市场规模/白皮书 | 中英文双语 |
 | **WebFetch** | WorkBuddy 内置 | 深读行业报告/政策文件/统计数据 | 配合 WebSearch |
+| **westock-mcp** | 腾讯自选股 MCP（`data_sector`/`data_industry_chain`/`data_fund_flow`/`data_north_holding`/`data_rating` 等） | 上市竞对 板块/产业链/资金流/北向/机构评级 | 补充 NeoData 的板块维度 |
 
 ### NeoData 调用（A/HK 竞对行情/财报/板块，本维度主力）
 ```bash
@@ -218,6 +219,7 @@ web_fetch: {搜索结果中的URL}
 | 我要查什么 | 走哪个工具 | 为什么 |
 |-----------|-----------|--------|
 | A/HK 竞对行情/财报/板块 | NeoData (`neodata_search` data_type=api) | 结构化金融数据，多源聚合 |
+| **上市竞对 板块/产业链/资金流/北向/机构评级** | **westock-mcp（`data_sector`/`data_industry_chain`/`data_fund_flow`/`data_north_holding`/`data_rating`）** | **板块归属、产业链位置、资金流向、北向持仓、机构评级——比 NeoData 更细** |
 | A/HK 行业研报 | NeoData (`neodata_search` data_type=doc) | 券商行业深度报告 |
 | **行业新闻/政策动态/供应链新闻** | **NeoData (`neodata_search` data_type=doc)** | **行业新闻、政策解读、供应链动态** |
 | 美股竞对估值/财务 | yfinance (`yfinance_summary`) | 美股精确估值数字 |
