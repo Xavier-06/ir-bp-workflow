@@ -6,11 +6,8 @@ Wave 角色 slug 映射、Wave 角色分组、8 维度 slug 列表，以及收�
 """
 from __future__ import annotations
 
-# 企业数据 MCP connector ID 列表 —— 天眼查（替代原企查查 6 connector）
+# 企业数据 MCP connector ID 列表 —— 天眼查（工商/股东/司法/专利/知产）
 BP_TYC_CONNECTOR_IDS = ['tyc-mcp']
-
-# 向后兼容别名 —— 旧代码引用 BP_QCC_CONNECTOR_IDS 不会报错
-BP_QCC_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS
 
 # 结构化金融数据源 MCP connector ID 列表 —— 腾讯自选股（westock-mcp）
 # 面向上市公司的结构化金融数据：板块/产业链/资金流/北向/机构评级/券商研报（data_report）

@@ -71,7 +71,6 @@ STEP_ROLE = {
 # IR 子代理可调用的数据源 connector（仅限实际可用、已验证的源）
 # tyc-mcp: 天眼查（工商/股东/司法/专利/知产）
 # westock-mcp: 腾讯自选股（A/HK/美股实时行情/财务/券商研报/板块/产业链/资金流/北向/评级/新闻/选股）
-# ⚠️ tdx-connector(通达信) 与 qcc-company(企查查) 当前环境不可用，已剔除。
 # ⚠️ 之前写死为 ['tyc-mcp']，导致 westock 从未授权给子代理，
 #   子代理只能用 neodata(bash) + web_search + 天眼查，金融数据源利用率极低。
 IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp']
@@ -778,7 +777,7 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
         'output_path': str(output_path),
         'timeout': timeout,
         'thinking': 'high',
-        'connectorIds': IR_SUBAGENT_CONNECTOR_IDS,  # 天眼查/腾讯自选股/通达信/企查查 — 全部已连接的数据源
+        'connectorIds': IR_SUBAGENT_CONNECTOR_IDS,  # 天眼查 + 腾讯自选股（已授权 MCP 数据源）
         'created_at': datetime.now().isoformat(timespec='seconds'),
         'status': 'pending',  # pending → running → completed/failed
     }
@@ -1451,7 +1450,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             'team_name_template': 'ir-{task_id}',
             'team_name': team_name,
             'mode': 'bypassPermissions',
-            'connectorIds': IR_SUBAGENT_CONNECTOR_IDS,  # 天眼查 + 腾讯自选股（tdx/qcc 当前环境不可用，已剔除）
+            'connectorIds': IR_SUBAGENT_CONNECTOR_IDS,  # 天眼查 + 腾讯自选股（已授权 MCP 数据源）
             'prompt': prompt_body,
             'brief_path': brief_path,
             'output_path': output_path,

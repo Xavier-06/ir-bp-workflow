@@ -18,7 +18,7 @@
 | 开源项目/GitHub/HF | web_search | `web_search('github.com/{company} latest release {YYYY}')` | web_fetch 读 README |
 | 网页正文深度阅读 | web_fetch | 直接传 URL | search_deep |
 
-> ⚠️ **westock-mcp（腾讯自选股）是已授权的 MCP connector，子代理可直接调用，无需 bash。行业数据、行情、财务、研报、板块、产业链、资金流、选股类查询必须优先走该结构化源，禁止只用 web_search 兜底。tdx-connector(通达信) 与 qcc-company(企查查) 当前环境不可用，已移除。**
+> ⚠️ **westock-mcp（腾讯自选股）是已授权的 MCP connector，子代理可直接调用，无需 bash。行业数据、行情、财务、研报、板块、产业链、资金流、选股类查询必须优先走该结构化源，禁止只用 web_search 兜底。**
 
 ### NeoData 能力细分
 

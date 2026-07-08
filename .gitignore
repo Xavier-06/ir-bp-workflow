@@ -83,6 +83,11 @@ memory_agent/instructions/
 # Deprecated instruction files
 *.deprecated
 
+# Runtime downloaded/extracted papers (pipeline artifacts)
+downloaded_pdfs/
+extracted/
+--output/
+
 # Generated deliverables (produced by pipeline, not versioned)
 *.docx
 *.xlsx

@@ -29,7 +29,7 @@
                     │  Phase 01-07: 预处理（脚本，无子代理）     │
                     │                                        │
                     │  01 OCR 识别 → 结构化公司数据              │
-                    │  02 企查查工商验证 → 公司基本信息           │
+                    │  02 天眼查工商验证 → 公司基本信息           │
                     │  03 研究计划 → claim 矩阵 + LLM enrichment │
                     │  04 四维度预搜索 → 初始事实种子             │
                     │  05 共享尽调页 → 跨维度信息板               │
@@ -131,7 +131,7 @@
                     │                                        │
                     │  academic_scout: S2/OpenAlex/arXiv/DBLP  │
                     │  industry_scout: NeoData/研报/新闻         │
-                    │  enterprise_scout: QCC/SEC 企业尽调        │
+                    │  enterprise_scout: 天眼查/SEC 企业尽调      │
                     │  → Evidence Gate (PRISMA 完整性)           │
                     │  → Fact Store Merge → Shared State Refresh│
                     └───────────────────┬────────────────────┘
@@ -354,14 +354,14 @@ Layer 5: yfinance（美股估值）
 
 | 角色 | Wave | 职责 | 核心工具 |
 |------|------|------|---------|
-| `bp_company_team_compliance` | W1 | 团队/合规/治理 | QCC 17 项工具 + NeoData |
-| `bp_product_commercial` | W1 | 产品/商业化/客户 | QCC + search_gateway |
-| `bp_tech_ip_moat` | W1 | 技术/IP/护城河 | QCC IPR + yfinance |
-| `bp_market_supply_chain` | W1 | 市场/行业/供应链 | QCC + NeoData + search_gateway |
-| `bp_customer_revenue_validation` | W2 | 客户收入交叉验证 | QCC + web_search |
-| `bp_competition_positioning` | W3 | 竞品清单/差异化/可复制性 | QCC + NeoData + yfinance |
+| `bp_company_team_compliance` | W1 | 团队/合规/治理 | 天眼查 + NeoData |
+| `bp_product_commercial` | W1 | 产品/商业化/客户 | 天眼查 + search_gateway |
+| `bp_tech_ip_moat` | W1 | 技术/IP/护城河 | 天眼查 IPR + yfinance |
+| `bp_market_supply_chain` | W1 | 市场/行业/供应链 | 天眼查 + NeoData + search_gateway |
+| `bp_customer_revenue_validation` | W2 | 客户收入交叉验证 | 天眼查 + web_search |
+| `bp_competition_positioning` | W3 | 竞品清单/差异化/可复制性 | 天眼查 + NeoData + yfinance |
 | `bp_valuation_return` | W3 | 估值/回报/可比公司 | NeoData + yfinance + enrich_valuation |
-| `bp_dealbreaker_risk` | W4 | 红队风险/deal breaker | QCC risk 全面扫描 + search_gateway |
+| `bp_dealbreaker_risk` | W4 | 红队风险/deal breaker | 天眼查 risk 全面扫描 + search_gateway |
 
 每个角色的指令文件在 `instruction_store_bp/` 目录，含角色专属工具映射表。通用工具使用指南在 `_common_tool_guide.md`。
 
@@ -372,7 +372,7 @@ Layer 5: yfinance（美股估值）
 | # | Phase | 类型 | 说明 |
 |---|-------|------|------|
 | 01 | document_intake | 脚本 | VL OCR 识别 + 结构化抽取 |
-| 02 | company_verify | 脚本 | 企查查工商/风险验证 |
+| 02 | company_verify | 脚本 | 天眼查工商/风险验证 |
 | 03 | research_plan | dispatch | 研究计划骨架 + LLM enrichment |
 | 03c | research_plan_collect | 收集 | 合并 enrichment delta |
 | 04 | presearch | 脚本 | 4 维度预搜索 |
@@ -524,7 +524,7 @@ curl -fsSL https://raw.githubusercontent.com/Xavier-06/ir-bp-workflow/main/setup
 | Python 3.10+ | ✅ | 管线运行 |
 | WorkBuddy | ✅ | AI Agent 平台 |
 | VL 视觉模型（qwen3-vl 等） | BP 必需 | BP OCR 识别 |
-| 企查查 MCP（qcc-*） | BP 必需 | 工商验证/竞争分析 |
+| 天眼查 MCP（tyc-mcp） | BP 必需 | 工商验证/竞争分析 |
 | DuckDuckGo Search | ✅ | 搜索引擎 |
 | yfinance | ✅ | 金融估值数据 |
 | NeoData | 推荐 | A/HK 股首选数据源 |

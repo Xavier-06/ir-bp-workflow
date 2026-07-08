@@ -13,7 +13,7 @@
 | 7 | RAG_search | 向量记忆知识库 |
 | 8 | tushare / yahoo skill | 补充金融数据 |
 
-> ⚠️ westock-mcp 为 MCP connector，子代理在 `connectorIds` 中已授权，可直接调用，无需 bash。行业/行情/财务/研报/产业链/资金流/选股类查询必须优先走该结构化源，web_search 仅作突发新闻与长尾兜底。**通达信(tdx) 与 企查查(qcc) 当前环境不可用，已从授权清单移除。**
+> ⚠️ westock-mcp 为 MCP connector，子代理在 `connectorIds` 中已授权，可直接调用，无需 bash。行业/行情/财务/研报/产业链/资金流/选股类查询必须优先走该结构化源，web_search 仅作突发新闻与长尾兜底。
 
 ## 最新季度财报获取策略
 
