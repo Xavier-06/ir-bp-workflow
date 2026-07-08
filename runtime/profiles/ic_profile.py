@@ -1254,6 +1254,7 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     entity = job_ctx.entity or topic_metadata.get("entity", "")
     core_q = topic_metadata.get("core_question", "")
     sub_qs = topic_metadata.get("sub_questions", [])
+    research_content = topic_metadata.get("research_content", [])
     companies = topic_metadata.get("key_companies", [])
     has_presearch = (tasks_dir / f"{job_ctx.job_id}-presearch_results.json").exists()
 
@@ -1262,6 +1263,7 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     brief = {
         "entity": entity, "core_question": core_q,
         "sub_questions": sub_qs if isinstance(sub_qs, list) else [],
+        "research_content": research_content if isinstance(research_content, list) else [],
         "key_companies": companies if isinstance(companies, list) else [],
         "presearch_available": has_presearch,
         "metadata_path": str(topic_path),
@@ -1286,6 +1288,7 @@ Agent tool 参数：
 
 搜索之前必须先读 brief 文件(`*_ic_phase04_brief.json`), 从中提取:
 - core_question(核心课题), sub_questions(子问题列表), key_companies(关键公司列表)
+- research_content(研究内容列表) — 定义了课题的具体研究方向和维度，research plan 的 research_dimensions 必须 1:1 覆盖其中每一项
 - 如果有 presearch 数据也先读
 
 ## 搜索策略（按顺序执行）
@@ -1331,6 +1334,12 @@ Agent tool 参数：
 ```
 
 维度至少覆盖6个: 行业规模与增长、竞争格局、政策与监管、技术趋势、产业链分析、关键公司画像、财务基准对标、风险与催化剂。每个维度须包含 key_questions/data_sources/priority。
+
+## 研究内容覆盖（硬约束）
+
+brief 中的 `research_content` 列表定义了课题的具体研究方向。你的 `research_dimensions` 必须为 `research_content` 中的每一项设立对应的维度。
+例如: 若 research_content 包含 "GPU/ASIC/NPU/FPGA各品类定位与用途"，则必须有一个维度专门分析芯片品类。
+`claim_matrix` 也必须围绕 research_content 设计 claim，确保每个研究方向都有对应的验证 claim。
 """
 
     return {
@@ -1377,7 +1386,14 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
     # 降级
     print(f"  ⚠️ [ic phase04_collect] 子代理未产出 plan，使用空骨架降级", flush=True)
     from scripts.ic_research_planner import build_empty_skeleton
-    skeleton = build_empty_skeleton(task_id=job_ctx.job_id, entity=job_ctx.entity)
+    topic_path = tasks_dir / "ic_topic_metadata.json"
+    fallback_topic_meta: dict[str, Any] = {}
+    if topic_path.exists():
+        try:
+            fallback_topic_meta = json.loads(topic_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    skeleton = build_empty_skeleton(task_id=job_ctx.job_id, entity=job_ctx.entity, topic_metadata=fallback_topic_meta)
     plan_path.write_text(json.dumps(skeleton, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {
         "ok": True, "mode": "ic_research_plan",
@@ -1468,3 +1484,48 @@ class ICProfile(PipelineProfile):
         )
         self.runtime_root = runtime_root
         self.research_tier = effective_tier
+        self._active_phases = set(active_handlers.keys())
+
+    def phase_prerequisites(self) -> dict[str, list[str]]:
+        """声明 phase 间的关键产物依赖（对标 BP/IR profile）。
+
+        kernel 在 start_phase 跳过前置 phase 时，自动回填缺失产物。
+        """
+        return {
+            "phase04_research_plan": ["ic_topic_metadata.json"],
+            "phase05_extract": ["{task_id}-presearch_results.json"],
+            "phase06_precompute": ["{task_id}-ic_research_plan.json"],
+            "phase07_dispatch_prepare": ["{task_id}-ic_research_plan.json"],
+            "phase09_evidence_gate": ["{task_id}-ic_research_plan.json"],
+            "phase10_claim_coverage": ["{task_id}-ic_research_plan.json"],
+            "phase10b_cross_dimension_gate": ["{task_id}-ic_research_plan.json"],
+        }
+
+    def phase_outputs(self) -> dict[str, list[str]]:
+        """声明每个 phase 产出的关键文件（相对 workspace.root）。
+
+        kernel 用它构建反查表 file → producer_phase，
+        在依赖缺失时精准回填到产出该文件的 phase，而非盲选前置。
+        """
+        return {
+            "phase01_topic_intake": ["ic_topic_metadata.json"],
+            "phase02_multi_company_verify": [],
+            "phase03_presearch": ["{task_id}-presearch_results.json"],
+            "phase04_research_plan": [],  # 子代理直接生成 plan
+            "phase04_research_plan_collect": ["{task_id}-ic_research_plan.json"],
+            "phase05_extract": [],
+            "phase06_precompute": [],
+            "phase07_dispatch_prepare": [],
+            "phase08_dispatch_collect": [],
+            "phase08b_fact_store_init": ["{task_id}-fact_store.json"],
+            "phase08b5_shared_state_init": ["{task_id}-shared_state.json"],
+            "phase09_evidence_gate": ["{task_id}-ic_evidence_gate.json"],
+            "phase09b_fact_store_merge": ["{task_id}-fact_store.json"],
+            "phase10_claim_coverage": ["{task_id}-ic_claim_coverage.json"],
+            "phase10b_cross_dimension_gate": ["{task_id}-ic_cross_dimension_gate.json"],
+            "phase11_debate_review": ["{task_id}-debate_review.json"],
+            "phase11b_final_assembly": ["{task_id}-final_report.md"],
+            "phase11c_readability_review": ["{task_id}-ic_readability_review.json"],
+            "phase11d_investment_judgment": ["{task_id}-ic_investment_judgment.json"],
+            "phase12_delivery": [],
+        }
