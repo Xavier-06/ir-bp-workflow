@@ -380,10 +380,10 @@ def _run_industry_precompute(runtime_root: Path, job_ctx: JobContext) -> dict[st
 
 def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
                            sequential: bool = False) -> dict[str, Any]:
-    """Phase 4a: 使用 launch_next_wave 发射第一个 wave。
+    """Phase 07: launch_next_wave 发射子代理。
 
-    sequential=True: 每次只派发 wave 内一个 step，配合 has_more 循环调用，
-    避免并行 Task 子代理触发 API 429。
+    v1.0: 读取 ic_research_plan.json 的 activated_steps，只对激活的维度生成 wave step。
+    不相关的维度（如纯技术比较课题的 financial/valuation）不会被派发。
     """
     from scripts.ic_subagent_launcher import (
         launch_next_wave,
@@ -393,12 +393,27 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
     entity = job_ctx.entity
     market = job_ctx.market
 
+    # Read research plan to get step filter
+    tasks_dir = runtime_root / "data" / "tasks"
+    plan_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan.json"
+    step_filter: set[str] | None = None
+    if plan_path.exists():
+        try:
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            activated = plan.get("activated_steps", [])
+            if activated:
+                step_filter = set(activated)
+                print(f"  🎯 [ic-dispatch] 步骤过滤器: {sorted(step_filter)}", flush=True)
+        except Exception:
+            pass
+
     wave_result = launch_next_wave(
         task_id=job_ctx.job_id,
         entity=entity,
         query=job_ctx.query,
         market=market,
         sequential=sequential,
+        step_filter=step_filter,
     )
 
     if wave_result.get('all_done'):
@@ -407,7 +422,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
             "needs_dispatch": False,
             "has_more": False,
             "mode": "wave_orchestration",
-            "phase": "phase06_dispatch_prepare",
+            "phase": "phase07_dispatch_prepare",
             "job_id": job_ctx.job_id,
             "result": {
                 "message": "All waves already completed, proceed to collect",
@@ -427,7 +442,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
                 "needs_dispatch": True,
                 "has_more": False,
                 "mode": "wave_orchestration",
-                "phase": "phase06_dispatch_prepare",
+                "phase": "phase07_dispatch_prepare",
                 "job_id": job_ctx.job_id,
                 "result": {
                     "message": "当前 wave 所有 step 被依赖阻塞，等待前序 step 完成后重试",
@@ -440,7 +455,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
             "ok": False,
             "has_more": False,
             "mode": "wave_orchestration",
-            "phase": "phase06_dispatch_prepare",
+            "phase": "phase07_dispatch_prepare",
             "job_id": job_ctx.job_id,
             "result": {"error": "No steps dispatched in wave", "wave_result": wave_result},
         }
@@ -450,7 +465,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
         "needs_dispatch": True,
         "has_more": has_more,
         "mode": "wave_orchestration",
-        "phase": "phase06_dispatch_prepare",
+        "phase": "phase07_dispatch_prepare",
         "job_id": job_ctx.job_id,
         "result": {
             "wave_index": wave_result.get('wave_index'),

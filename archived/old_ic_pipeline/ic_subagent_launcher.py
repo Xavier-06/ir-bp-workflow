@@ -54,6 +54,51 @@ STATIC_WAVE_6 = ["step_investment_thesis", "step_risk_assessment", "step_scenari
 STATIC_WAVE_7 = ["step_master_synthesis"]
 STATIC_WAVE_8 = ["step_investment_playbook"]
 
+# ── 强制运行的结构性 step（不受 activated_steps 过滤影响）──
+# 这些 step 是管线骨架，不管课题性质如何都必须运行
+_ALWAYS_ACTIVE_STEPS = {
+    "step_executive_hypothesis",   # 投研假说先行
+    "step_value_chain",             # 产业链分析（dynamic wave 生成依赖）
+    "step_master_synthesis",        # 最终统稿
+}
+
+def _is_step_active(step_name: str, activated_steps: set[str]) -> bool:
+    """Check if a step should be active based on research plan's activated_steps.
+
+    Matching rules:
+    1. Exact match in activated_steps → active
+    2. For dynamic steps (step_dim_segid): match by base dimension name
+       e.g., step_competitive_upstream → matches step_competitive
+    3. Structural steps (_ALWAYS_ACTIVE_STEPS) → always active
+    4. Everything else → inactive (unless empty filter = all active)
+    """
+    if not activated_steps:
+        return True  # No filter → all steps active
+
+    if step_name in _ALWAYS_ACTIVE_STEPS:
+        return True
+
+    if step_name in activated_steps:
+        return True
+
+    # Dynamic step matching: strip segment suffix to get base name
+    # step_competitive_upstream_materials → step_competitive
+    parts = step_name.split("_")
+    # Try progressively shorter prefixes
+    for prefix_len in range(len(parts), 1, -1):
+        prefix = "_".join(parts[:prefix_len])
+        if prefix in activated_steps:
+            return True
+
+    return False
+
+
+def _filter_steps(steps: list[str], activated_steps: set[str]) -> list[str]:
+    """Filter a list of step names, keeping only active ones."""
+    if not activated_steps:
+        return steps  # No filter → all active
+    return [s for s in steps if _is_step_active(s, activated_steps)]
+
 # ── ConnectorIds 授权 ──
 # 按 step 前缀授予 connectorIds。tyc-mcp（天眼查）+ westock-mcp（腾讯自选股）。
 # tdx（通达信）/ qcc（企查查）当前环境不可用。
@@ -293,10 +338,11 @@ def _fallback_segments() -> list[dict]:
     ]
 
 
-def build_dynamic_wave_plan(task_id: str) -> dict:
+def build_dynamic_wave_plan(task_id: str, step_filter: set[str] | None = None) -> dict:
     """Wave 1 完成后调用。读取 value_chain 输出，生成完整动态计划。
 
     返回完整 wave_manifest。
+    step_filter: 从 research plan 的 activated_steps 传入，用于过滤无关维度。
     """
     segments = parse_segments_from_value_chain(task_id)
     all_seg_ids = [s["id"] for s in segments]
@@ -305,30 +351,37 @@ def build_dynamic_wave_plan(task_id: str) -> dict:
     dynamic_wave2 = []
     for seg in segments:
         for dim in SEGMENT_DIMS_W2:
-            dynamic_wave2.append(f"step_{dim}_{seg['id']}")
+            step = f"step_{dim}_{seg['id']}"
+            if _is_step_active(step, step_filter or set()):
+                dynamic_wave2.append(step)
 
     # Wave 3: 财务/估值/资本 × N segments
     dynamic_wave3 = []
     for seg in segments:
         for dim in SEGMENT_DIMS_W3:
-            dynamic_wave3.append(f"step_{dim}_{seg['id']}")
+            step = f"step_{dim}_{seg['id']}"
+            if _is_step_active(step, step_filter or set()):
+                dynamic_wave3.append(step)
 
     # Wave 4: 环节小结 × N segments（两阶段统稿的第一阶段）
     dynamic_wave4 = []
     for seg in segments:
-        dynamic_wave4.append(f"step_seg_synthesis_{seg['id']}")
+        step = f"step_seg_synthesis_{seg['id']}"
+        if _is_step_active(step, step_filter or set()):
+            dynamic_wave4.append(step)
 
-    # 完整 waves
+    # 完整 waves — 静态 waves 也应用 filter，动态 waves 已在上面过滤
+    sf = step_filter or set()
     waves = [
-        STATIC_WAVE_0,   # Wave 0: 投研假说
-        STATIC_WAVE_1,   # Wave 1: 静态
+        _filter_steps(STATIC_WAVE_0, sf),   # Wave 0: 投研假说
+        STATIC_WAVE_1,   # Wave 1: 静态（已在上层 filtered）
         dynamic_wave2,   # Wave 2: 动态竞争/技术/市场
         dynamic_wave3,   # Wave 3: 动态财务/估值/资本
         dynamic_wave4,   # Wave 4: 环节小结
-        STATIC_WAVE_5,   # Wave 5: 跨环节对比+催化剂+共识挑战
-        STATIC_WAVE_6,   # Wave 6: 投资论点+风险评估+场景敏感性
-        STATIC_WAVE_7,   # Wave 7: 统稿
-        STATIC_WAVE_8,   # Wave 8: 投资手册
+        _filter_steps(STATIC_WAVE_5, sf),   # Wave 5: 跨环节对比+催化剂+共识挑战
+        _filter_steps(STATIC_WAVE_6, sf),   # Wave 6: 投资论点+风险评估+场景敏感性
+        _filter_steps(STATIC_WAVE_7, sf),   # Wave 7: 统稿
+        _filter_steps(STATIC_WAVE_8, sf),   # Wave 8: 投资手册
     ]
 
     # ── 构建 STEP_DEPS ──
@@ -879,7 +932,7 @@ def check_step_quality(task_id: str, step: str) -> dict:
 # ═══════════════════════════════════════════════════════
 
 def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: str = 'cn',
-                     sequential: bool = False) -> dict:
+                     sequential: bool = False, step_filter: set[str] | None = None) -> dict:
     """统一入口 — 根据当前状态决定发射哪个 wave。
 
     状态机：
@@ -891,17 +944,23 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
     sequential=True: 每次只发射当前 wave 的第一个待处理 step，
     完成后再调下一次 → 避免并行 Task 子代理触发 API 429。
     返回 has_more 标志需继续调用。
+
+    step_filter: research plan 中的 activated_steps 集合，用于跳过无关维度。
+    只影响静态和动态 step 的激活决策——结构性 step 不受影响。
     """
     manifest = load_json(wave_manifest_path(task_id))
 
     # ── 状态 1：首次调用，Wave 0 还没跑 ──
     if manifest is None:
+        # 应用 step_filter 到初始 waves
+        w0 = _filter_steps(STATIC_WAVE_0, step_filter or set())
+        w1 = _filter_steps(STATIC_WAVE_1, step_filter or set())
         manifest = {
             "generated_at": datetime.now().isoformat(timespec='seconds'),
             "dynamic_generated": False,
             "current_wave_index": 0,
             "segments": [],
-            "waves": [STATIC_WAVE_0, STATIC_WAVE_1],
+            "waves": [w0, w1] if w0 and w1 else ([w0] if w0 else ([w1] if w1 else [])),
             "step_deps": {
                 "step_executive_hypothesis": [],
                 "step_ind_overview": [],
@@ -909,7 +968,8 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 "step_value_chain": [],
             },
             "completed_steps": [],
-            "total_waves": 2,  # Wave 0 + Wave 1，后续动态追加
+            "total_waves": 2,
+            "step_filter": list(step_filter) if step_filter else [],
         }
         save_json(wave_manifest_path(task_id), manifest)
 
@@ -935,8 +995,12 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             for step in STATIC_WAVE_1
         )
         if w1_completed:
+            # 从 manifest 恢复 step_filter（sequtial 调用时 step_filter 可能为 None）
+            saved_filter = set(manifest.get("step_filter", []))
+            effective_filter = step_filter or saved_filter
+
             # Wave 1 完成 + 之前没有动态生成 → 触发
-            manifest = build_dynamic_wave_plan(task_id)
+            manifest = build_dynamic_wave_plan(task_id, step_filter=effective_filter)
             waves = manifest["waves"]
             current_wave = waves[manifest["current_wave_index"]]
             # 更新 completed_steps
