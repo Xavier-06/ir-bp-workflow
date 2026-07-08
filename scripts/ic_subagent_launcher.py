@@ -102,26 +102,8 @@ def _filter_steps(steps: list[str], activated_steps: set[str]) -> list[str]:
 # ── ConnectorIds 授权 ──
 # 按 step 前缀授予 connectorIds。tyc-mcp（天眼查）+ westock-mcp（腾讯自选股）。
 # tdx（通达信）/ qcc（企查查）当前环境不可用。
-IC_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
-    "step_ind_overview": ["tyc-mcp", "westock-mcp"],
-    "step_policy_scan": ["tyc-mcp", "westock-mcp"],
-    "step_value_chain": ["tyc-mcp", "westock-mcp"],
-    "step_competitive": ["tyc-mcp", "westock-mcp"],
-    "step_tech": ["tyc-mcp", "westock-mcp"],
-    "step_market": ["tyc-mcp", "westock-mcp"],
-    "step_financial": ["westock-mcp"],
-    "step_valuation": ["westock-mcp"],
-    "step_capital": ["tyc-mcp", "westock-mcp"],
-    "step_executive_hypothesis": ["tyc-mcp", "westock-mcp"],
-    "step_cross_chain_compare": ["tyc-mcp", "westock-mcp"],
-    "step_catalyst_analysis": ["tyc-mcp", "westock-mcp"],
-    "step_consensus_challenge": ["tyc-mcp", "westock-mcp"],
-    "step_investment_thesis": ["tyc-mcp", "westock-mcp"],
-    "step_risk_assessment": ["tyc-mcp", "westock-mcp"],
-    "step_scenario_sensitivity": ["tyc-mcp", "westock-mcp"],
-    "step_master_synthesis": ["tyc-mcp", "westock-mcp"],
-    "step_investment_playbook": ["tyc-mcp", "westock-mcp"],
-}
+# ★ 从 ic_constants 导入，单一真实来源。
+from scripts.ic_constants import IC_ROLE_CONNECTOR_IDS, IC_DEFAULT_CONNECTOR_IDS
 
 def _get_step_connector_ids(step: str) -> list[str]:
     """Get connectorIds for a step, matching by prefix."""
@@ -129,7 +111,7 @@ def _get_step_connector_ids(step: str) -> list[str]:
     for prefix, ids in IC_ROLE_CONNECTOR_IDS.items():
         if step.startswith(prefix):
             return ids
-    return ["tyc-mcp", "westock-mcp"]  # default
+    return IC_DEFAULT_CONNECTOR_IDS  # default
 
 # ── 静态 step 的 STEP_DEPS（Wave 1 无依赖） ──
 STATIC_DEPS = {

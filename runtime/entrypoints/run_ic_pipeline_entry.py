@@ -25,14 +25,16 @@ def run_ic_job(
     dispatch_max_wait: int = 1800,
     dispatch_poll_interval: int = 30,
     start_phase: str | None = None,
+    research_tier: str = "deep",
 ) -> dict:
     """行业研究管线入口（旧版，行业全景模式）。
 
     entity: 行业名称（如"半导体"、"新能源汽车"）
     query: 研究查询（可包含重点公司名单）
     market: 市场区域（cn/hk/us）
+    research_tier: 研究深度 (deep/standard/quick)
     """
-    profile = ICProfile(runtime_root=RUNTIME_ROOT)
+    profile = ICProfile(runtime_root=RUNTIME_ROOT, research_tier=research_tier)
     job_ctx = JobContext(
         job_id=job_id,
         entity=entity,

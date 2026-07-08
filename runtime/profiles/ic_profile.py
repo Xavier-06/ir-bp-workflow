@@ -728,6 +728,78 @@ def _run_fact_store_init(runtime_root: Path, job_ctx: JobContext) -> dict[str, A
 
 
 # ═══════════════════════════════════════════════════════════
+# Phase 08b5: Shared State Init — IC 跨 Wave 共享状态
+# ═══════════════════════════════════════════════════════════
+
+def _run_shared_state_init(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 08b5: 初始化 IC 跨 Wave 共享状态。
+
+    在 fact_store_init 之后创建 ic_shared_state.json，
+    记录管线进度、claim 状态、开放问题和冲突，
+    供各 wave 子代理读取上下文。
+    """
+    import time as _time
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    # 读取 research plan 获取 claim 列表
+    plan_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan.json"
+    claim_status: dict[str, str] = {}
+    if plan_path.exists():
+        try:
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            for claim in plan.get("claim_matrix", []):
+                cid = claim.get("claim_id", "")
+                if cid:
+                    claim_status[cid] = "planned"
+        except Exception:
+            pass
+
+    # 读取 wave manifest 获取当前进度
+    from scripts.ic_subagent_launcher import wave_manifest_path as _wmp, load_json as _lj
+    wm = _lj(_wmp(job_ctx.job_id))
+    step_deps = wm.get("step_deps", {}) if wm else {}
+    current_wave = wm.get("current_wave", 1) if wm else 1
+
+    shared_state = {
+        "schema_version": "ic_shared_state.v1",
+        "job_id": job_ctx.job_id,
+        "entity": job_ctx.entity,
+        "wave_progress": current_wave,
+        "total_waves": wm.get("total_waves", 8) if wm else 8,
+        "claim_status": claim_status,
+        "claim_count": len(claim_status),
+        "completed_steps": list(step_deps.keys()),
+        "open_questions": [],
+        "evidence_conflicts": [],
+        "key_findings": {},
+        "created_at": _time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "updated_at": _time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    ss_path = tasks_dir / f"{job_ctx.job_id}-ic_shared_state.json"
+    ss_path.write_text(json.dumps(shared_state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    _sync_step_to_workspace(job_ctx, "ic_shared_state", ss_path)
+
+    print(f"  📦 [ic] shared_state 初始化: wave={current_wave}, "
+          f"claims={len(claim_status)}, steps={len(step_deps)}", flush=True)
+
+    return {
+        "ok": True,
+        "mode": "shared_state_init",
+        "phase": "phase08b5_shared_state_init",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "wave_progress": current_wave,
+            "claim_count": len(claim_status),
+            "step_count": len(step_deps),
+            "shared_state_path": str(ss_path),
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
 # Phase 09b: Fact Store Merge — 从 step 输出汇总事实
 # ═══════════════════════════════════════════════════════════
 
@@ -1338,32 +1410,18 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
 # ═══════════════════════════════════════════════════════════
 
 class ICProfile(PipelineProfile):
-    """IC (Industry Coverage) 行业研究管线 Profile — 18 Phase。
+    """IC (Industry Coverage) 行业研究管线 Profile — 20 Phase (v1.3).
 
-    Phase 执行顺序:
-      01 phase01_topic_intake            课题元数据解析
-      02 phase02_multi_company_verify    批量公司工商验证
-      03 phase03_presearch               行业预搜索 [heavy_bg]
-      04 phase04_research_plan           LLM 驱动研究计划 (needs_dispatch)
-      04 phase04_research_plan_collect   合并 enrichment
-      05 phase05_extract                 URL 内容抽取
-      06 phase06_precompute              行业预计算
-      07 phase07_dispatch_prepare        Wave 派发 (needs_dispatch, sequential)
-      08 phase08_dispatch_collect        Wave 收集 + 质量检查
-      08b phase08b_fact_store_init        Fact Store 初始化 [NEW v1.1]
-      09 phase09_evidence_gate            Step 输出质量门禁
-      09b phase09b_fact_store_merge       Fact Store 合并 [NEW v1.1]
-      10 phase10_claim_coverage           Claim 覆盖校验
-      10b phase10b_cross_dimension_gate   跨维度一致性 [NEW v1.1]
-      11 phase11_debate_review            对抗审查
-      11b phase11b_final_assembly         最终组装 [NEW v1.1]
-      11c phase11c_readability_review     可读性审查 [NEW v1.1]
-      11d phase11d_investment_judgment    投资判断汇总 [NEW v1.1]
-      12 phase12_delivery                 交付 [heavy_bg]
+    核心 phase 链: topic_intake → verify → presearch → research_plan → extract
+    → precompute → dispatch → collect → fact_store → shared_state → evidence_gate
+    → fact_store_merge → claim_coverage → cross_dimension_gate → debate_review
+    → final_assembly → readability_review → investment_judgment → delivery
 
-    v1.1 (2026-07-08): +6 phase — fact_store init/merge, cross_dimension_gate,
-    final_assembly, readability_review, investment_judgment
-    v1.2 (2026-07-08): +evidence_gate repair, +Stage Tier 分级 (deep/standard/quick)
+    Stage Tier:
+      deep (默认): 全量 20 phase
+      standard: 18 phase (跳过 readability_review + investment_judgment)
+      quick: 13 phase (跳过 evidence_gate + claim_coverage + cross_dimension_gate
+              + debate_review + final_assembly + readability + investment_judgment)
     """
     def __init__(self, runtime_root: Path, research_tier: str = "deep"):
         # ── Stage Tier 分类 ──
@@ -1402,9 +1460,10 @@ class ICProfile(PipelineProfile):
             "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
             "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
             "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-            # ── v1.1 新增 ──
-            "phase08b_fact_store_init": lambda job_ctx: _run_fact_store_init(runtime_root, job_ctx),
-            "phase09_evidence_gate": lambda job_ctx: _run_evidence_gate(runtime_root, job_ctx),
+                # ── v1.1 新增 ──
+                "phase08b_fact_store_init": lambda job_ctx: _run_fact_store_init(runtime_root, job_ctx),
+                "phase08b5_shared_state_init": lambda job_ctx: _run_shared_state_init(runtime_root, job_ctx),
+                "phase09_evidence_gate": lambda job_ctx: _run_evidence_gate(runtime_root, job_ctx),
             "phase09b_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
             "phase10_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
             "phase10b_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
