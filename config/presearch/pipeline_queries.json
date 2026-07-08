@@ -1,0 +1,210 @@
+{
+  "version": "1.0",
+  "description": "Per-pipeline presearch query strategies. Each pipeline defines query domains, sources to use, and generation rules.",
+  "pipelines": {
+    "ir": {
+      "label": "个股投研",
+      "query_domains": [
+        {
+          "key": "latest_news",
+          "label": "最新新闻",
+          "sources": ["tencent_news"],
+          "query_strategy": "生成2-3条新闻搜索：'{entity}' 最新 + '{entity} 公告/财报/事件'",
+          "max_queries": 3,
+          "priority": "first"
+        },
+        {
+          "key": "stock_financial",
+          "label": "行情与财务",
+          "sources": ["westock_finance", "web_search"],
+          "query_strategy": "生成2-4条财务搜索：'{entity}' PE/PB/ROE/营收增速/revenue growth",
+          "max_queries": 4,
+          "priority": "high"
+        },
+        {
+          "key": "industry_competition",
+          "label": "行业竞争格局",
+          "sources": ["westock_sector", "web_search", "neodata"],
+          "query_strategy": "生成2-3条行业搜索：'{entity}' industry market/行业 竞争格局/市场份额",
+          "max_queries": 3,
+          "priority": "high"
+        },
+        {
+          "key": "business_moat",
+          "label": "商业模式与护城河",
+          "sources": ["web_search", "neodata"],
+          "query_strategy": "生成2-3条业务搜索：'{entity}' business model/商业模式/竞争优势/moat",
+          "max_queries": 3,
+          "priority": "medium"
+        },
+        {
+          "key": "valuation_debate",
+          "label": "估值与分歧",
+          "sources": ["westock_report", "web_search"],
+          "query_strategy": "生成2条估值搜索：'{entity}' target price/估值/目标价/analyst rating",
+          "max_queries": 2,
+          "priority": "medium"
+        },
+        {
+          "key": "risk_catalyst",
+          "label": "风险与催化剂",
+          "sources": ["web_search", "tencent_news"],
+          "query_strategy": "生成2-3条风险搜索：'{entity}' risk/风险/competition threat/cash burn",
+          "max_queries": 3,
+          "priority": "low"
+        }
+      ],
+      "output_summary": true,
+      "max_total_queries": 20
+    },
+    "bp": {
+      "label": "BP 商业尽调",
+      "query_domains": [
+        {
+          "key": "company_background",
+          "label": "公司背景验证",
+          "sources": ["tyc_company", "web_search"],
+          "query_strategy": "搜索公司基本工商信息和公开背景",
+          "max_queries": 3,
+          "priority": "first"
+        },
+        {
+          "key": "latest_news",
+          "label": "最新动态",
+          "sources": ["tencent_news"],
+          "query_strategy": "生成2-3条新闻搜索：'{entity}' 融资/产品/合作/最新",
+          "max_queries": 3,
+          "priority": "high"
+        },
+        {
+          "key": "industry_market",
+          "label": "行业与市场",
+          "sources": ["westock_sector", "web_search", "neodata"],
+          "query_strategy": "生成2-4条行业搜索：'{entity}行业' 市场规模/增速/竞争",
+          "max_queries": 4,
+          "priority": "high"
+        },
+        {
+          "key": "competitor_check",
+          "label": "竞品验证",
+          "sources": ["web_search", "westock_report"],
+          "query_strategy": "生成2-3条竞品搜索：竞品名 + '{entity}' comparison/对比",
+          "max_queries": 3,
+          "priority": "medium"
+        },
+        {
+          "key": "tech_validation",
+          "label": "技术与专利",
+          "sources": ["tyc_company", "web_search"],
+          "query_strategy": "搜公司专利、技术团队背景",
+          "max_queries": 2,
+          "priority": "medium"
+        },
+        {
+          "key": "risk_signal",
+          "label": "风险信号",
+          "sources": ["web_search", "tencent_news"],
+          "query_strategy": "生成2条风险搜索：'{entity}' 诉讼/纠纷/负面",
+          "max_queries": 2,
+          "priority": "low"
+        }
+      ],
+      "output_summary": true,
+      "max_total_queries": 18
+    },
+    "ic": {
+      "label": "行业研究课题",
+      "query_domains": [
+        {
+          "key": "latest_news",
+          "label": "最新新闻与动态",
+          "sources": ["tencent_news"],
+          "query_strategy": "从课题核心问题+子问题中提取关键词，搜索最新新闻",
+          "max_queries": 4,
+          "priority": "first"
+        },
+        {
+          "key": "industry_overview",
+          "label": "行业概览",
+          "sources": ["westock_sector", "web_search", "neodata"],
+          "query_strategy": "从课题描述生成行业搜索：行业名 + 市场规模/增速/格局",
+          "max_queries": 4,
+          "priority": "high"
+        },
+        {
+          "key": "topic_deep_dive",
+          "label": "课题深度搜索",
+          "sources": ["web_search"],
+          "query_strategy": "将课题核心问题和子问题转化为搜索查询",
+          "max_queries": 6,
+          "priority": "high"
+        },
+        {
+          "key": "company_search",
+          "label": "关键公司搜索",
+          "sources": ["web_search", "tyc_company"],
+          "query_strategy": "对课题中列出的每家公司生成搜索查询",
+          "max_queries": 4,
+          "priority": "medium"
+        },
+        {
+          "key": "financial_benchmarks",
+          "label": "财务基准",
+          "sources": ["westock_finance", "westock_report"],
+          "query_strategy": "搜索行业财务基准数据（如果课题涉及财务维度）",
+          "max_queries": 3,
+          "priority": "medium"
+        },
+        {
+          "key": "policy_scan",
+          "label": "政策与监管",
+          "sources": ["web_search", "tencent_news"],
+          "query_strategy": "搜索相关产业政策、监管变化",
+          "max_queries": 2,
+          "priority": "low"
+        }
+      ],
+      "output_summary": true,
+      "max_total_queries": 22
+    },
+    "lit": {
+      "label": "文献综述",
+      "query_domains": [
+        {
+          "key": "academic_search",
+          "label": "学术搜索",
+          "sources": ["web_search"],
+          "query_strategy": "将 tech_direction + sub_topics 转为学术搜索查询",
+          "max_queries": 5,
+          "priority": "first"
+        },
+        {
+          "key": "industry_news",
+          "label": "产业化新闻",
+          "sources": ["tencent_news", "web_search"],
+          "query_strategy": "搜索子方向的产业化动态和公司进展",
+          "max_queries": 3,
+          "priority": "high"
+        },
+        {
+          "key": "company_tracking",
+          "label": "公司跟踪",
+          "sources": ["web_search", "tyc_company"],
+          "query_strategy": "对 target_companies 做定向搜索",
+          "max_queries": 3,
+          "priority": "high"
+        },
+        {
+          "key": "patent_scan",
+          "label": "专利扫描",
+          "sources": ["tyc_company", "web_search"],
+          "query_strategy": "搜 sub_topics 相关专利",
+          "max_queries": 2,
+          "priority": "low"
+        }
+      ],
+      "output_summary": true,
+      "max_total_queries": 14
+    }
+  }
+}

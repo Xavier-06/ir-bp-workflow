@@ -1,0 +1,80 @@
+{
+  "version": "1.0",
+  "sources": {
+    "web_search": {
+      "label": "Web 通用搜索",
+      "description": "通过 search_gateway 进行网页搜索，覆盖 SearXNG/DDG/Yahoo",
+      "module": "scripts.search_gateway",
+      "function": "search",
+      "params": {
+        "max_results": 8,
+        "timeout": 20
+      },
+      "suitable_for": ["通用信息", "行业研究", "公司信息", "技术文献", "政策法规"],
+      "freshness": "T+0~小时级"
+    },
+    "tencent_news": {
+      "label": "腾讯新闻",
+      "description": "7×24 实时新闻搜索，分钟级时效，适合突发消息和最新动态",
+      "module": "scripts.presearch_adapters.tencent_news_adapter",
+      "function": "search_news",
+      "params": {
+        "max_results": 10
+      },
+      "suitable_for": ["突发新闻", "最新动态", "政策发布", "公司公告", "行业事件"],
+      "freshness": "分钟级",
+      "priority": "highest_for_news"
+    },
+    "westock_sector": {
+      "label": "腾讯自选股-行业板块",
+      "description": "行业板块数据：成分股、指数、PE分位、涨跌幅",
+      "source": "westock-mcp",
+      "tool": "data_sector",
+      "suitable_for": ["行业概览", "板块估值", "行业成分", "行业涨跌"],
+      "freshness": "T+0"
+    },
+    "westock_chain": {
+      "label": "腾讯自选股-产业链",
+      "description": "产业链上下游结构数据",
+      "source": "westock-mcp",
+      "tool": "data_industry_chain",
+      "suitable_for": ["产业链分析", "上下游关系", "供应链"],
+      "freshness": "T+0"
+    },
+    "westock_finance": {
+      "label": "腾讯自选股-财务数据",
+      "description": "营收/利润/ROE/毛利率等结构化财务指标",
+      "source": "westock-mcp",
+      "tool": "data_finance",
+      "suitable_for": ["财务分析", "行业基准", "公司财务"],
+      "freshness": "T+0~T+1"
+    },
+    "westock_report": {
+      "label": "腾讯自选股-券商研报",
+      "description": "机构研报摘要和核心观点",
+      "source": "westock-mcp",
+      "tool": "data_report",
+      "suitable_for": ["投资观点", "机构评级", "行业研报"],
+      "freshness": "T+0~T+1"
+    },
+    "tyc_company": {
+      "label": "天眼查-企业工商",
+      "description": "企业工商注册/股东/经营/司法/专利信息",
+      "source": "tyc-mcp",
+      "suitable_for": ["企业背景", "股东结构", "司法风险", "知识产权"],
+      "freshness": "T+0"
+    },
+    "neodata": {
+      "label": "NeoData 深度研报",
+      "description": "A/H 股深度研报、行业数据、宏观数据",
+      "module": "scripts.search_gateway",
+      "function": "neodata_search",
+      "params": {
+        "max_results": 10,
+        "timeout": 30
+      },
+      "suitable_for": ["深度分析", "行业数据", "宏观研究", "公司深度"],
+      "freshness": "T+0~T+1"
+    }
+  }
+}

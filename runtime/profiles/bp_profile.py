@@ -128,14 +128,30 @@ def _run_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 
 def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     if os.environ.get("IRBP_BG_CHILD") == "1":
-        from scripts.bp_presearch import run_presearch
-        return run_presearch(job_ctx)
+        # v5.1: 使用统一 presearch_query_builder
+        from scripts.presearch_query_builder import execute_presearch
+        task_dir = _task_dir(runtime_root, job_ctx)
+        entity, market = _bp_entity_market(job_ctx)
+        result = execute_presearch(
+            pipeline="bp",
+            task_id=job_ctx.job_id,
+            entity=entity,
+            market=market,
+            output_dir=task_dir,
+        )
+        return {
+            "ok": True,
+            "mode": "presearch",
+            "phase": "phase03_presearch",
+            "job_id": job_ctx.job_id,
+            "result": result,
+        }
     from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase04_presearch")
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase03_presearch")
     if cached is not None:
         print(f"  📦 [bp] 使用缓存的 presearch 结果", flush=True)
         return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase04_presearch", pipeline="bp")
+    return launch_heavy_phase(runtime_root, job_ctx, "phase03_presearch", pipeline="bp")
 
 
 def _bp_entity_market(job_ctx: JobContext) -> tuple[str, str]:

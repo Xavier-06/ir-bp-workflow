@@ -693,10 +693,10 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
 
 
 def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 03: 快速预搜 — web + NeoData，验证方向可行性。
+    """Phase 03: 预搜索 — v1.0 unified presearch_query_builder。
 
-    v3.1: research_plan.json 可能还未生成（presearch 前置于 research plan），
-    优先读 tech_decomposition.json 获取 sub_topics。
+    数据源: web_search + tencent_news + tyc。
+    优先从 tech_decomposition.json 获取 sub_topics 和 target_companies 用于定向搜索。
     """
     task = _task_dir(runtime_root, job_ctx)
     presearch_path = task / "presearch.json"
@@ -723,44 +723,59 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
         else:
             sub_topics.append(str(item))
 
-    results = {"sub_topic_results": [], "viable": True, "warnings": []}
+    target_companies = decompose.get("target_companies", [])
 
-    # 简化预搜: 每个 sub_topic 做一次快速 web 查询
+    # 使用统一 presearch 引擎
     try:
-        sys_path = str(runtime_root)
-        if sys_path not in __import__('sys').path:
-            __import__('sys').path.insert(0, sys_path)
-        from scripts.search_gateway import search, neodata_search, verify_engines
+        from scripts.presearch_query_builder import execute_presearch
 
-        engines = verify_engines()
-        results["engines"] = engines
+        result = execute_presearch(
+            pipeline="lit",
+            task_id=job_ctx.job_id,
+            entity=job_ctx.entity,
+            sub_topics=sub_topics,
+            target_companies=target_companies,
+            output_dir=task,
+        )
 
-        for st in sub_topics[:3]:  # 最多预搜 3 个 sub_topic
-            ddg_results = search(st, max_results=5, prefer="ddg")
-            neodata_results = neodata_search(f"{st} 行业研报", data_type="all") if engines.get("neodata") else []
-            results["sub_topic_results"].append({
-                "sub_topic": st,
-                "ddg_count": len(ddg_results),
-                "neodata_count": len(neodata_results),
-                "viable": len(ddg_results) > 0,
-            })
-            if len(ddg_results) == 0:
-                results["warnings"].append(f"sub_topic '{st}': DDG 返回 0 结果，可能需要调整关键词")
+        presearch_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        _sync_to_workspace(job_ctx, presearch_path, "presearch.json")
 
+        return {
+            "ok": result.get("total_evidence", 0) > 0,
+            "mode": "presearch",
+            "phase": "phase03_presearch",
+            "job_id": job_ctx.job_id,
+            "result": result,
+        }
     except Exception as e:
-        results["viable"] = True  # 预搜失败不阻断管线
-        results["warnings"].append(f"presearch error: {str(e)}")
+        # Fallback: 简化的 viability check
+        results = {"sub_topic_results": [], "viable": True, "warnings": [f"presearch error (fallback): {str(e)}"]}
+        try:
+            sys_path = str(runtime_root)
+            if sys_path not in __import__('sys').path:
+                __import__('sys').path.insert(0, sys_path)
+            from scripts.search_gateway import search
+            for st in sub_topics[:3]:
+                ddg_results = search(st, max_results=5, prefer="ddg")
+                results["sub_topic_results"].append({
+                    "sub_topic": st,
+                    "ddg_count": len(ddg_results),
+                    "viable": len(ddg_results) > 0,
+                })
+        except Exception:
+            pass
 
-    presearch_path.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    _sync_to_workspace(job_ctx, presearch_path, "presearch.json")
+        presearch_path.write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        _sync_to_workspace(job_ctx, presearch_path, "presearch.json")
 
-    return {
-        "ok": results["viable"],
-        "mode": "script",
-        "phase": "phase03_presearch",
-        "job_id": job_ctx.job_id,
-        "result": results,
-    }
+        return {
+            "ok": results["viable"],
+            "mode": "presearch_fallback",
+            "phase": "phase03_presearch",
+            "job_id": job_ctx.job_id,
+            "result": results,
+        }
 
 
 def _run_shared_state_init(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:

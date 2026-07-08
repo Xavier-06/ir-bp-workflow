@@ -432,34 +432,39 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
 
 
 def _run_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """presearch 实际执行逻辑（子进程内直接调用）"""
-    from scripts.ir_presearch import run_presearch
+    """presearch 实际执行逻辑 — v5.1: 使用统一 presearch_query_builder。
+
+    数据源: web_search + tencent_news + westock_finance/sector/report + neodata
+    """
+    from scripts.presearch_query_builder import execute_presearch
 
     metadata = job_ctx.metadata or {}
     ticker = metadata.get("ticker", "")
     english_name = metadata.get("english_name", "")
 
-    # 自动解析 ticker 和英文名（如果 submit 时没传）
+    # 自动解析 ticker 和英文名
     if not ticker:
         try:
             from tasks.valuation_enricher import _resolve_ticker, _CN_TO_EN_SEARCH
             resolved = _resolve_ticker(job_ctx.entity)
             if resolved:
                 ticker = resolved
-                print(f"  🔍 自动解析 ticker: {job_ctx.entity} → {ticker}", flush=True)
             if not english_name:
                 english_name = _CN_TO_EN_SEARCH.get(job_ctx.entity, "")
-                if english_name:
-                    print(f"  🔍 自动解析英文名: {job_ctx.entity} → {english_name}", flush=True)
         except Exception:
             pass
 
-    result = run_presearch(
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    result = execute_presearch(
+        pipeline="ir",
         task_id=job_ctx.job_id,
         entity=job_ctx.entity,
         market=job_ctx.market,
         ticker=ticker,
         english_name=english_name,
+        output_dir=tasks_dir,
     )
     return {
         "ok": True,

@@ -191,14 +191,33 @@ def _run_industry_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str
 
 
 def _run_industry_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """presearch 实际执行逻辑 — 使用行业专用预搜索"""
-    from scripts.ic_presearch import run_ic_presearch
+    """presearch actual execution — v1.0: unified presearch_query_builder.
 
-    result = run_ic_presearch(
+    Data sources: web_search + tencent_news + westock sector/finance + tyc + neodata
+    Queries driven by topic metadata (core_question, sub_questions, key_companies).
+    """
+    from scripts.presearch_query_builder import execute_presearch
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    # Read topic metadata for IC-specific query generation
+    topic_metadata = None
+    topic_path = tasks_dir / "ic_topic_metadata.json"
+    if topic_path.exists():
+        try:
+            topic_metadata = json.loads(topic_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    result = execute_presearch(
+        pipeline="ic",
         task_id=job_ctx.job_id,
         entity=job_ctx.entity,
         market=job_ctx.market,
         query=job_ctx.query or "",
+        topic_metadata=topic_metadata,
+        output_dir=tasks_dir,
     )
     return {
         "ok": True,
