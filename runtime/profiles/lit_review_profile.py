@@ -10,8 +10,8 @@
 Phase 清单 (20 phases):
   01 intake             解析输入
   02 tech_decomposition 分解 sub_topic + 搜索关键词矩阵
-  03 research_plan      核心问题 + claim matrix
-  04 presearch          快速预搜验证方向可行性
+  03 presearch          预搜索 [heavy_bg] ★v2.0: 基于 intake 数据独立运行，前置到 research plan 之前
+  04 research_plan      核心问题 + claim matrix (cached check, 基于 presearch 结果规划)
   05 shared_state_init  初始化 fact_store + shared_state
   06 wave1_dispatch_prepare  W1 调度 (3 角色)
   07 wave1_dispatch_collect  W1 收集 (4 层防御)
@@ -693,37 +693,56 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
 
 
 def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 03: 预搜索 — v1.0 unified presearch_query_builder。
+    """Phase 03: 预搜索 — v2.0 heavy_bg + westock。
 
-    数据源: web_search + tencent_news + tyc。
-    优先从 tech_decomposition.json 获取 sub_topics 和 target_companies 用于定向搜索。
+    v2.0 变更 (2026-07-08):
+      - 改为 heavy_bg 后台执行，不再阻塞管线
+      - 基于 intake.json 的 tech_direction 生成查询，不再依赖 tech_decomposition
+      - 新增 westock_report + westock_sector + neodata 数据源
+      - 查询预算提升到 20+
+
+    数据源: web_search + tencent_news + tyc + westock_report + westock_sector + neodata
+    """
+    if os.environ.get("IRBP_BG_CHILD") == "1":
+        return _run_presearch_inner(runtime_root, job_ctx)
+    from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase03_presearch")
+    if cached is not None:
+        print(f"  📦 [lit] 使用缓存的 presearch 结果", flush=True)
+        return cached
+    return launch_heavy_phase(runtime_root, job_ctx, "phase03_presearch", pipeline="lit")
+
+
+def _run_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """presearch 实际执行 — v2.0: 基于 intake 数据独立搜索。
+
+    v2.0: 从 intake.json 提取 tech_direction 和 query 生成搜索方向，
+    不再依赖 tech_decomposition 的 sub_topics——presearch 在 research plan 之前独立运行。
     """
     task = _task_dir(runtime_root, job_ctx)
     presearch_path = task / "presearch.json"
 
-    # 优先从 tech_decomposition.json 读 sub_topics（phase02 产物）
-    decompose_path = task / "tech_decomposition.json"
-    decompose = {}
-    if decompose_path.exists():
-        decompose = json.loads(decompose_path.read_text(encoding="utf-8"))
+    # v2.0: 从 intake.json 读取 tech_direction 和 query（不依赖 tech_decomposition）
+    intake_path = task / "intake.json"
+    intake = {}
+    if intake_path.exists():
+        try:
+            intake = json.loads(intake_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
 
-    # fallback: 读 research_plan.json
-    plan_path = task / "research_plan.json"
-    if plan_path.exists():
-        plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        decompose["sub_topics"] = decompose.get("sub_topics") or plan.get("sub_topics", [])
+    tech_direction = intake.get("tech_direction") or job_ctx.entity
+    query = intake.get("query") or job_ctx.query or ""
 
-    raw_sub_topics = decompose.get("sub_topics", [job_ctx.entity])
-    sub_topics: list[str] = []
-    for item in raw_sub_topics:
-        if isinstance(item, str):
-            sub_topics.append(item)
-        elif isinstance(item, dict):
-            sub_topics.append(item.get("name") or item.get("sub_topic") or str(item))
-        else:
-            sub_topics.append(str(item))
+    # 从 tech_direction 拆分关键词作为 sub_topics
+    # 按常见分隔符切分 (逗号/顿号/分号/和/与/及)
+    raw_parts = __import__('re').split(r'[,，、;；和与及]', tech_direction)
+    sub_topics = [p.strip() for p in raw_parts if len(p.strip()) > 1]
+    if not sub_topics:
+        sub_topics = [tech_direction]
 
-    target_companies = decompose.get("target_companies", [])
+    # target_companies 从 intake 中提取（如果有）
+    target_companies = intake.get("target_companies", [])
 
     # 使用统一 presearch 引擎
     try:
@@ -735,6 +754,7 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
             entity=job_ctx.entity,
             sub_topics=sub_topics,
             target_companies=target_companies,
+            query=query,
             output_dir=task,
         )
 

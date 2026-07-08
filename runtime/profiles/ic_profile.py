@@ -541,20 +541,26 @@ def _run_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     """Phase 09: 检查所有 completed step 的输出质量。
 
     检查维度: citations/content_length/structure。
-    FAIL → 管线终止。WARN → 记录到 deferred_fixes。
+    v1.1: FAIL → 派发修复子代理 → max 1 retry → 降级 WARN 放行。
     """
-    from scripts.ic_evidence_gate import run_evidence_gate
-    from scripts.ic_subagent_launcher import wave_manifest_path, load_json, step_output_path
+    from scripts.ic_evidence_gate import (
+        run_evidence_gate,
+        build_repair_manifest,
+        read_repair_attempts,
+        write_repair_attempt,
+        _MAX_REPAIR_RETRIES,
+    )
+    from scripts.ic_subagent_launcher import wave_manifest_path as _wmp, load_json as _lj, step_output_path as _sop
 
     tasks_dir = runtime_root / "data" / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    wm = load_json(wave_manifest_path(job_ctx.job_id))
+    wm = _lj(_wmp(job_ctx.job_id))
     step_deps = wm.get("step_deps", {}) if wm else {}
 
     step_outputs: dict[str, Path] = {}
     for step_name in step_deps:
-        out = step_output_path(job_ctx.job_id, step_name)
+        out = _sop(job_ctx.job_id, step_name)
         if out.exists():
             step_outputs[step_name] = out
 
@@ -565,6 +571,93 @@ def _run_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     )
 
     overall = result.get("overall_verdict", "WARN")
+
+    # ── Repair 逻辑 (v1.1) ──
+    if overall == "FAIL":
+        repair_attempt = read_repair_attempts(job_ctx.job_id, tasks_dir)
+
+        if repair_attempt < _MAX_REPAIR_RETRIES:
+            # 取第一个 FAIL step 做修复
+            failed_steps = [
+                sn for sn, sr in result.get("per_step", {}).items()
+                if sr.get("verdict") == "FAIL"
+            ]
+            if not failed_steps:
+                return {
+                    "ok": False,
+                    "mode": "ic_evidence_gate",
+                    "phase": "phase09_evidence_gate",
+                    "job_id": job_ctx.job_id,
+                    "result": result,
+                }
+
+            first_fail = failed_steps[0]
+            fail_path = _sop(job_ctx.job_id, first_fail)
+            fail_reasons = [
+                i.get("detail", i.get("type", ""))
+                for i in result.get("per_step", {}).get(first_fail, {}).get("issues", [])
+            ]
+
+            manifest = build_repair_manifest(
+                task_id=job_ctx.job_id,
+                failed_step=first_fail,
+                step_output_path=fail_path,
+                failure_reasons=fail_reasons,
+                tasks_dir=tasks_dir,
+            )
+            write_repair_attempt(job_ctx.job_id, tasks_dir, repair_attempt + 1, failed_steps)
+
+            has_more = len(failed_steps) > 1
+            instruction = (
+                f"## IC Evidence Gate Repair — {first_fail}\n\n"
+                f"MANDATORY: Read the repair manifest at:\n"
+                f"  {manifest.get('manifest_path', '')}\n\n"
+                f"Use the Agent tool with:\n"
+                f"  - name = 'ic-repair-{first_fail}'\n"
+                f"  - team_name = 'ic-{{task_id}}'\n"
+                f"  - mode = 'bypassPermissions'\n"
+                f"  - prompt = manifest's 'system_prompt' field (COMPLETE)\n"
+                f"  - connectorIds = ['westock-mcp', 'tyc-mcp']\n\n"
+                f"子代理修复完成后，用 start_phase='phase09_evidence_gate' 恢复管线。\n"
+                + (f"\n⚠️ has_more=True: 还有 {len(failed_steps)-1} 个 step 待修复，恢复后会返回下一个 manifest。\n"
+                   if has_more else "\n✅ 这是最后一个待修复 step，恢复后推进到 fact_store_merge。\n")
+                + "\n## ⚠️ 绝对禁止:\n"
+                  "- 禁止并行派发多个 repair 子代理\n"
+                  "- 禁止在 repair 完成前推进管线\n"
+            )
+
+            print(f"  🔧 [ic] evidence gate REPAIR #{repair_attempt + 1}: {first_fail}", flush=True)
+
+            return {
+                "ok": True,
+                "needs_dispatch": True,
+                "has_more": has_more,
+                "mode": "ic_evidence_gate_repair",
+                "phase": "phase09_evidence_gate",
+                "job_id": job_ctx.job_id,
+                "dispatch_info": {
+                    "manifests": [manifest.get("manifest_path", "")],
+                    "remaining_manifests": [],
+                    "is_repair": True,
+                },
+                "result": result,
+                "instruction": instruction,
+            }
+
+        else:
+            # Repair 次数耗尽 → 降级 WARN 放行
+            print(f"  ⚠️ [ic] evidence gate repair exhausted ({repair_attempt}/{_MAX_REPAIR_RETRIES}), "
+                  f"降级为 WARN 放行", flush=True)
+            result["overall_verdict"] = "WARN"
+            result["repair_exhausted"] = True
+            overall = "WARN"
+
+    print(f"  🔍 [ic] evidence gate: {overall}, "
+          f"pass={result.get('summary', {}).get('pass', 0)}, "
+          f"warn={result.get('summary', {}).get('warn', 0)}, "
+          f"fail={result.get('summary', {}).get('fail', 0)}", flush=True)
+
+    # IC evidence gate: FAIL → ok=False (but repair handles this), WARN → ok=True
     return {
         "ok": overall != "FAIL",
         "mode": "ic_evidence_gate",
@@ -1270,32 +1363,68 @@ class ICProfile(PipelineProfile):
 
     v1.1 (2026-07-08): +6 phase — fact_store init/merge, cross_dimension_gate,
     final_assembly, readability_review, investment_judgment
+    v1.2 (2026-07-08): +evidence_gate repair, +Stage Tier 分级 (deep/standard/quick)
     """
-    def __init__(self, runtime_root: Path):
+    def __init__(self, runtime_root: Path, research_tier: str = "deep"):
+        # ── Stage Tier 分类 ──
+        # quick: 跳过 evidence_gate, claim_coverage, cross_dimension_gate,
+        #        debate_review, final_assembly, readability_review, investment_judgment
+        # standard: 跳过 readability_review, investment_judgment
+        # deep: 全量 18 phase
+        _QUICK_SKIP = frozenset({
+            "phase09_evidence_gate", "phase10_claim_coverage",
+            "phase10b_cross_dimension_gate", "phase11_debate_review",
+            "phase11b_final_assembly", "phase11c_readability_review",
+            "phase11d_investment_judgment",
+        })
+        _STANDARD_SKIP = frozenset({
+            "phase11c_readability_review", "phase11d_investment_judgment",
+        })
+
+        skip_phases: set[str] = set()
+        effective_tier = research_tier.strip().lower()
+        if effective_tier == "quick":
+            skip_phases = set(_QUICK_SKIP)
+        elif effective_tier == "standard":
+            skip_phases = set(_STANDARD_SKIP)
+
+        if skip_phases:
+            print(f"  🎯 [ic] Stage Tier: {effective_tier}, 跳过 {len(skip_phases)} phase(s): "
+                  f"{sorted(skip_phases)}", flush=True)
+
+        all_handlers = {
+            "phase01_topic_intake": lambda job_ctx: _run_topic_intake(runtime_root, job_ctx),
+            "phase02_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
+            "phase03_presearch": lambda job_ctx: _run_industry_presearch(runtime_root, job_ctx),
+            "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
+            "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
+            "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
+            "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
+            "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
+            "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
+            # ── v1.1 新增 ──
+            "phase08b_fact_store_init": lambda job_ctx: _run_fact_store_init(runtime_root, job_ctx),
+            "phase09_evidence_gate": lambda job_ctx: _run_evidence_gate(runtime_root, job_ctx),
+            "phase09b_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
+            "phase10_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
+            "phase10b_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
+            "phase11_debate_review": lambda job_ctx: _run_debate_review(runtime_root, job_ctx),
+            "phase11b_final_assembly": lambda job_ctx: _run_final_assembly(runtime_root, job_ctx),
+            "phase11c_readability_review": lambda job_ctx: _run_readability_review(runtime_root, job_ctx),
+            "phase11d_investment_judgment": lambda job_ctx: _run_investment_judgment(runtime_root, job_ctx),
+            "phase12_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
+        }
+
+        # 按 tier 过滤
+        active_handlers = {
+            ph: handler for ph, handler in all_handlers.items()
+            if ph not in skip_phases
+        }
+
         super().__init__(
             name="ic",
             job_type="industry_coverage",
-            phase_handlers={
-                "phase01_topic_intake": lambda job_ctx: _run_topic_intake(runtime_root, job_ctx),
-                "phase02_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
-                "phase03_presearch": lambda job_ctx: _run_industry_presearch(runtime_root, job_ctx),
-                "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
-                "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
-                "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
-                "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
-                "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
-                "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-                # ── v1.1 新增 ──
-                "phase08b_fact_store_init": lambda job_ctx: _run_fact_store_init(runtime_root, job_ctx),
-                "phase09_evidence_gate": lambda job_ctx: _run_evidence_gate(runtime_root, job_ctx),
-                "phase09b_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
-                "phase10_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
-                "phase10b_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
-                "phase11_debate_review": lambda job_ctx: _run_debate_review(runtime_root, job_ctx),
-                "phase11b_final_assembly": lambda job_ctx: _run_final_assembly(runtime_root, job_ctx),
-                "phase11c_readability_review": lambda job_ctx: _run_readability_review(runtime_root, job_ctx),
-                "phase11d_investment_judgment": lambda job_ctx: _run_investment_judgment(runtime_root, job_ctx),
-                "phase12_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
-            },
+            phase_handlers=active_handlers,
         )
         self.runtime_root = runtime_root
+        self.research_tier = effective_tier

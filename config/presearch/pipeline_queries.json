@@ -173,7 +173,7 @@
         {
           "key": "academic_search",
           "label": "学术搜索",
-          "sources": ["web_search"],
+          "sources": ["web_search", "neodata"],
           "query_strategy": "将 tech_direction + sub_topics 转为学术搜索查询",
           "max_queries": 5,
           "priority": "first"
@@ -183,15 +183,15 @@
           "label": "产业化新闻",
           "sources": ["tencent_news", "web_search"],
           "query_strategy": "搜索子方向的产业化动态和公司进展",
-          "max_queries": 3,
+          "max_queries": 4,
           "priority": "high"
         },
         {
           "key": "company_tracking",
           "label": "公司跟踪",
-          "sources": ["web_search", "tyc_company"],
-          "query_strategy": "对 target_companies 做定向搜索",
-          "max_queries": 3,
+          "sources": ["web_search", "tyc_company", "westock_report"],
+          "query_strategy": "对 target_companies 做定向搜索，结合券商研报",
+          "max_queries": 4,
           "priority": "high"
         },
         {
@@ -199,12 +199,28 @@
           "label": "专利扫描",
           "sources": ["tyc_company", "web_search"],
           "query_strategy": "搜 sub_topics 相关专利",
-          "max_queries": 2,
+          "max_queries": 3,
           "priority": "low"
+        },
+        {
+          "key": "market_evidence",
+          "label": "市场证据",
+          "sources": ["westock_sector", "westock_report", "neodata"],
+          "query_strategy": "搜索 sub_topics 相关的行业研报、板块数据、产业化证据",
+          "max_queries": 3,
+          "priority": "medium"
+        },
+        {
+          "key": "financial_benchmark",
+          "label": "财务基准",
+          "sources": ["westock_finance", "web_search"],
+          "query_strategy": "搜索 target_companies 的财务数据和估值基准",
+          "max_queries": 3,
+          "priority": "medium"
         }
       ],
       "output_summary": true,
-      "max_total_queries": 14
+      "max_total_queries": 22
     }
   }
 }
