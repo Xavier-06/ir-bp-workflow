@@ -237,7 +237,7 @@ Agent tool 参数：
 - name = 'ir-research-planner'
 - team_name = 'ir-{job_ctx.job_id}'
 - mode = 'bypassPermissions'
-- connectorIds = ['westock-mcp']
+- connectorIds = ['westock-mcp', 'tyc-mcp']
 - prompt = 下面的完整 prompt
 
 ### 子代理 Prompt:
@@ -259,6 +259,11 @@ Agent tool 参数：
 
 ### Step 2: 行业数据 (westock-mcp)
 - `data_sector` 查所属行业 → PE分位/成分股/涨跌幅
+
+### Step 2.5: 公司工商验证 (tyc-mcp)
+- `tyc-mcp.search_companies`: query "{entity}" → 获取 company_id
+- `tyc-mcp.get_company_basic_profile`: 注册资本、成立日期、经营范围、股东结构、融资历史、法律风险
+- 如果 tyc 找不到（小市值/非上市公司）：记录在 search_summary 中，继续后续步骤
 
 ### Step 3: 资金面（大盘股可查，小盘股跳过）
 - `data_fund_flow` 查 {entity} → 主力资金净流入
@@ -289,7 +294,7 @@ step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, st
   "schema_version": "ir_research_plan.v3",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}", "market": "{market}",
   "query": "{query}", "ticker": "{ticker}", "english_name": "{english_name}",
-  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "web_search:公开信息"],
+  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "web_search:公开信息"],
   "core_questions": [...], "strategic_questions": [...],
   "fact_requirements": [...], "section_requirements": {{}},
   "coverage_matrix": {{}}, "plan_status": "ready",
@@ -305,7 +310,7 @@ step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, st
         "dispatch_info": {
             "brief_path": str(brief_path),
             "presearch_path": str(presearch_path) if has_presearch else None,
-            "subagent_connector_ids": ["westock-mcp"],
+            "subagent_connector_ids": ["westock-mcp", "tyc-mcp"],
             "task_dir": str(tasks_dir),
         },
         "instruction": instruction,

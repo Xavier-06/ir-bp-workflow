@@ -1451,9 +1451,9 @@ class ICProfile(PipelineProfile):
             "phase01_topic_intake": lambda job_ctx: _run_topic_intake(runtime_root, job_ctx),
             "phase02_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
             "phase03_presearch": lambda job_ctx: _run_industry_presearch(runtime_root, job_ctx),
+            "phase03b_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
             "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
             "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
-            "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
             "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
             "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
             "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
@@ -1492,8 +1492,8 @@ class ICProfile(PipelineProfile):
         kernel 在 start_phase 跳过前置 phase 时，自动回填缺失产物。
         """
         return {
+            "phase03b_extract": ["{task_id}-presearch_results.json"],
             "phase04_research_plan": ["ic_topic_metadata.json"],
-            "phase05_extract": ["{task_id}-presearch_results.json"],
             "phase06_precompute": ["{task_id}-ic_research_plan.json"],
             "phase07_dispatch_prepare": ["{task_id}-ic_research_plan.json"],
             "phase09_evidence_gate": ["{task_id}-ic_research_plan.json"],
@@ -1511,9 +1511,9 @@ class ICProfile(PipelineProfile):
             "phase01_topic_intake": ["ic_topic_metadata.json"],
             "phase02_multi_company_verify": [],
             "phase03_presearch": ["{task_id}-presearch_results.json"],
+            "phase03b_extract": [],
             "phase04_research_plan": [],  # 子代理直接生成 plan
             "phase04_research_plan_collect": ["{task_id}-ic_research_plan.json"],
-            "phase05_extract": [],
             "phase06_precompute": [],
             "phase07_dispatch_prepare": [],
             "phase08_dispatch_collect": [],

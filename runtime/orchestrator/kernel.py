@@ -41,6 +41,23 @@ class OrchestratorKernel:
         # kernel 用它在缺失文件时精准定位应该回填哪个 phase，而非盲选前置
         phase_outputs = getattr(profile, "phase_outputs", lambda: {})()
 
+        # ── 占位符替换：{task_id} → 实际 job_id ──
+        # IR/IC 管线在 phase_prerequisites/phase_outputs 中使用 {task_id} 占位符，
+        # BP 管线使用固定文件名（如 bp_research_plan.json）无占位符。
+        # kernel 必须在使用前统一替换，否则带占位符的路径永远匹配不到实际文件。
+        task_id = job_ctx.job_id
+        _resolve = lambda p: p.replace("{task_id}", task_id)
+
+        resolved_prereqs: dict[str, list[str]] = {}
+        for phase_name, files in prerequisites.items():
+            resolved_prereqs[phase_name] = [_resolve(f) for f in files]
+        prerequisites = resolved_prereqs
+
+        resolved_outputs: dict[str, list[str]] = {}
+        for phase_name, files in phase_outputs.items():
+            resolved_outputs[phase_name] = [_resolve(f) for f in files]
+        phase_outputs = resolved_outputs
+
         # 构建反查表：file → 产出该文件的 phase_name
         file_to_producer: dict[str, str] = {}
         for phase_name, outputs in phase_outputs.items():
