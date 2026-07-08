@@ -1,101 +1,56 @@
 {
   "meta": {
-    "version": 3,
-    "created_at": "2026-05-29T22:00:00",
-    "updated_at": "2026-06-02T23:20:00",
-    "changelog": "v3: P1P2升级 — 新增催化剂/共识挑战/场景敏感性Agent + P2深度增强"
+    "version": 1,
+    "created_at": "2026-07-08",
+    "task_type": "ic_课题研究",
+    "description": "IC 课题研究管线指令库 v1 — 6 角色 / 3 Wave 架构，映射课题池 48 个课题"
   },
   "roles": [
     {
-      "key": "行业_投研假说",
-      "name": "投研假说 Agent (Wave 0)",
-      "file": "行业_投研假说.md"
+      "key": "ic_market_overview",
+      "name": "市场全景分析师 (Wave 1)",
+      "file": "ic_market_overview.md",
+      "description": "市场规模测算、增速、TAM/SAM/SOM、关键数据点收集、需求侧分析"
     },
     {
-      "key": "行业_概览",
-      "name": "行业概览 Agent",
-      "file": "行业_概览.md"
+      "key": "ic_competitive_landscape",
+      "name": "竞争格局分析师 (Wave 1)",
+      "file": "ic_competitive_landscape.md",
+      "description": "玩家格局、市场份额、商业模式对比、龙头企业深度画像"
     },
     {
-      "key": "行业_政策扫描",
-      "name": "政策扫描 Agent",
-      "file": "行业_政策扫描.md"
+      "key": "ic_tech_product",
+      "name": "技术产品分析师 (Wave 1)",
+      "file": "ic_tech_product.md",
+      "description": "技术路线对比、关键技术参数、产品演进、专利分析、标准制定"
     },
     {
-      "key": "行业_产业链分析",
-      "name": "产业链分析 Agent",
-      "file": "行业_产业链分析.md"
+      "key": "ic_supply_chain",
+      "name": "产业链分析师 (Wave 2)",
+      "file": "ic_supply_chain.md",
+      "description": "产业链上中下游解构、价值分布、关键环节、瓶颈、国产替代路径"
     },
     {
-      "key": "行业_环节分析_W2",
-      "name": "环节分析 Agent (Wave2: 竞争/技术/市场)",
-      "file": "行业_环节分析_W2.md"
+      "key": "ic_policy_risk",
+      "name": "政策风险分析师 (Wave 2)",
+      "file": "ic_policy_risk.md",
+      "description": "政策法规扫描、监管趋势、地缘风险、出口管制、风险评估矩阵"
     },
     {
-      "key": "行业_环节分析_W3",
-      "name": "环节分析 Agent (Wave3: 财务/估值/资本)",
-      "file": "行业_环节分析_W3.md"
-    },
-    {
-      "key": "行业_环节小结",
-      "name": "环节小结 Agent",
-      "file": "行业_环节小结.md"
-    },
-    {
-      "key": "行业_跨环节对比",
-      "name": "跨环节对比 Agent",
-      "file": "行业_跨环节对比.md"
-    },
-    {
-      "key": "行业_催化剂分析",
-      "name": "催化剂分析 Agent (Wave 5)",
-      "file": "行业_催化剂分析.md"
-    },
-    {
-      "key": "行业_共识挑战",
-      "name": "共识挑战 Agent (Wave 5)",
-      "file": "行业_共识挑战.md"
-    },
-    {
-      "key": "行业_投资机会",
-      "name": "投资机会 Agent",
-      "file": "行业_投资机会.md"
-    },
-    {
-      "key": "行业_风险评估",
-      "name": "风险评估 Agent",
-      "file": "行业_风险评估.md"
-    },
-    {
-      "key": "行业_场景敏感性",
-      "name": "场景敏感性 Agent (Wave 6)",
-      "file": "行业_场景敏感性.md"
-    },
-    {
-      "key": "行业_统稿",
-      "name": "行业研报统稿 Agent",
-      "file": "行业_统稿.md"
-    },
-    {
-      "key": "行业_投资手册",
-      "name": "投资手册 Agent (Wave 8)",
-      "file": "行业_投资手册.md"
+      "key": "ic_report_synthesizer",
+      "name": "课题统稿师 (Wave 3)",
+      "file": "ic_report_synthesizer.md",
+      "description": "综合全部维度输出为结构化课题研究报告"
     }
   ],
   "pipeline_bindings": {
-    "ic": {
-      "step_executive_hypothesis": "行业_投研假说",
-      "step_ind_overview": "行业_概览",
-      "step_policy_scan": "行业_政策扫描",
-      "step_value_chain": "行业_产业链分析",
-      "step_cross_chain_compare": "行业_跨环节对比",
-      "step_catalyst_analysis": "行业_催化剂分析",
-      "step_consensus_challenge": "行业_共识挑战",
-      "step_investment_thesis": "行业_投资机会",
-      "step_risk_assessment": "行业_风险评估",
-      "step_scenario_sensitivity": "行业_场景敏感性",
-      "step_master_report": "行业_统稿",
-      "step_investment_playbook": "行业_投资手册"
+    "ic_topic": {
+      "ic_market_overview": "ic_market_overview",
+      "ic_competitive_landscape": "ic_competitive_landscape",
+      "ic_tech_product": "ic_tech_product",
+      "ic_supply_chain": "ic_supply_chain",
+      "ic_policy_risk": "ic_policy_risk",
+      "ic_report_synthesizer": "ic_report_synthesizer"
     }
   }
 }
