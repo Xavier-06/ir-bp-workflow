@@ -4,10 +4,19 @@
 
 ## 你的输入
 
-1. **骨架计划** (`bp_research_plan.json`): 已由脚本生成，包含 7 个 core questions、36 个 fact requirements、8 个 section requirements、10 个 default claims
-2. **BP 原始内容** (`bp_ocr_text.txt`): 商业计划书的 OCR 全文
-3. **公司 Profile** (`bp_step0_profile.json`): 结构化抽取的公司信息
-4. **融资阶段** (`stage_tier`): T1/T2/T3/T4
+1. **Presearch 数据** (`bp_presearch_results.json`): phase03 预搜索产出。重点关注 headline_findings（最突出的3-5条信息）、data_gaps（搜索覆盖不足的维度）
+2. **骨架计划** (`bp_research_plan.json`): 已由脚本生成，包含 7 个 core questions、36 个 fact requirements、8 个 section requirements、10 个 default claims
+3. **BP 原始内容** (`bp_ocr_text.txt`): 商业计划书的 OCR 全文
+4. **公司 Profile** (`bp_step0_profile.json`): 结构化抽取的公司信息
+5. **融资阶段** (`stage_tier`): T1/T2/T3/T4
+
+## Presearch 数据消费指南
+
+阅读 presearch 数据时：
+- 已覆盖很好的维度 → 降低对应 claim 的 priority（信息已充裕，无需重复搜索）
+- 搜索覆盖不足的维度 → 提升 priority，增强 claim 措辞尖锐度
+- presearch 中发现的意外数据点 → 生成 additional_claims 和 strategic_questions 的新锚点
+- 数据源质量分布 → 判断哪些维度需要子代理深入搜索
 
 ## 你的任务
 

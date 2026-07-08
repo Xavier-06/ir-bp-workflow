@@ -68,57 +68,55 @@ def _sync_artifact_to_workspace(job_ctx: JobContext, artifact_type: str, src_pat
 
 
 # ═══════════════════════════════════════════════════════════
-# Phase 0: Scope Definition — 行业边界定义
+# Phase 01: Topic Intake — 课题元数据解析
 # ═══════════════════════════════════════════════════════════
 
-def _run_scope_definition(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 0: 定义行业边界 + 关键词扩展 + 关键公司名单解析。
+def _run_topic_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 01: 解析课题元数据（从 DOCX/MD/JSON 或直接 entity/query）。
 
-    输出行业关键词列表和初步公司清单，供后续 phase 使用。
+    产出 ic_topic_metadata.json，供下游 presearch 和 research plan 使用。
     """
-    entity = job_ctx.entity
-    query = job_ctx.query or entity
-
-    # 基础关键词扩展
-    keywords = {
-        "primary": entity,
-        "variants": [entity],
-        "search_queries": [
-            f'"{entity}" 行业 市场规模 竞争格局',
-            f'"{entity}" 产业链 上中下游',
-            f'"{entity}" industry market size competitive landscape',
-        ],
-    }
-
-    # 解析 query 中的公司名（逗号/顿号/空格分隔）
-    company_list = []
-    if query and query != entity:
-        import re
-        parts = re.split(r'[,，、\s]+', query)
-        company_list = [p.strip() for p in parts if p.strip() and p.strip() != entity]
+    from scripts.ic_topic_intake import parse_topic_metadata
 
     tasks_dir = runtime_root / "data" / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
+    # 获取课题源文件路径
+    metadata = job_ctx.metadata or {}
+    topic_file = metadata.get("topic_file", "")
+    entity = job_ctx.entity or metadata.get("entity", "")
+
+    result = parse_topic_metadata(
+        topic_source=topic_file or entity,
+        entity=entity,
+        output_dir=tasks_dir,
+    )
+
+    # 同时保留 scope 兼容性（legacy ic_presearch 需要）
+    company_list = result.get("key_companies", [])
     scope_data = {
         "industry": entity,
-        "query": query,
+        "query": job_ctx.query or "",
         "market": job_ctx.market,
-        "keywords": keywords,
+        "keywords": {"primary": entity, "variants": [entity], "search_queries": []},
         "company_list": company_list,
         "defined_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
     scope_path = tasks_dir / f"{job_ctx.job_id}-ic_scope.json"
-    scope_path.write_text(
-        json.dumps(scope_data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    scope_path.write_text(json.dumps(scope_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return {
         "ok": True,
-        "mode": "scope_definition",
-        "phase": "phase01_scope_definition",
+        "mode": "topic_intake",
+        "phase": "phase01_topic_intake",
         "job_id": job_ctx.job_id,
-        "result": scope_data,
+        "result": {
+            "metadata_path": str(tasks_dir / "ic_topic_metadata.json"),
+            "core_question": result.get("core_question", ""),
+            "sub_questions_count": len(result.get("sub_questions", [])),
+            "key_companies": company_list,
+            "category": result.get("category", ""),
+        },
     }
 
 
@@ -548,6 +546,183 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 
 
 # ═══════════════════════════════════════════════════════════
+# Phase 04: Research Plan — LLM 驱动的 enrichment
+# ═══════════════════════════════════════════════════════════
+
+def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 04: IC 研究计划 — needs_dispatch 模式。
+
+    phase03 已完成 presearch → 生成空骨架 → 主 AI 读 presearch 数据 enrichment。
+    脚本只提供空骨架和文件路径，所有研究内容由 LLM 决定。
+    """
+    from scripts.ic_research_planner import build_empty_skeleton
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    # 读取课题元数据
+    topic_path = tasks_dir / "ic_topic_metadata.json"
+    topic_metadata: dict[str, Any] = {}
+    if topic_path.exists():
+        try:
+            topic_metadata = json.loads(topic_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    entity = job_ctx.entity or topic_metadata.get("entity", "")
+
+    # 生成空骨架
+    skeleton = build_empty_skeleton(
+        task_id=job_ctx.job_id,
+        entity=entity,
+        topic_metadata=topic_metadata,
+    )
+    skeleton_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan_skeleton.json"
+    skeleton_path.write_text(json.dumps(skeleton, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    # 检查 presearch 数据
+    presearch_path = tasks_dir / f"{job_ctx.job_id}-presearch_results.json"
+    presearch_ready = presearch_path.exists()
+
+    # 写 enrichment instruction
+    instruction_path = tasks_dir / f"{job_ctx.job_id}-ic_phase04_enrichment_instruction.md"
+    instruction_text = _ic_enrichment_instruction(
+        entity=entity,
+        tasks_dir=tasks_dir,
+        presearch_ready=presearch_ready,
+    )
+    instruction_path.write_text(instruction_text, encoding="utf-8")
+
+    return {
+        "ok": True,
+        "needs_dispatch": True,
+        "has_more": False,
+        "mode": "ic_research_plan",
+        "phase": "phase04_research_plan",
+        "job_id": job_ctx.job_id,
+        "dispatch_info": {
+            "instruction_path": str(instruction_path),
+            "skeleton_path": str(skeleton_path),
+            "presearch_path": str(presearch_path),
+            "presearch_ready": presearch_ready,
+            "topic_metadata_path": str(topic_path),
+            "task_dir": str(tasks_dir),
+        },
+        "instruction": instruction_text,
+    }
+
+
+def _ic_enrichment_instruction(
+    entity: str,
+    tasks_dir: Path,
+    presearch_ready: bool = False,
+) -> str:
+    """生成 phase04 enrichment 的主 AI 指令。"""
+    presearch_section = ""
+    if presearch_ready:
+        presearch_section = """\
+## Presearch 数据（已就绪）
+phase03 已完成预搜索。你必须先阅读 presearch 数据再生成研究计划：
+- 完整结果: `*_presearch_results.md` 或 `*_presearch_results.json`
+- 摘要: `*_presearch_summary.json`
+
+Presearch 数据消费规则：
+- presearch 覆盖好的维度 → 可适当降低对应 claim/question 的 priority
+- presearch 明显搜不到的维度 → 提升 priority，扩展搜索关键词
+- presearch 中发现的意外线索 → 生成 additional_claims
+"""
+    else:
+        presearch_section = """\
+## Presearch 数据（未就绪）
+phase03 预搜索可能未完成或未产生结果。你仍需要生成完整的研究计划，但在 data_gaps 中标注"presearch unavailable"。
+"""
+
+    return f"""\
+PHASE04 IC RESEARCH PLAN ENRICHMENT — 主 AI 执行
+
+## 背景
+课题 `{entity}` 的研究规划由你全权负责。脚本不提供任何预定义的 core_questions、claim_matrix 或 fact_requirements。
+
+{presearch_section}
+
+## 输入文件（按读取顺序）
+1. Presearch 数据: `*_presearch_results.*` + `*_presearch_summary.json`（如就绪）
+2. 课题元数据: `ic_topic_metadata.json`
+3. 空骨架: `*_ic_research_plan_skeleton.json`
+4. Enrichment 指令库: `instruction_store_ic/ic_research_plan_enrichment.md`
+
+## 执行步骤
+1. 读取 instruction_store_ic/ic_research_plan_enrichment.md 了解完整输出格式
+2. 读取课题元数据，理解核心问题、子问题、研究内容
+3. （如 presearch 就绪）读取 presearch 数据，了解当前信息覆盖情况
+4. 基于课题元数据 + presearch 数据，生成完整的研究计划（core_questions、claim_matrix、fact_requirements、step 激活列表）
+5. 将输出写入 `*_ic_research_plan_enrichment.json`
+6. 用 start_phase='phase04_research_plan_collect' 恢复管线
+
+## 关键约束
+- core_questions[0] 必须是课题元数据中的原始核心问题
+- 所有 fact_key 由你命名，无预定义列表
+- step 激活决策基于课题内容，不要默认激活所有 step
+- 输出格式严格遵循 instruction_store_ic/ic_research_plan_enrichment.md
+"""
+
+
+def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 04 collect: 读取 LLM 输出的完整 research plan → 校验 → 落盘。"""
+    from scripts.ic_research_planner import (
+        apply_enrichment,
+        load_skeleton,
+        load_enrichment,
+        write_research_plan,
+    )
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    skeleton_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan_skeleton.json"
+
+    if not skeleton_path.exists():
+        return {
+            "ok": False,
+            "mode": "ic_research_plan",
+            "phase": "phase04_research_plan_collect",
+            "job_id": job_ctx.job_id,
+            "result": {"error": "skeleton file not found"},
+        }
+
+    skeleton = load_skeleton(skeleton_path)
+
+    enrichment_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan_enrichment.json"
+    if not enrichment_path.exists():
+        print(f"  ⚠️ [phase04_collect] enrichment 文件不存在，plan 保持空骨架状态", flush=True)
+        return {
+            "ok": True,
+            "mode": "ic_research_plan",
+            "phase": "phase04_research_plan_collect",
+            "job_id": job_ctx.job_id,
+            "result": {"plan_path": str(skeleton_path), "enrichment": "missing_fallback"},
+        }
+
+    enrichment = load_enrichment(enrichment_path)
+    plan = apply_enrichment(skeleton, enrichment)
+
+    plan_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan.json"
+    write_research_plan(plan_path, plan)
+
+    return {
+        "ok": plan.get("plan_status") == "ready",
+        "mode": "ic_research_plan",
+        "phase": "phase04_research_plan_collect",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "plan_path": str(plan_path),
+            "plan_status": plan.get("plan_status"),
+            "core_questions_count": len(plan.get("core_questions", [])),
+            "claim_count": len(plan.get("claim_matrix", [])),
+            "activated_steps": plan.get("activated_steps", []),
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
 # IC Profile
 # ═══════════════════════════════════════════════════════════
 
@@ -557,14 +732,16 @@ class ICProfile(PipelineProfile):
             name="ic",
             job_type="industry_coverage",
             phase_handlers={
-                "phase01_scope_definition": lambda job_ctx: _run_scope_definition(runtime_root, job_ctx),
+                "phase01_topic_intake": lambda job_ctx: _run_topic_intake(runtime_root, job_ctx),
                 "phase02_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
                 "phase03_presearch": lambda job_ctx: _run_industry_presearch(runtime_root, job_ctx),
-                "phase04_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
-                "phase05_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
-                "phase06_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
-                "phase07_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-                "phase08_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
+                "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
+                "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
+                "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
+                "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
+                "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
+                "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
+                "phase09_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
             },
         )
         self.runtime_root = runtime_root

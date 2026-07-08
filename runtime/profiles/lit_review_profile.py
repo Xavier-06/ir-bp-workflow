@@ -634,7 +634,7 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
 
     if plan_path.exists() and plan_path.stat().st_size > 100:
         data = json.loads(plan_path.read_text(encoding="utf-8"))
-        return {"ok": True, "mode": "cached", "phase": "phase03_research_plan", "job_id": job_ctx.job_id, "result": data}
+        return {"ok": True, "mode": "cached", "phase": "phase04_research_plan", "job_id": job_ctx.job_id, "result": data}
 
     # 兜底: phase02 子代理没写 research_plan → 从 tech_decomposition.json 构建
     decompose_path = task / "tech_decomposition.json"
@@ -686,24 +686,34 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     return {
         "ok": True,
         "mode": "fallback_script",
-        "phase": "phase03_research_plan",
+        "phase": "phase04_research_plan",
         "job_id": job_ctx.job_id,
         "result": {"output_path": str(plan_path), "claim_count": len(claim_matrix)},
     }
 
 
 def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 04: 快速预搜 — OpenAlex + arXiv + NeoData 各查一次，验证方向可行性。"""
+    """Phase 03: 快速预搜 — web + NeoData，验证方向可行性。
+
+    v3.1: research_plan.json 可能还未生成（presearch 前置于 research plan），
+    优先读 tech_decomposition.json 获取 sub_topics。
+    """
     task = _task_dir(runtime_root, job_ctx)
     presearch_path = task / "presearch.json"
 
+    # 优先从 tech_decomposition.json 读 sub_topics（phase02 产物）
+    decompose_path = task / "tech_decomposition.json"
+    decompose = {}
+    if decompose_path.exists():
+        decompose = json.loads(decompose_path.read_text(encoding="utf-8"))
+
+    # fallback: 读 research_plan.json
     plan_path = task / "research_plan.json"
-    plan = {}
     if plan_path.exists():
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        decompose["sub_topics"] = decompose.get("sub_topics") or plan.get("sub_topics", [])
 
-    # sub_topics 类型兼容: 兼容 list[str] 和 list[dict]
-    raw_sub_topics = plan.get("sub_topics", [job_ctx.entity])
+    raw_sub_topics = decompose.get("sub_topics", [job_ctx.entity])
     sub_topics: list[str] = []
     for item in raw_sub_topics:
         if isinstance(item, str):
@@ -715,7 +725,7 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
 
     results = {"sub_topic_results": [], "viable": True, "warnings": []}
 
-    # 简化预搜: 只检查 search_gateway 是否可用 + 每个 sub_topic 做一次快速查询
+    # 简化预搜: 每个 sub_topic 做一次快速 web 查询
     try:
         sys_path = str(runtime_root)
         if sys_path not in __import__('sys').path:
@@ -747,7 +757,7 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     return {
         "ok": results["viable"],
         "mode": "script",
-        "phase": "phase04_presearch",
+        "phase": "phase03_presearch",
         "job_id": job_ctx.job_id,
         "result": results,
     }
@@ -2404,8 +2414,8 @@ class LitReviewProfile(PipelineProfile):
                 # Phase 01-05: 准备
                 "phase01_intake": _bind(_run_intake),
                 "phase02_tech_decomposition": _bind(_run_tech_decomposition),
-                "phase03_research_plan": _bind(_run_research_plan),
-                "phase04_presearch": _bind(_run_presearch),
+                "phase03_presearch": _bind(_run_presearch),
+                "phase04_research_plan": _bind(_run_research_plan),
                 "phase05_shared_state_init": _bind(_run_shared_state_init),
                 # Phase 06-10: Wave 1
                 "phase06_wave1_dispatch_prepare": _bind(_run_wave1_dispatch_prepare),
@@ -2432,8 +2442,8 @@ class LitReviewProfile(PipelineProfile):
         """声明每个 phase 需要的文件依赖 — Kernel 据此做 auto-backfill。"""
         return {
             "phase02_tech_decomposition": ["intake.json"],
-            "phase03_research_plan": ["intake.json", "tech_decomposition.json"],
-            "phase04_presearch": ["research_plan.json"],
+            "phase04_research_plan": ["intake.json", "tech_decomposition.json"],
+            "phase03_presearch": ["tech_decomposition.json"],
             "phase05_shared_state_init": ["research_plan.json"],
             # Wave 1
             "phase06_wave1_dispatch_prepare": ["research_plan.json", "shared_state.json"],
@@ -2483,7 +2493,7 @@ class LitReviewProfile(PipelineProfile):
             "phase01_intake": ["intake.json"],
             "phase02_tech_decomposition": ["tech_decomposition.json"],
             "phase03_research_plan": ["research_plan.json"],
-            "phase04_presearch": ["presearch.json"],
+            "phase03_presearch": ["presearch.json"],
             "phase05_shared_state_init": ["fact_store.json", "shared_state.json"],
             # Wave 1
             "phase06_wave1_dispatch_prepare": [],  # dispatch 不产出文件

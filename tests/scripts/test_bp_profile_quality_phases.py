@@ -57,9 +57,9 @@ def test_bp_profile_registers_research_plan_before_presearch(tmp_path):
     assert "phase29_bp_debate_review" in phases
     assert "phase30_bp_final_assembly" in phases
     assert "phase31_bp_readability_review" in phases
-    assert phases.index("phase02_company_verify") < phases.index("phase03_research_plan")
-    assert phases.index("phase03_research_plan") < phases.index("phase04_presearch")
-    assert phases.index("phase04_presearch") < phases.index("phase05_bp_shared_page_init")
+    assert phases.index("phase02_company_verify") < phases.index("phase03_presearch")
+    assert phases.index("phase03_presearch") < phases.index("phase04_research_plan")
+    assert phases.index("phase04_research_plan_collect") < phases.index("phase05_bp_shared_page_init")
     assert phases.index("phase05_bp_shared_page_init") < phases.index("phase06_search_plan_compile")
     assert phases.index("phase06_search_plan_compile") < phases.index("phase07_bp_fact_store_bootstrap")
     assert phases.index("phase07_bp_fact_store_bootstrap") < phases.index("phase08_dispatch_prepare")

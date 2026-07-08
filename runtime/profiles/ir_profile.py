@@ -202,10 +202,10 @@ def _run_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 
 
 def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase03: IR 研究计划 — needs_dispatch 模式（对标 BP v5.0）。
+    """Phase04: IR 研究计划 — needs_dispatch 模式（对标 BP v5.1）。
 
-    首次执行：脚本生成骨架计划 → 返回 needs_dispatch + instruction
-    主 AI 读 instruction → 输出 ir_research_plan_enrichment.json
+    首次执行：脚本生成骨架计划 → 返回 needs_dispatch + instruction（含 presearch 路径）
+    主 AI 读 presearch 数据 + instruction → 输出 ir_research_plan_enrichment.json
     恢复时由 _run_research_plan_collect 合并 enrichment
     """
     from scripts.ir_research_planner import build_ir_research_plan_skeleton
@@ -224,22 +224,28 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     skeleton_path = tasks_dir / f"{job_ctx.job_id}-ir_research_plan_skeleton.json"
     skeleton_path.write_text(json.dumps(skeleton, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    # 写入 enrichment instruction
-    instruction_path = tasks_dir / f"{job_ctx.job_id}-ir_phase03_enrichment_instruction.md"
+    # 写入 enrichment instruction（含 presearch 数据路径引用）
+    instruction_path = tasks_dir / f"{job_ctx.job_id}-ir_phase04_enrichment_instruction.md"
     instruction_path.write_text(_ir_research_plan_enrichment_instruction(
         entity=job_ctx.entity, query=job_ctx.query, tasks_dir=tasks_dir,
     ), encoding="utf-8")
+
+    # 检查 presearch 数据
+    presearch_path = tasks_dir / f"{job_ctx.job_id}-ir_presearch_results.json"
+    presearch_ready = presearch_path.exists()
 
     return {
         "ok": True,
         "needs_dispatch": True,
         "has_more": False,
         "mode": "ir_research_plan",
-        "phase": "phase03_research_plan",
+        "phase": "phase04_research_plan",
         "job_id": job_ctx.job_id,
         "dispatch_info": {
             "instruction_path": str(instruction_path),
             "skeleton_path": str(skeleton_path),
+            "presearch_path": str(presearch_path),
+            "presearch_ready": presearch_ready,
             "task_dir": str(tasks_dir),
         },
         "instruction": _ir_research_plan_enrichment_instruction(
@@ -249,25 +255,33 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
 
 
 def _ir_research_plan_enrichment_instruction(entity: str, query: str, tasks_dir: Path) -> str:
-    """生成 phase03 enrichment 的主 AI 指令。"""
+    """生成 phase04 enrichment 的主 AI 指令。包含 presearch 数据路径引用。"""
     return f"""\
-PHASE03 IR RESEARCH PLAN ENRICHMENT — 主 AI 执行
+PHASE04 IR RESEARCH PLAN ENRICHMENT — 主 AI 执行
 
 ## 背景
-脚本已生成确定性骨架计划（{entity}，{query}）。
-你需要阅读骨架计划和标的信息，输出定制化的 enrichment delta。
+phase03 已完成预搜索。脚本已生成确定性骨架计划（{entity}，{query}）。
+你需要先阅读 presearch 数据，再输出定制化的 enrichment delta。
 
 ## 输入文件
-1. 骨架计划: `{tasks_dir / f"{entity}-ir_research_plan_skeleton.json"}` (用实际 task_id 替换)
-2. Enrichment 指令库: `instruction_store_ir/ir_research_plan_enrichment.md`
+1. **Presearch 数据** (`*_ir_presearch_results.json`): phase03 产出的预搜索结果
+   - 重点关注 headline_findings、data_gaps、search_coverage
+2. 骨架计划: `*_ir_research_plan_skeleton.json`
+3. Enrichment 指令库: `instruction_store_ir/ir_research_plan_enrichment.md`
+
+## Presearch 数据消费指南
+- 已覆盖很好的维度 → 降低对应 core_question 的 priority
+- 搜索覆盖不足的维度 → 提升对应 question 的 priority，扩展 strategic_questions
+- presearch 中发现的意外信息 → 生成 strategic_questions 的新锚点
 
 ## 执行步骤
-1. 读取 instruction_store_ir/ir_research_plan_enrichment.md 了解完整要求
-2. 读取骨架计划，理解 core_questions / fact_requirements / section_requirements 结构
-3. 围绕标的 `{entity}` 和研究重点 `{query}` 生成 5 条尖锐的 strategic_questions
-4. 按 instruction 要求生成 delta JSON
-5. 将输出写入 `{tasks_dir / f"{entity}-ir_research_plan_enrichment.json"}`
-6. 用 start_phase='phase03_research_plan_collect' 恢复管线
+1. 读取 presearch 数据（优先读 headline_findings 和 data_gaps）
+2. 读取 instruction_store_ir/ir_research_plan_enrichment.md 了解完整要求
+3. 读取骨架计划，理解 core_questions / fact_requirements / section_requirements 结构
+4. 围绕标的 `{entity}` 和研究重点 `{query}`，基于 presearch 数据生成 5 条 strategic_questions
+5. 按 instruction 要求生成完整的 enrichment delta JSON
+6. 将输出写入 `*_ir_research_plan_enrichment.json`
+7. 用 start_phase='phase04_research_plan_collect' 恢复管线
 
 ## 输出格式
 严格遵循 instruction_store_ir/ir_research_plan_enrichment.md 中定义的 JSON schema。
@@ -277,7 +291,7 @@ PHASE03 IR RESEARCH PLAN ENRICHMENT — 主 AI 执行
 
 
 def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase03 collect: 读取主 AI 的 enrichment，合并到骨架计划。"""
+    """Phase04 collect: 读取主 AI 的 enrichment，合并到骨架计划。"""
     from scripts.ir_research_planner import (
         apply_ir_enrichment,
         build_ir_research_plan_skeleton,
@@ -304,7 +318,7 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
         return {
             "ok": True,
             "mode": "ir_research_plan",
-            "phase": "phase03_research_plan_collect",
+            "phase": "phase04_research_plan_collect",
             "job_id": job_ctx.job_id,
             "result": {"plan_path": path, "enrichment": "skipped_fallback"},
         }
@@ -318,9 +332,9 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
         try:
             enrichment = json.loads(enrichment_path.read_text(encoding="utf-8"))
         except Exception:
-            print(f"  ⚠️ [phase03_collect] enrichment JSON 解析失败，使用模板版 strategic_questions", flush=True)
+            print(f"  ⚠️ [phase04_collect] enrichment JSON 解析失败，使用模板版 strategic_questions", flush=True)
     else:
-        print(f"  ⚠️ [phase03_collect] enrichment 文件不存在，使用模板版 strategic_questions", flush=True)
+        print(f"  ⚠️ [phase04_collect] enrichment 文件不存在，使用模板版 strategic_questions", flush=True)
 
     # 合并
     plan = apply_ir_enrichment(skeleton, enrichment)
@@ -337,7 +351,7 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
     return {
         "ok": plan.get("plan_status") == "ready",
         "mode": "ir_research_plan",
-        "phase": "phase03_research_plan_collect",
+        "phase": "phase04_research_plan_collect",
         "job_id": job_ctx.job_id,
         "result": {
             "plan_path": str(path),
@@ -410,11 +424,11 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     if os.environ.get("IRBP_BG_CHILD") == "1":
         return _run_presearch_inner(runtime_root, job_ctx)
     from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase04_presearch")
+    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase03_presearch")
     if cached is not None:
         print(f"  📦 [ir] 使用缓存的 presearch 结果", flush=True)
         return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase04_presearch", pipeline="ir")
+    return launch_heavy_phase(runtime_root, job_ctx, "phase03_presearch", pipeline="ir")
 
 
 def _run_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
@@ -450,7 +464,7 @@ def _run_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, A
     return {
         "ok": True,
         "mode": "legacy_wrapped",
-        "phase": "phase04_presearch",
+        "phase": "phase03_presearch",
         "job_id": job_ctx.job_id,
         "result": result,
         "query_context": {
@@ -2074,9 +2088,9 @@ def _IR_FULL_PHASE_HANDLERS(runtime_root: Path) -> dict[str, Any]:
     return {
         "phase01_preflight": lambda job_ctx: _run_preflight(runtime_root, job_ctx),
         "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),
-        "phase03_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
-        "phase03_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
-        "phase04_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),
+        "phase03_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),
+        "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
+        "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
         "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
         "phase06_fact_store_bootstrap": lambda job_ctx: _run_fact_store_bootstrap(runtime_root, job_ctx),
         "phase07_precompute": lambda job_ctx: _run_precompute(runtime_root, job_ctx),
@@ -2163,9 +2177,9 @@ class IRProfile(PipelineProfile):
         full = {
             "phase01_preflight": [],
             "phase02_company_verify": ["{task_id}-ir_company_verify.json"],
-            "phase03_research_plan": ["{task_id}-ir_research_plan_skeleton.json"],
-            "phase03_research_plan_collect": ["{task_id}-research_plan.json"],
-            "phase04_presearch": [],
+            "phase04_research_plan": ["{task_id}-ir_research_plan_skeleton.json"],
+            "phase04_research_plan_collect": ["{task_id}-research_plan.json"],
+            "phase03_presearch": [],
             "phase05_extract": [],
             "phase06_fact_store_bootstrap": ["{task_id}-fact_store.json"],
             "phase07_precompute": [],

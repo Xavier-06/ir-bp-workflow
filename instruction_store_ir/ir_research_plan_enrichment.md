@@ -6,7 +6,15 @@
 
 1. **骨架计划** (`ir_research_plan_skeleton.json`): 已由脚本生成，包含 7 个 core questions、35 个 fact requirements、10 个 section requirements
 2. **标的信息**: entity（标的名称）、query（研究重点）、market（市场）
-3. **预搜索摘要**（如有）: `phase04_presearch` 产出的搜索结果摘要
+3. **Presearch 数据** (`*_ir_presearch_results.json`): phase03 预搜索产出
+   - 重点关注 headline_findings、data_gaps、search_coverage
+   - 用 presearch 发现的具体数据点作为 strategic_questions 的锚点
+
+## Presearch 数据消费指南
+
+- 已覆盖好的维度 → 降低对应 question 的 priority
+- 搜索覆盖不足的维度 → 提升 priority，扩展搜索计划
+- presearch 中的意外发现 → 生成 strategic_questions 的新锚点
 
 ## 你的任务
 
