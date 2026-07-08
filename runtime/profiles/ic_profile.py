@@ -1233,19 +1233,18 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 # ═══════════════════════════════════════════════════════════
 
 def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 04: IC 研究计划 — needs_dispatch 模式。
+    """Phase 04: IC 研究计划 — 子代理派发模式 (v5.2)。
 
-    phase03 已完成 presearch → 生成空骨架 → 主 AI 读 presearch 数据 enrichment。
-    脚本只提供空骨架和文件路径，所有研究内容由 LLM 决定。
+    v5.2 (2026-07-08): 从主 AI 手动 enrichment 重构为子代理派发。
+    子代理有 MCP 工具可搜 westock-mcp/tyc-mcp 的结构化行业数据。
+    脚本不再生成骨架——子代理全权决定研究计划的内容和结构。
     """
-    from scripts.ic_research_planner import build_empty_skeleton
-
     tasks_dir = runtime_root / "data" / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
     # 读取课题元数据
-    topic_path = tasks_dir / "ic_topic_metadata.json"
     topic_metadata: dict[str, Any] = {}
+    topic_path = tasks_dir / "ic_topic_metadata.json"
     if topic_path.exists():
         try:
             topic_metadata = json.loads(topic_path.read_text(encoding="utf-8"))
@@ -1253,155 +1252,137 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
             pass
 
     entity = job_ctx.entity or topic_metadata.get("entity", "")
+    core_q = topic_metadata.get("core_question", "")
+    sub_qs = topic_metadata.get("sub_questions", [])
+    companies = topic_metadata.get("key_companies", [])
+    has_presearch = (tasks_dir / f"{job_ctx.job_id}-presearch_results.json").exists()
 
-    # 生成空骨架
-    skeleton = build_empty_skeleton(
-        task_id=job_ctx.job_id,
-        entity=entity,
-        topic_metadata=topic_metadata,
-    )
-    skeleton_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan_skeleton.json"
-    skeleton_path.write_text(json.dumps(skeleton, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # 写 brief 文件
+    brief_path = tasks_dir / f"{job_ctx.job_id}-ic_phase04_brief.json"
+    brief = {
+        "entity": entity, "core_question": core_q,
+        "sub_questions": sub_qs if isinstance(sub_qs, list) else [],
+        "key_companies": companies if isinstance(companies, list) else [],
+        "presearch_available": has_presearch,
+        "metadata_path": str(topic_path),
+    }
+    brief_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    # 检查 presearch 数据
-    presearch_path = tasks_dir / f"{job_ctx.job_id}-presearch_results.json"
-    presearch_ready = presearch_path.exists()
+    instruction = f"""\
+PHASE04 IC RESEARCH PLAN — 派发子代理
 
-    # 写 enrichment instruction
-    instruction_path = tasks_dir / f"{job_ctx.job_id}-ic_phase04_enrichment_instruction.md"
-    instruction_text = _ic_enrichment_instruction(
-        entity=entity,
-        tasks_dir=tasks_dir,
-        presearch_ready=presearch_ready,
-    )
-    instruction_path.write_text(instruction_text, encoding="utf-8")
+Agent tool 参数：
+- name = 'ic-research-planner'
+- team_name = 'ic-{job_ctx.job_id}'
+- mode = 'bypassPermissions'
+- connectorIds = ['westock-mcp', 'tyc-mcp']
+- prompt = 下面的完整 prompt
+
+### 子代理 Prompt:
+
+你是行业研究分析师。基于课题元数据为 {entity} 生成完整的研究计划。
+
+## Step 0: 读取输入文件（必须先做）
+
+搜索之前必须先读 brief 文件(`*_ic_phase04_brief.json`), 从中提取:
+- core_question(核心课题), sub_questions(子问题列表), key_companies(关键公司列表)
+- 如果有 presearch 数据也先读
+
+## 搜索策略（按顺序执行）
+
+### Step 1: 行业数据 (westock-mcp)
+- westock-mcp.data_sector: 查课题对应行业板块 -> PE分位、成分股、涨跌幅
+- westock-mcp.data_report: 搜行业研报, 用课题核心问题中的关键词 -> 市场规模、增长趋势、机构观点
+- westock-mcp.data_finance: 查行业财务基准 -> ROE/毛利率中枢、营收增速均值
+
+### Step 2: 关键公司验证 (tyc-mcp)
+- 从 brief 中读取 key_companies 列表, 逐个搜索
+- 对每个公司: tyc-mcp.search_companies -> get_company_basic_profile
+- 记录: 注册资本、成立日期、经营范围、股东、融资历史、与课题的相关性
+
+### Step 3: Web 补搜（中英双语, 具体查询）
+- 从 core_question 提取关键词 -> "{提取的关键词} 产业政策 监管 2025 2026"
+- 从 core_question 提取关键词 -> "{提取的关键词} 竞争格局 市场份额 产业链"
+- 从 core_question 提取关键词 -> "{提取的关键词} industry policy regulation market size"
+- 对每个 sub_question 转化为 1-2 条搜索词（去掉问号, 保留核心名词）
+- 对每个 key_company -> "{company_name} {行业关键词} 业务 财务 融资"
+- 如果有 presearch 数据先读它, 跳过 presearch 已经覆盖好的关键词
+- tencent_news: 搜课题关键词最新动态
+
+## 分析任务
+
+生成研究计划写入 `{tasks_dir / f'{job_ctx.job_id}-ic_research_plan.json'}`：
+
+```json
+{{
+  "schema_version": "ic_research_plan.v2",
+  "task_id": "{job_ctx.job_id}", "entity": "{entity}",
+  "data_sources_used": ["westock-mcp:行业数据/研报", "tyc-mcp:公司验证", "web_search:公开信息"],
+  "research_dimensions": [
+    {{"dimension": "行业规模与增长", "key_questions": [...], "data_sources": [...], "priority": "high"}}
+  ],
+  "claim_matrix": [
+    {{"claim_id": "IC001", "claim": "...", "dimension": "...", "priority": "high", "status": "planned"}}
+  ],
+  "company_profiles": [{{"company": "...", "tyc_verified": true, "relevance": "..."}}],
+  "search_keywords": {{"en": [...], "zh": [...]}},
+  "plan_status": "ready"
+}}
+```
+
+维度至少覆盖6个: 行业规模与增长、竞争格局、政策与监管、技术趋势、产业链分析、关键公司画像、财务基准对标、风险与催化剂。每个维度须包含 key_questions/data_sources/priority。
+"""
 
     return {
-        "ok": True,
-        "needs_dispatch": True,
-        "has_more": False,
-        "mode": "ic_research_plan",
-        "phase": "phase04_research_plan",
-        "job_id": job_ctx.job_id,
+        "ok": True, "needs_dispatch": True, "has_more": False,
+        "mode": "ic_research_plan_subagent",
+        "phase": "phase04_research_plan", "job_id": job_ctx.job_id,
         "dispatch_info": {
-            "instruction_path": str(instruction_path),
-            "skeleton_path": str(skeleton_path),
-            "presearch_path": str(presearch_path),
-            "presearch_ready": presearch_ready,
-            "topic_metadata_path": str(topic_path),
+            "brief_path": str(brief_path),
+            "presearch_available": has_presearch,
+            "subagent_connector_ids": ["westock-mcp", "tyc-mcp"],
             "task_dir": str(tasks_dir),
         },
-        "instruction": instruction_text,
+        "instruction": instruction,
     }
 
 
-def _ic_enrichment_instruction(
-    entity: str,
-    tasks_dir: Path,
-    presearch_ready: bool = False,
-) -> str:
-    """生成 phase04 enrichment 的主 AI 指令。"""
-    presearch_section = ""
-    if presearch_ready:
-        presearch_section = """\
-## Presearch 数据（已就绪）
-phase03 已完成预搜索。你必须先阅读 presearch 数据再生成研究计划：
-- 完整结果: `*_presearch_results.md` 或 `*_presearch_results.json`
-- 摘要: `*_presearch_summary.json`
-
-Presearch 数据消费规则：
-- presearch 覆盖好的维度 → 可适当降低对应 claim/question 的 priority
-- presearch 明显搜不到的维度 → 提升 priority，扩展搜索关键词
-- presearch 中发现的意外线索 → 生成 additional_claims
-"""
-    else:
-        presearch_section = """\
-## Presearch 数据（未就绪）
-phase03 预搜索可能未完成或未产生结果。你仍需要生成完整的研究计划，但在 data_gaps 中标注"presearch unavailable"。
-"""
-
-    return f"""\
-PHASE04 IC RESEARCH PLAN ENRICHMENT — 主 AI 执行
-
-## 背景
-课题 `{entity}` 的研究规划由你全权负责。脚本不提供任何预定义的 core_questions、claim_matrix 或 fact_requirements。
-
-{presearch_section}
-
-## 输入文件（按读取顺序）
-1. Presearch 数据: `*_presearch_results.*` + `*_presearch_summary.json`（如就绪）
-2. 课题元数据: `ic_topic_metadata.json`
-3. 空骨架: `*_ic_research_plan_skeleton.json`
-4. Enrichment 指令库: `instruction_store_ic/ic_research_plan_enrichment.md`
-
-## 执行步骤
-1. 读取 instruction_store_ic/ic_research_plan_enrichment.md 了解完整输出格式
-2. 读取课题元数据，理解核心问题、子问题、研究内容
-3. （如 presearch 就绪）读取 presearch 数据，了解当前信息覆盖情况
-4. 基于课题元数据 + presearch 数据，生成完整的研究计划（core_questions、claim_matrix、fact_requirements、step 激活列表）
-5. 将输出写入 `*_ic_research_plan_enrichment.json`
-6. 用 start_phase='phase04_research_plan_collect' 恢复管线
-
-## 关键约束
-- core_questions[0] 必须是课题元数据中的原始核心问题
-- 所有 fact_key 由你命名，无预定义列表
-- step 激活决策基于课题内容，不要默认激活所有 step
-- 输出格式严格遵循 instruction_store_ic/ic_research_plan_enrichment.md
-"""
-
-
 def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 04 collect: 读取 LLM 输出的完整 research plan → 校验 → 落盘。"""
-    from scripts.ic_research_planner import (
-        apply_enrichment,
-        load_skeleton,
-        load_enrichment,
-        write_research_plan,
-    )
-
+    """Phase04 collect v5.2: 读取子代理产出的 ic_research_plan.json。"""
     tasks_dir = runtime_root / "data" / "tasks"
-    skeleton_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan_skeleton.json"
-
-    if not skeleton_path.exists():
-        return {
-            "ok": False,
-            "mode": "ic_research_plan",
-            "phase": "phase04_research_plan_collect",
-            "job_id": job_ctx.job_id,
-            "result": {"error": "skeleton file not found"},
-        }
-
-    skeleton = load_skeleton(skeleton_path)
-
-    enrichment_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan_enrichment.json"
-    if not enrichment_path.exists():
-        print(f"  ⚠️ [phase04_collect] enrichment 文件不存在，plan 保持空骨架状态", flush=True)
-        return {
-            "ok": True,
-            "mode": "ic_research_plan",
-            "phase": "phase04_research_plan_collect",
-            "job_id": job_ctx.job_id,
-            "result": {"plan_path": str(skeleton_path), "enrichment": "missing_fallback"},
-        }
-
-    enrichment = load_enrichment(enrichment_path)
-    plan = apply_enrichment(skeleton, enrichment)
-
     plan_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan.json"
-    write_research_plan(plan_path, plan)
 
+    if plan_path.exists() and plan_path.stat().st_size > 200:
+        try:
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            # 基本校验
+            has_dimensions = len(plan.get("research_dimensions", [])) > 0
+            has_claims = len(plan.get("claim_matrix", [])) > 0
+            if has_dimensions and has_claims:
+                plan["plan_status"] = "ready"
+                plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                return {
+                    "ok": True, "mode": "ic_research_plan",
+                    "phase": "phase04_research_plan_collect", "job_id": job_ctx.job_id,
+                    "result": {"plan_path": str(plan_path), "enrichment": "subagent_generated",
+                                "dimensions": len(plan.get("research_dimensions", [])),
+                                "claims": len(plan.get("claim_matrix", []))},
+                }
+            print(f"  ⚠️ [ic phase04_collect] plan 内容不完整", flush=True)
+            return {"ok": False, "mode": "ic_research_plan", "phase": "phase04_research_plan_collect",
+                    "job_id": job_ctx.job_id, "result": {"error": "plan_incomplete"}}
+        except Exception as exc:
+            print(f"  ⚠️ [ic phase04_collect] 读取子代理 plan 失败: {exc}", flush=True)
+
+    # 降级
+    print(f"  ⚠️ [ic phase04_collect] 子代理未产出 plan，使用空骨架降级", flush=True)
+    from scripts.ic_research_planner import build_empty_skeleton
+    skeleton = build_empty_skeleton(task_id=job_ctx.job_id, entity=job_ctx.entity)
+    plan_path.write_text(json.dumps(skeleton, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {
-        "ok": plan.get("plan_status") == "ready",
-        "mode": "ic_research_plan",
-        "phase": "phase04_research_plan_collect",
-        "job_id": job_ctx.job_id,
-        "result": {
-            "plan_path": str(plan_path),
-            "plan_status": plan.get("plan_status"),
-            "core_questions_count": len(plan.get("core_questions", [])),
-            "claim_count": len(plan.get("claim_matrix", [])),
-            "activated_steps": plan.get("activated_steps", []),
-        },
+        "ok": True, "mode": "ic_research_plan",
+        "phase": "phase04_research_plan_collect", "job_id": job_ctx.job_id,
+        "result": {"plan_path": str(plan_path), "enrichment": "fallback_script"},
     }
 
 
@@ -1460,10 +1441,10 @@ class ICProfile(PipelineProfile):
             "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
             "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
             "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
-                # ── v1.1 新增 ──
-                "phase08b_fact_store_init": lambda job_ctx: _run_fact_store_init(runtime_root, job_ctx),
-                "phase08b5_shared_state_init": lambda job_ctx: _run_shared_state_init(runtime_root, job_ctx),
-                "phase09_evidence_gate": lambda job_ctx: _run_evidence_gate(runtime_root, job_ctx),
+            # ── v1.1 新增 ──
+            "phase08b_fact_store_init": lambda job_ctx: _run_fact_store_init(runtime_root, job_ctx),
+            "phase08b5_shared_state_init": lambda job_ctx: _run_shared_state_init(runtime_root, job_ctx),
+            "phase09_evidence_gate": lambda job_ctx: _run_evidence_gate(runtime_root, job_ctx),
             "phase09b_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
             "phase10_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
             "phase10b_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
