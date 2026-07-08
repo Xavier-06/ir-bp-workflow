@@ -16,18 +16,29 @@ from runtime.entrypoints.run_ic_pipeline_entry import run_ic_job
 result = run_ic_job(job_id=..., entity="半导体", query="行业研究", market="cn")
 ```
 
-## Phase 设计（8 phases）
+## Phase 设计（18 phases, v1.1 升级）
 
 | Phase | 名称 | 说明 | 执行模式 |
 |-------|------|------|---------|
-| phase0 | scope_definition | 行业边界定义 + 关键词扩展 + 关键公司名单 | Python 自动 |
-| phase0.5 | multi_company_verify | 批量公司工商验证（天眼查MCP） | Python 自动 |
-| phase1 | industry_presearch | 行业数据预搜索（NeoData + SearchGateway） | 后台子进程 |
-| phase1.5 | content_extraction | URL 抓取提取 | Python 自动 |
-| phase1.2 | industry_precompute | 行业规模预计算 + 财务基准 | Python 自动 |
-| phase4a | dispatch_prepare | launch_next_wave 发射 Wave 1 | Coordinator 接管 |
-| phase4b | dispatch_collect | 检查动态 step 输出 + 质量门禁 | Coordinator 接管 |
-| phase5 | delivery | 对抗验证 + DOCX + 桌面 + 微信 | 后台子进程 |
+| phase01 | topic_intake | 课题元数据解析（DOCX/MD/JSON） | Python 自动 |
+| phase02 | multi_company_verify | 批量公司工商验证（天眼查MCP） | Python 自动 |
+| phase03 | presearch | 行业数据预搜索 [heavy_bg] | 后台子进程 |
+| phase04a | research_plan | LLM 驱动 research plan (needs_dispatch) | Coordinator 接管 |
+| phase04b | research_plan_collect | 合并 enrichment delta | Python 自动 |
+| phase05 | extract | URL 内容抽取 | Python 自动 |
+| phase06 | precompute | 行业规模 + 财务基准预计算 | Python 自动 |
+| phase07 | dispatch_prepare | Wave 派发 (needs_dispatch, sequential) | Coordinator 接管 |
+| phase08 | dispatch_collect | Wave 收集 + 质量检查 | Coordinator 接管 |
+| phase08b | fact_store_init | Fact Store 初始化 [v1.1 NEW] | Python 自动 |
+| phase09 | evidence_gate | Step 输出质量门禁 | Python 自动 |
+| phase09b | fact_store_merge | Fact Store 合并 [v1.1 NEW] | Python 自动 |
+| phase10 | claim_coverage | Claim 覆盖校验 (FAIL→非阻断) | Python 自动 |
+| phase10b | cross_dimension_gate | 跨维度一致性 [v1.1 NEW] | Python 自动 |
+| phase11 | debate_review | 跨维度对抗审查 | Python 自动 |
+| phase11b | final_assembly | 最终组装 [v1.1 NEW] | Python 自动 |
+| phase11c | readability_review | 可读性审查 [v1.1 NEW] | Python 自动 |
+| phase11d | investment_judgment | 投资判断汇总 [v1.1 NEW] | Python 自动 |
+| phase12 | delivery | 对抗验证 + DOCX + 交付 [heavy_bg] | 后台子进程 |
 
 ## Wave 编排（6 波，Wave 2-4 动态生成）
 

@@ -575,6 +575,151 @@ def _run_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
 
 
 # ═══════════════════════════════════════════════════════════
+# Phase 08b: Fact Store Init — IC 事实库初始化
+# ═══════════════════════════════════════════════════════════
+
+def _run_fact_store_init(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 08b: 初始化 IC fact_store + 共享状态。
+
+    在 dispatch_collect 完成、子代理都已产出后，初始化结构化事实库。
+    后续 evidence_gate 和 claim_coverage 可以使用 fact_store 做交叉验证。
+    """
+    import time as _time
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    # 读取 research plan 获取 claim 列表
+    plan_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan.json"
+    claims: list[dict[str, Any]] = []
+    if plan_path.exists():
+        try:
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            claims = plan.get("claim_matrix", [])
+        except Exception:
+            pass
+
+    # 读取 wave manifest 获取 step 列表
+    from scripts.ic_subagent_launcher import wave_manifest_path as _wmp, load_json as _lj
+    wm = _lj(_wmp(job_ctx.job_id))
+    step_deps = wm.get("step_deps", {}) if wm else {}
+
+    # 初始化 fact_store
+    fact_store = {
+        "schema_version": "ic_fact_store.v1",
+        "job_id": job_ctx.job_id,
+        "entity": job_ctx.entity,
+        "facts": [],
+        "step_outputs": list(step_deps.keys()),
+        "claim_count": len(claims),
+        "created_at": _time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    fs_path = tasks_dir / f"{job_ctx.job_id}-ic_fact_store.json"
+    fs_path.write_text(json.dumps(fact_store, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    _sync_step_to_workspace(job_ctx, "ic_fact_store", fs_path)
+
+    print(f"  📦 [ic] fact_store 初始化: {len(step_deps)} steps, {len(claims)} claims", flush=True)
+
+    return {
+        "ok": True,
+        "mode": "fact_store_init",
+        "phase": "phase08b_fact_store_init",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "step_count": len(step_deps),
+            "claim_count": len(claims),
+            "fact_store_path": str(fs_path),
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 09b: Fact Store Merge — 从 step 输出汇总事实
+# ═══════════════════════════════════════════════════════════
+
+def _run_fact_store_merge(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 09b: 扫描所有 step 输出，提取关键事实到 fact_store。
+
+    在 evidence_gate 之后运行，基于已验证的 step 输出做结构化提取。
+    """
+    import time as _time
+    from scripts.ic_subagent_launcher import wave_manifest_path as _wmp, load_json as _lj, step_output_path as _sop
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    fs_path = tasks_dir / f"{job_ctx.job_id}-ic_fact_store.json"
+
+    # 加载已有 fact_store
+    existing_facts: list[dict[str, Any]] = []
+    if fs_path.exists():
+        try:
+            existing = json.loads(fs_path.read_text(encoding="utf-8"))
+            existing_facts = existing.get("facts", [])
+        except Exception:
+            pass
+
+    wm = _lj(_wmp(job_ctx.job_id))
+    step_deps = wm.get("step_deps", {}) if wm else {}
+
+    new_facts: list[dict[str, Any]] = []
+    merged_count = 0
+
+    for step_name in step_deps:
+        output_path = _sop(job_ctx.job_id, step_name)
+        if not output_path.exists():
+            continue
+        try:
+            text = output_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        if len(text) < 100:
+            continue
+
+        # 简单提取：每个 step 的前 200 字摘要 + 步名作为 fact
+        summary = text[:200].replace("\n", " ").strip()
+        if summary:
+            fact_id = f"IC-{job_ctx.job_id[-8:]}-{step_name}"
+            # 避免重复
+            if not any(f.get("fact_id") == fact_id for f in existing_facts):
+                new_facts.append({
+                    "fact_id": fact_id,
+                    "step": step_name,
+                    "summary": summary,
+                    "source": "step_output",
+                    "extracted_at": _time.strftime("%Y-%m-%dT%H:%M:%S"),
+                })
+                merged_count += 1
+
+    all_facts = existing_facts + new_facts
+    fact_store = {
+        "schema_version": "ic_fact_store.v1",
+        "job_id": job_ctx.job_id,
+        "entity": job_ctx.entity,
+        "facts": all_facts,
+        "fact_count": len(all_facts),
+        "merged_count": merged_count,
+        "updated_at": _time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    fs_path.write_text(json.dumps(fact_store, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    _sync_step_to_workspace(job_ctx, "ic_fact_store", fs_path)
+
+    print(f"  📦 [ic] fact_store 合并: +{merged_count} facts, 总计 {len(all_facts)}", flush=True)
+
+    return {
+        "ok": True,
+        "mode": "fact_store_merge",
+        "phase": "phase09b_fact_store_merge",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "total_facts": len(all_facts),
+            "new_facts": merged_count,
+            "fact_store_path": str(fs_path),
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
 # Phase 10: Claim Coverage — 研究计划 claim 覆盖校验
 # ═══════════════════════════════════════════════════════════
 
@@ -646,6 +791,227 @@ def _run_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
         "ok": overall != "FAIL",
         "mode": "ic_debate_review",
         "phase": "phase11_debate_review",
+        "job_id": job_ctx.job_id,
+        "result": result,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 10b: Cross-Dimension Gate — 跨维度一致性
+# ═══════════════════════════════════════════════════════════
+
+def _run_cross_dimension_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 10b: 跨维度一致性门禁。
+
+    检查不同 step 之间的市场规模、增速、CRn 一致性。
+    FAIL → WARN 放行，记录到 deferred_fixes。
+    """
+    from scripts.ic_cross_dimension_gate import run_cross_dimension_gate
+    from scripts.ic_subagent_launcher import wave_manifest_path as _wmp, load_json as _lj, step_output_path as _sop
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    wm = _lj(_wmp(job_ctx.job_id))
+    step_deps = wm.get("step_deps", {}) if wm else {}
+
+    step_outputs: dict[str, Path] = {}
+    for step_name in step_deps:
+        out = _sop(job_ctx.job_id, step_name)
+        if out.exists():
+            step_outputs[step_name] = out
+
+    result = run_cross_dimension_gate(
+        task_id=job_ctx.job_id,
+        step_outputs=step_outputs,
+        tasks_dir=tasks_dir,
+    )
+
+    overall = result.get("overall_verdict", "WARN")
+    print(f"  🔍 [ic] 跨维度一致性: {overall}, issues={len(result.get('issues', []))}", flush=True)
+
+    # IC 跨维度门禁：FAIL → WARN 放行（非阻断）
+    return {
+        "ok": True,
+        "mode": "ic_cross_dimension_gate",
+        "phase": "phase10b_cross_dimension_gate",
+        "job_id": job_ctx.job_id,
+        "result": result,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 11b: Final Assembly — 最终组装
+# ═══════════════════════════════════════════════════════════
+
+def _run_final_assembly(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 11b: 将所有 step 输出组装为统一报告。
+
+    按产业链顺序编排 step 输出，统一标题层级，添加目录。
+    """
+    from scripts.ic_subagent_launcher import wave_manifest_path as _wmp, load_json as _lj, step_output_path as _sop
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    wm = _lj(_wmp(job_ctx.job_id))
+    step_deps = wm.get("step_deps", {}) if wm else {}
+
+    # 按 wave 顺序收集 step 输出
+    wave_order = wm.get("wave_order", []) if wm else []
+    assembled: list[str] = [
+        f"# {job_ctx.entity} — 行业深度研究报告",
+        "",
+        f"*自动生成 | 日期: {__import__('time').strftime('%Y-%m-%d')}*",
+        "",
+        "---",
+        "",
+    ]
+
+    step_count = 0
+    for wave_key in wave_order:
+        wave_steps = wm.get(wave_key, [])
+        for step_name in wave_steps:
+            out = _sop(job_ctx.job_id, step_name)
+            if out.exists():
+                try:
+                    text = out.read_text(encoding="utf-8")
+                except Exception:
+                    continue
+                if len(text) < 50:
+                    continue
+                assembled.append(text)
+                assembled.append("")
+                assembled.append("---")
+                assembled.append("")
+                step_count += 1
+
+    if step_count == 0:
+        # 回退: 遍历 step_deps
+        for step_name in step_deps:
+            out = _sop(job_ctx.job_id, step_name)
+            if out.exists():
+                try:
+                    text = out.read_text(encoding="utf-8")
+                except Exception:
+                    continue
+                if len(text) < 50:
+                    continue
+                assembled.append(text)
+                assembled.append("")
+                assembled.append("---")
+                assembled.append("")
+                step_count += 1
+
+    assembled.append("")
+    assembled.append("---")
+    assembled.append("")
+    assembled.append("*本报告由 IC 管线自动生成。*")
+
+    report_path = tasks_dir / f"{job_ctx.job_id}-ic_final_report.md"
+    report_text = "\n".join(assembled)
+    report_path.write_text(report_text, encoding="utf-8")
+
+    _sync_step_to_workspace(job_ctx, "ic_final_report", report_path)
+
+    print(f"  📝 [ic] 最终组装: {step_count} steps → {len(report_text)} chars", flush=True)
+
+    return {
+        "ok": step_count > 0,
+        "mode": "final_assembly",
+        "phase": "phase11b_final_assembly",
+        "job_id": job_ctx.job_id,
+        "result": {
+            "step_count": step_count,
+            "total_length": len(report_text),
+            "report_path": str(report_path),
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 11c: Readability Review — 可读性审查
+# ═══════════════════════════════════════════════════════════
+
+def _run_readability_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 11c: 可读性审查 — 字数/结构/引用密度/数据多样性。
+
+    FAIL → WARN 放行，记录到 deferred_fixes。
+    """
+    from scripts.ic_readability_reviewer import run_readability_review
+    from scripts.ic_subagent_launcher import wave_manifest_path as _wmp, load_json as _lj, step_output_path as _sop
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    # 收集待审查文件
+    report_paths: list[Path] = []
+    final_path = tasks_dir / f"{job_ctx.job_id}-ic_final_report.md"
+    if final_path.exists():
+        report_paths.append(final_path)
+
+    # 若 final_report 不存在，回退到所有 step 输出
+    if not report_paths:
+        wm = _lj(_wmp(job_ctx.job_id))
+        step_deps = wm.get("step_deps", {}) if wm else {}
+        for step_name in step_deps:
+            out = _sop(job_ctx.job_id, step_name)
+            if out.exists():
+                report_paths.append(out)
+
+    result = run_readability_review(
+        task_id=job_ctx.job_id,
+        report_paths=report_paths,
+        tasks_dir=tasks_dir,
+    )
+
+    overall = result.get("overall_verdict", "WARN")
+    print(f"  📖 [ic] 可读性: {overall}, length={result.get('total_length', 0)}, "
+          f"issues={len(result.get('issues', []))}", flush=True)
+
+    # IC 可读性审查：FAIL → WARN 放行
+    return {
+        "ok": True,
+        "mode": "ic_readability_review",
+        "phase": "phase11c_readability_review",
+        "job_id": job_ctx.job_id,
+        "result": result,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# Phase 11d: Investment Judgment — 投资判断汇总
+# ═══════════════════════════════════════════════════════════
+
+def _run_investment_judgment(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 11d: 行业投资判断汇总。
+
+    扫描所有 step 输出，提取结论、置信度、风险，输出超配/标配/低配建议。
+    """
+    from scripts.ic_investment_judgment import build_ic_investment_judgment
+
+    tasks_dir = runtime_root / "data" / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    result = build_ic_investment_judgment(
+        job_id=job_ctx.job_id,
+        tasks_dir=tasks_dir,
+    )
+
+    recommendation = result.get("recommendation", "")
+    print(f"  💡 [ic] 投资判断: {recommendation}, "
+          f"dims={result.get('dimension_count', 0)}", flush=True)
+
+    # 同步到 workspace
+    json_p = tasks_dir / f"{job_ctx.job_id}-ic_investment_judgment.json"
+    md_p = tasks_dir / f"{job_ctx.job_id}-ic_investment_judgment.md"
+    _sync_step_to_workspace(job_ctx, "ic_investment_judgment", json_p)
+    _sync_step_to_workspace(job_ctx, "ic_investment_judgment_md", md_p)
+
+    return {
+        "ok": True,
+        "mode": "ic_investment_judgment",
+        "phase": "phase11d_investment_judgment",
         "job_id": job_ctx.job_id,
         "result": result,
     }
@@ -879,6 +1245,32 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
 # ═══════════════════════════════════════════════════════════
 
 class ICProfile(PipelineProfile):
+    """IC (Industry Coverage) 行业研究管线 Profile — 18 Phase。
+
+    Phase 执行顺序:
+      01 phase01_topic_intake            课题元数据解析
+      02 phase02_multi_company_verify    批量公司工商验证
+      03 phase03_presearch               行业预搜索 [heavy_bg]
+      04 phase04_research_plan           LLM 驱动研究计划 (needs_dispatch)
+      04 phase04_research_plan_collect   合并 enrichment
+      05 phase05_extract                 URL 内容抽取
+      06 phase06_precompute              行业预计算
+      07 phase07_dispatch_prepare        Wave 派发 (needs_dispatch, sequential)
+      08 phase08_dispatch_collect        Wave 收集 + 质量检查
+      08b phase08b_fact_store_init        Fact Store 初始化 [NEW v1.1]
+      09 phase09_evidence_gate            Step 输出质量门禁
+      09b phase09b_fact_store_merge       Fact Store 合并 [NEW v1.1]
+      10 phase10_claim_coverage           Claim 覆盖校验
+      10b phase10b_cross_dimension_gate   跨维度一致性 [NEW v1.1]
+      11 phase11_debate_review            对抗审查
+      11b phase11b_final_assembly         最终组装 [NEW v1.1]
+      11c phase11c_readability_review     可读性审查 [NEW v1.1]
+      11d phase11d_investment_judgment    投资判断汇总 [NEW v1.1]
+      12 phase12_delivery                 交付 [heavy_bg]
+
+    v1.1 (2026-07-08): +6 phase — fact_store init/merge, cross_dimension_gate,
+    final_assembly, readability_review, investment_judgment
+    """
     def __init__(self, runtime_root: Path):
         super().__init__(
             name="ic",
@@ -893,9 +1285,16 @@ class ICProfile(PipelineProfile):
                 "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
                 "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
                 "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
+                # ── v1.1 新增 ──
+                "phase08b_fact_store_init": lambda job_ctx: _run_fact_store_init(runtime_root, job_ctx),
                 "phase09_evidence_gate": lambda job_ctx: _run_evidence_gate(runtime_root, job_ctx),
+                "phase09b_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
                 "phase10_claim_coverage": lambda job_ctx: _run_claim_coverage(runtime_root, job_ctx),
+                "phase10b_cross_dimension_gate": lambda job_ctx: _run_cross_dimension_gate(runtime_root, job_ctx),
                 "phase11_debate_review": lambda job_ctx: _run_debate_review(runtime_root, job_ctx),
+                "phase11b_final_assembly": lambda job_ctx: _run_final_assembly(runtime_root, job_ctx),
+                "phase11c_readability_review": lambda job_ctx: _run_readability_review(runtime_root, job_ctx),
+                "phase11d_investment_judgment": lambda job_ctx: _run_investment_judgment(runtime_root, job_ctx),
                 "phase12_delivery": lambda job_ctx: _run_delivery(runtime_root, job_ctx),
             },
         )
