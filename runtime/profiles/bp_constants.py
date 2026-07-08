@@ -12,6 +12,24 @@ BP_TYC_CONNECTOR_IDS = ['tyc-mcp']
 # 向后兼容别名 —— 旧代码引用 BP_QCC_CONNECTOR_IDS 不会报错
 BP_QCC_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS
 
+# 结构化金融数据源 MCP connector ID 列表 —— 腾讯自选股（westock-mcp）
+# 仅面向上市公司的"可比公司分析"维度使用（竞争定位 / 估值回报）
+BP_WESTOCK_CONNECTOR_IDS = ['westock-mcp']
+
+# ── Connector IDs 按角色分配 ──
+# 基础六维只走天眼查；竞争定位 & 估值回报额外开放 westock-mcp
+# （可比公司的板块/产业链/资金流/北向/机构评级/券商研报 data_report）
+BP_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
+    'bp_company_team_compliance': BP_TYC_CONNECTOR_IDS,
+    'bp_product_commercial': BP_TYC_CONNECTOR_IDS,
+    'bp_tech_ip_moat': BP_TYC_CONNECTOR_IDS,
+    'bp_market_supply_chain': BP_TYC_CONNECTOR_IDS,
+    'bp_competition_positioning': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
+    'bp_valuation_return': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
+    'bp_customer_revenue_validation': BP_TYC_CONNECTOR_IDS,
+    'bp_dealbreaker_risk': BP_TYC_CONNECTOR_IDS,
+}
+
 # Wave 1: 公司团队合规 / 产品商业化 / 技术IP护城河 / 市场供应链（4 维度并行）
 BP_WAVE1_ROLE_SLUGS: dict[str, str] = {
     "bp_company_team_compliance": "company_team_compliance",

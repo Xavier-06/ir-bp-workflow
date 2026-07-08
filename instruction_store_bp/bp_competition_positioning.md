@@ -90,6 +90,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | **NeoData(api)** | `neodata_search('关键词', data_type='api')` | A/HK 竞品市值/PE/PS/营收 | 上市竞品财务首选 |
 | **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **竞品研报/行业新闻/市场份额分析/竞争格局** | **新闻+研报主力** |
 | **yfinance** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import yfinance_summary; ..."` | 美股竞品估值快照 | 交叉验证用 |
+| **westock-mcp (MCP)** | `data_sector`/`data_industry_chain`/`data_fund_flow`/`data_north_holding`/`data_rating` | 竞品板块归属/产业链位置/资金流/北向/机构评级 | **westock 独有维度，补充 NeoData** |
 | **WebSearch** | WorkBuddy 内置 | 竞品产品/客户/新闻/市场份额/行业排名 | 竞品情报主力 |
 | **WebFetch** | WorkBuddy 内置 | 深读竞品官网/媒体报道/行业报告 | 配合 WebSearch |
 
@@ -224,6 +225,7 @@ web_fetch: {搜索结果中的URL}
 | A/HK 竞品市值/PE/PS/营收 | NeoData (`neodata_search` data_type=api) | 结构化金融数据首选 |
 | **竞品研报/竞争格局/市场份额分析** | **NeoData (`neodata_search` data_type=doc)** | **券商竞品分析、行业排名研报** |
 | **竞品新闻/融资/产品发布** | **NeoData (`neodata_search` data_type=doc)** | **竞品动态、行业新闻** |
+| **竞品板块/产业链/资金流/北向/机构评级** | **westock-mcp (`data_sector`/`data_industry_chain`/`data_fund_flow`/`data_north_holding`/`data_rating`)** | **NeoData 覆盖弱的维度，优先走 westock** |
 | 美股竞品估值 | yfinance (`yfinance_summary`) | 美股精确估值 |
 | 竞品产品/客户/新闻报道 | WebSearch → WebFetch 深读 | 非结构化情报 |
 | 竞品产品参数/价格 | WebSearch | 搜 datasheet/评测 |

@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from runtime.profiles.bp_constants import BP_TYC_CONNECTOR_IDS
+from runtime.profiles.bp_constants import BP_TYC_CONNECTOR_IDS, BP_ROLE_CONNECTOR_IDS
 
 ROOT = Path(__file__).resolve().parent.parent
 TASKS_DIR = ROOT / 'tasks'
@@ -581,7 +581,7 @@ def _spawn_one(task_id: str, sub: dict, task_dir: Path | None = None) -> dict:
         'mode': 'bypassPermissions',
         'subagent_type': 'general-purpose',
         'team_name_template': 'bp-{task_id}',
-        'connectorIds': BP_TYC_CONNECTOR_IDS,
+        'connectorIds': BP_ROLE_CONNECTOR_IDS.get(sub['role_name'], BP_TYC_CONNECTOR_IDS),
         'created_at': datetime.now().isoformat(timespec='seconds'),
         'status': 'pending',
     }

@@ -216,7 +216,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 角色 | 可以做 | 禁止做 |
 |------|--------|--------|
 | academic_scout | 搜论文 (arXiv/DBLP/PMC/Crossref, 4源必用) | 搜研报/新闻/企业信息/下载全文 |
-| industry_scout | 搜研报/报告/新闻 (NeoData/腾讯新闻/Yahoo/WebSearch) | 搜论文/企业信息 |
+| industry_scout | 搜研报/报告/新闻/板块/产业链/机构评级 (NeoData/westock-mcp/腾讯新闻/Yahoo/WebSearch) | 搜论文/企业信息 |
 | enterprise_scout | 企业尽调 (TYC + NeoData/yfinance + 腾讯新闻 + Yahoo + SEC/WebSearch) | 搜论文/研报 |
 | deep_reader | 读全文+压缩笔记 | 搜新文档 |
 | tech_decomposition | 快速预搜+拆解方向 | 下载全文/深度阅读 |

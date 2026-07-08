@@ -91,6 +91,7 @@
 | **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | **可比公司研报/估值分析/融资新闻/退出案例报道** | **新闻+研报主力** |
 | **yfinance** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import yfinance_summary; ..."` | 美股可比公司估值快照 + A/HK 交叉验证 | 精确估值数字 |
 | **enrich_valuation** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.valuation_enricher import enrich_valuation; ..."` | 结构化估值快照（NeoData+yfinance 双源交叉验证） | 自动聚合 |
+| **westock-mcp (MCP)** | `data_sector`/`data_industry_chain`/`data_rating`/`data_fund_flow` | 可比公司板块/产业链/机构评级/资金流 | **westock 独有维度，补充 NeoData** |
 | **WebSearch** | WorkBuddy 内置 | 可比交易/融资新闻/退出案例/行业估值报告 | 非结构化 |
 | **WebFetch** | WorkBuddy 内置 | 深读估值报告/融资新闻/退出案例 | 配合 WebSearch |
 
@@ -198,6 +199,7 @@ web_fetch: {搜索结果中的URL}
 | 美股可比公司估值 | yfinance (`yfinance_summary`) | 美股精确估值首选 |
 | A/HK 可比公司交叉验证 | yfinance (`yfinance_summary`) | 双源验证，差异>5%要告警 |
 | 目标公司估值快照 | enrich_valuation (market=auto) | 自动 NeoData+yfinance 双源 |
+| **可比公司板块/产业链/机构评级/资金流** | **westock-mcp (`data_sector`/`data_industry_chain`/`data_rating`/`data_fund_flow`)** | **NeoData 覆盖弱的维度，优先走 westock** |
 | company_verify_report 中的估值数据 | Read `{task_dir}/company_verify_report.json` | 管线已预注入，优先读取 |
 | 可比交易（融资/估值/轮次） | WebSearch → WebFetch 深读 | 非上市公司交易数据 |
 | 退出案例（IPO/并购/估值倍数） | WebSearch → WebFetch 深读 | 退出回报参考 |

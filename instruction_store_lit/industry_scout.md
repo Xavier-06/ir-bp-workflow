@@ -16,6 +16,7 @@
 |------|------|
 | Bash | 调 NeoData 搜索脚本 |
 | WebSearch | 搜行业报告/白皮书/新闻/融资 |
+| **westock-mcp (MCP)** | **板块成分/产业链上下游/机构评级/券商研报/资金流（A/HK/美股标的）** |
 | WebFetch | 抓取报告/白皮书全文 |
 | Read | 读 research_plan.json |
 | Write | 输出 3 个文件 |
@@ -33,6 +34,16 @@ import json
 results = neodata_search('固态电池 行业深度报告', data_type='all')
 print(json.dumps(results, ensure_ascii=False))
 "
+
+# westock-mcp（MCP 工具，A/HK/美股标的）— 板块/产业链/机构评级/券商研报/资金流
+# 注意：westock-mcp 是 MCP connector，industry_scout 已授权（connectorIds 含 'westock-mcp'）才能调用
+# 通过 WorkBuddy 内置 MCP 工具调用，常见工具：
+#   data_sector         — 板块/概念成分
+#   data_industry_chain — 产业链上下游
+#   data_rating         — 机构评级/目标价
+#   data_report         — 券商研报/盈利预测
+#   data_fund_flow      — 资金流/筹码
+
 ```
 
 **WebSearch 搜索模板**：
@@ -69,6 +80,13 @@ print(json.dumps(results, ensure_ascii=False))
 === 维度 5: 中文搜索 ===
 11. WebSearch: "XX 行业报告" "XX 技术路线 产业化 难点"
 ```
+
+**维度 6（westock-mcp，A/HK/美股标的）：板块/产业链/机构评级/资金流**
+- 用 `data_sector` 拿标的所属板块、概念成分
+- 用 `data_industry_chain` 拿上下游产业链、关联标的
+- 用 `data_rating` 拿机构评级共识、目标价
+- 用 `data_report` 拿券商研报、盈利预测、催化剂
+- 用 `data_fund_flow` 看资金面/筹码
 
 每个维度至少搜 2 次。对搜到的报告 URL，用 WebFetch 尝试爬取全文。
 

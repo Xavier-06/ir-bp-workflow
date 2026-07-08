@@ -214,6 +214,30 @@ print(v)
 
 **⚠️ 关键纪律：call_tool 的 tool_name 必须逐字复制 get_company_capabilities 返回表格中的真实名称，不能按中文含义猜测或翻译。**
 
+### 3.5 腾讯自选股 westock-mcp（A/HK/美股结构化金融，仅竞争定位 & 估值回报可用）
+
+**⚠️ 这是 MCP 工具（connector `westock-mcp`），当前管线仅授权给 `competition_positioning`（竞争定位）和 `valuation_return`（估值回报）两个角色。其他维度角色未授权，调用会被拒绝——不要尝试。**
+
+westock-mcp 提供 NeoData/yfinance 之外**独有**的结构化维度，是做可比上市公司分析的增量补充：
+
+| 维度 | westock-mcp 工具 | 查什么 |
+|------|-----------------|--------|
+| 板块/概念 | `data_sector` | 个股所属板块、概念成分、板块涨跌 |
+| 产业链 | `data_industry_chain` | 上下游产业链、关联标的 |
+| 资金流 | `data_fund_flow` | 主力/北向资金净流入、筹码分布 |
+| 北向持仓 | `data_north_holding` | 北向资金持股变动、外资偏好 |
+| 机构评级 | `data_rating` | 券商评级、目标价、评级变动 |
+| 券商研报 | `data_report` | 个股研报、盈利预测、催化剂 |
+| 行情/财务 | `data_quote` / `data_finance` | 实时行情、财报、估值指标 |
+| 个股筛选 | `tool_filter` / `tool_ranking` / `tool_strategy` | 按条件/策略/排行筛标的 |
+
+**什么时候用 westock-mcp（优先于 NeoData 的对应维度）：**
+- 做可比公司分析时，先拿竞品的**板块归属、产业链位置、北向资金动向、机构评级共识**——这些是 NeoData 不强的
+- 需要**券商最新评级/目标价/研报催化**时走 `data_rating` / `data_report`
+- 需要**实时资金面/筹码面**时走 `data_fund_flow` / `data_north_holding`
+
+**与 NeoData 的关系**：NeoData 仍是 A/HK 行情/财报/研报主力；westock-mcp 补充板块/产业链/资金流/北向/评级这些 NeoData 覆盖弱的维度，二者交叉验证。**非上市标的没有 westock 数据，直接走 NeoData + WebSearch。**
+
 
 ### 4. 腾讯新闻搜索（实时中文新闻，BP 管线专用）
 
@@ -298,6 +322,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | **美股竞品新闻/earnings** | **Yahoo Finance (`_yahoo_search`)** | WebSearch |
 | 通用网络搜索 | WebSearch → WebFetch 深读 | — |
 | 读某个 URL 的正文 | WebFetch | — |
+| **可比公司板块/产业链/资金流/北向/机构评级** | **westock-mcp（`data_sector`/`data_industry_chain`/`data_fund_flow`/`data_north_holding`/`data_rating`）** | NeoData(doc) → WebSearch |
 
 ### ⚠️ 不可用工具清单
 
@@ -315,6 +340,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - 禁止在能用 TYC 直接查到结构化数据时用 WebSearch 去搜（如查股东信息，TYC 直接返回结构列表，WebSearch 只能搜到新闻）
 - 禁止在需要精确估值数字时只用 WebSearch（用 yfinance 或 NeoData）
 - 禁止编造 URL、编造数据源、编造引用
+- 禁止非授权角色调用 westock-mcp——仅 `competition_positioning` / `valuation_return` 已授权，其他维度调用会被拒绝
 
 ## 角色边界（写在每个角色指令开头）
 
@@ -324,8 +350,8 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | product_commercial | TYC 客户验证/招投标 + WebSearch 产品/客户/合同 + NeoData(api)上市客户 + **NeoData(doc)行业新闻/产品报道** | 估值分析/技术路线/市场规模 |
 | tech_ip_moat | TYC 专利/商标/软著 + WebSearch 技术路线/论文/标准 + NeoData(api)竞品研发 + **NeoData(doc)技术趋势/行业研报** | 估值分析/市场规模/客户收入 |
 | market_supply_chain | NeoData(api+doc)行业研报/竞对/新闻 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 | 估值建模/技术路线/团队分析 |
-| competition_positioning | TYC 竞品验证 + NeoData(api+doc)/yfinance 竞品财务/新闻/研报 + WebSearch 竞品情报 | 估值主模型/客户收入主结论/泛化风险 |
-| valuation_return | NeoData(api+doc)/yfinance/enrich_valuation 三源估值+研报 + WebSearch 可比交易 | 客户验证/技术判断/竞品主分析/市场规模 |
+| competition_positioning | TYC 竞品验证 + NeoData(api+doc)/yfinance 竞品财务/新闻/研报 + **westock-mcp 板块/产业链/资金流/北向/机构评级** + WebSearch 竞品情报 | 估值主模型/客户收入主结论/泛化风险 |
+| valuation_return | NeoData(api+doc)/yfinance/enrich_valuation 三源估值+研报 + **westock-mcp 板块/产业链/机构评级/资金流** + WebSearch 可比交易 | 客户验证/技术判断/竞品主分析/市场规模 |
 | customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData(api)上市客户 + **NeoData(doc)客户新闻/订单报道** | 估值分析/技术判断/市场规模/竞品主分析 |
 | dealbreaker_risk | TYC 风险全扫(35项) + **NeoData(doc)负面新闻/风险舆情/监管动态** + WebSearch 负面/舆情/监管 + NeoData(api)前置验证 | 估值建模/客户主验证/技术判断/市场规模 |
 | 统稿 | Read 所有维度输出 + Write 完整报告 | 搜任何外部数据 |
