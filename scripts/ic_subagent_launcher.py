@@ -777,6 +777,115 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
     }
 
 
+def _build_inline_data_source_guide(role: str, step: str) -> str:
+    """为 inline prompt 生成角色专属的数据源路由指引。
+
+    核心目的：子代理的 inline prompt 直接告诉它"搜什么→用什么工具"，
+    不要让它自己去翻 brief 或 system_prompt 里的 _common_tool_guide.md。
+    """
+    # 按角色分发数据源路由
+    if role == 'ic_executive_hypothesis':
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 行业板块走势/估值 → westock-mcp: data_sector（查 AI芯片/半导体 板块）\n'
+            '- 最新行业动态 → 腾讯新闻 CLI（Bash 调用，见 System Prompt 工具指南）\n'
+            '- 龙头公司实时估值锚 → westock-mcp: data_quote（查英伟达/寒武纪/海光等）\n'
+            '- 行业研报/市场规模 → westock-mcp: data_report\n'
+            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+        )
+    elif role == 'ic_market_overview':
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 行业板块走势/估值水平 → westock-mcp: data_sector\n'
+            '- 行业市场规模/TAM/CAGR → NeoData(Bash) → web_search 兜底\n'
+            '- 券商行业研报 → westock-mcp: data_report → NeoData(Bash)\n'
+            '- 突发行业动态 → 腾讯新闻 CLI(Bash)\n'
+            '- 可比公司估值/财务 → westock-mcp: data_finance\n'
+            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+        )
+    elif role in ('ic_competitive', 'ic_segment_deep'):
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 企业工商/股东/融资 → tyc-mcp: search_companies → call_tool\n'
+            '- 上市公司财务对比 → westock-mcp: data_finance + data_quote\n'
+            '- 机构评级/一致预期 → westock-mcp: data_rating\n'
+            '- 竞品最新动态 → 腾讯新闻 CLI(Bash)\n'
+            '- 专利布局/研发能力 → tyc-mcp: call_tool(search_patents)\n'
+            '- 市场份额/CR3/CR5 → westock-mcp + web_search 交叉验证\n'
+            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+        )
+    elif role in ('ic_tech_product', 'ic_route_deep'):
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 技术论文/arxiv → web_search("arxiv {关键词} {YYYY}") + web_fetch 读全文\n'
+            '- 专利检索 → tyc-mcp: search_patents\n'
+            '- 产品参数/性能对比 → web_search + web_fetch\n'
+            '- 技术突破新闻 → 腾讯新闻 CLI(Bash)\n'
+            '- 公司研发投入/研发费用率 → westock-mcp: data_finance\n'
+            '- web_search 用于学术/技术类搜索是合理的，但商业数据仍优先结构化源\n\n'
+        )
+    elif role == 'ic_supply_chain':
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 产业链图谱/环节梳理 → westock-mcp: data_industry_chain\n'
+            '- 企业画像/技术能力 → tyc-mcp: search_companies → get_company_capabilities\n'
+            '- 招投标/政府采购 → tyc-mcp: search_bids\n'
+            '- 产能/订单动态 → 腾讯新闻 CLI(Bash)\n'
+            '- 行业深度数据 → NeoData(Bash)\n'
+            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+        )
+    elif role == 'ic_policy_risk':
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 国内政策文件/产业规划 → web_search("site:gov.cn {关键词}")\n'
+            '- 企业司法/风险/行政处罚 → tyc-mcp: call_tool（风险扫描类）\n'
+            '- 出口管制/制裁清单 → web_search("BIS entity list {关键词}")\n'
+            '- 政策最新动态/解读 → 腾讯新闻 CLI(Bash)\n'
+            '- 地缘风险/贸易摩擦 → web_search + 腾讯新闻 CLI\n\n'
+        )
+    elif role in ('ic_unit_economics', 'ic_business_overview'):
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 公司财务 → westock-mcp: data_finance\n'
+            '- 客户/供应商关系 → tyc-mcp: call_tool\n'
+            '- 定价/收费模式 → web_search + web_fetch（产品官网）\n'
+            '- 用户数据/留存/渗透率 → web_search\n\n'
+        )
+    elif role == 'ic_feasibility':
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 学术论文/前沿研究 → web_search("arxiv ...") + web_fetch\n'
+            '- 实验进展/里程碑 → web_search + 腾讯新闻 CLI(Bash)\n'
+            '- 专利 → tyc-mcp: search_patents\n'
+            '- 项目/公司融资 → tyc-mcp: search_companies → web_search\n\n'
+        )
+    elif role in ('ic_catalyst', 'ic_consensus'):
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 重大事件/业绩会/并购 → westock-mcp: data_events\n'
+            '- 机构评级/一致预期 → westock-mcp: data_rating\n'
+            '- 资金流向/北向持仓 → westock-mcp: data_fund_flow + data_north_holding\n'
+            '- 最新动态 → 腾讯新闻 CLI(Bash)\n'
+            '- web_search 仅作兜底\n\n'
+        )
+    elif role == 'ic_report_synthesizer':
+        return (
+            '⚠️ 数据源路由：统稿不搜索新数据。综合全部前序 wave 输出。\n'
+            '如需补充验证，仅通过 westock-mcp / tyc-mcp 定向查询，不超过 2 次。\n\n'
+        )
+    else:
+        # 通用 fallback
+        return (
+            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '- 公司财务/行情/估值 → westock-mcp: data_finance / data_quote\n'
+            '- 企业工商/股东/专利 → tyc-mcp: search_companies → call_tool\n'
+            '- 行业研报/板块数据 → westock-mcp: data_report / data_sector\n'
+            '- 最新动态 → 腾讯新闻 CLI(Bash)\n'
+            '- 深度行业数据 → NeoData(Bash)\n'
+            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+        )
+
+
 def build_step_prompt(step: str, entity: str, market: str = 'cn',
                       archetype: str | None = None,
                       segments: list[dict] | None = None,
@@ -1170,6 +1279,9 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'\n'
             )
 
+        # ── 角色专属数据源路由（v2.1: 嵌入 inline prompt，子代理直接看到）──
+        data_source_guide = _build_inline_data_source_guide(role, step)
+
         prompt_body += (
             f'【执行步骤】\n'
             f'1. 读取 brief 文件：{brief_path}\n'
@@ -1188,34 +1300,37 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             )
         elif step == "step_executive_hypothesis":
             prompt_body += (
-                f'2. 根据 brief 中的角色指令，快速扫描行业基本面（最多2轮搜索）\n'
-                f'3. 构建核心投资假说（必须有对立面和量化锚点）\n'
-                f'4. 产出≥5个待验证问题\n'
-                f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
+                f'2. {data_source_guide}'
+                f'3. 根据 brief 中的角色指令，快速扫描行业基本面（最多2轮搜索）\n'
+                f'4. 构建核心投资假说（必须有对立面和量化锚点）\n'
+                f'5. 产出≥5个待验证问题\n'
+                f'6. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         elif step == "step_value_chain":
             prompt_body += (
-                f'2. 根据 brief 执行产业链分析\n'
-                f'3. ⚠️ 必须包含 ```json block（segments 定义），否则管线无法继续\n'
-                f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
+                f'2. {data_source_guide}'
+                f'3. 根据 brief 执行产业链分析\n'
+                f'4. ⚠️ 必须包含 ```json block（segments 定义），否则管线无法继续\n'
+                f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         elif step == "step_tech_landscape":
             prompt_body += (
-                f'2. 根据 brief 执行技术全景扫描\n'
-                f'3. ⚠️ 必须包含 ```json block（competing_routes 定义），否则管线无法继续\n'
-                f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
+                f'2. {data_source_guide}'
+                f'3. 根据 brief 执行技术全景扫描\n'
+                f'4. ⚠️ 必须包含 ```json block（competing_routes 定义），否则管线无法继续\n'
+                f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         elif step_deps_list:
             prompt_body += (
                 f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 根据 brief 中的角色指令执行分析\n'
-                f'4. 如发现数据缺口，用 westock-mcp / tyc-mcp / NeoData(Bash) / 腾讯新闻(Bash) / web_search 补搜（最多 3 轮，Bash 调用示例见 System Prompt 工具指南）\n'
+                f'3. {data_source_guide}'
+                f'4. 根据 brief 中的角色指令执行分析，如发现数据缺口按上方数据源路由补搜（最多 3 轮）\n'
                 f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         else:
             prompt_body += (
-                f'2. 根据 brief 中的角色指令，执行完整分析\n'
-                f'3. 如发现数据缺口，用 westock-mcp / tyc-mcp / NeoData(Bash) / 腾讯新闻(Bash) / web_search 补搜（最多 3 轮，Bash 调用示例见 System Prompt 工具指南）\n'
+                f'2. {data_source_guide}'
+                f'3. 根据 brief 中的角色指令执行完整分析，如发现数据缺口按上方数据源路由补搜（最多 3 轮）\n'
                 f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
 
@@ -1237,6 +1352,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             'name': step,
             'team_name': f'ic-{task_id}',
             'mode': 'bypassPermissions',
+            'connectorIds': _get_step_connector_ids(step, archetype),
             'prompt': prompt_body,
             'brief_path': brief_path,
             'output_path': output_path,
