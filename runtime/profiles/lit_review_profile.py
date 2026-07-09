@@ -597,7 +597,7 @@ def _run_tech_decomposition(runtime_root: Path, job_ctx: JobContext) -> dict[str
         f"  - team_name = 'lit-{{task_id}}'\n"
         f"  - mode = 'bypassPermissions'\n"
         f"  - prompt = manifest's 'system_prompt' field (COMPLETE, do NOT simplify)\n"
-        f"  - connectorIds = []\n\n"
+        f"  - connectorIds = manifest's 'connectorIds' field\n\n"
         f"## ⚠️ 双文件验证\n"
         f"子代理输出 **2 个文件**:\n"
         f"  - tech_decomposition.json (>50 bytes, valid JSON)\n"
