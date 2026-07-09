@@ -1,0 +1,83 @@
+{
+  "archetype": "chain_scan",
+  "name": "产业链扫描",
+  "description": "成熟行业的全景研究，有清晰的产业链环节分解",
+  "is_dynamic": true,
+  "dynamic_source": "value_chain_segments",
+  "waves": [
+    {
+      "index": 0,
+      "name": "投研假说",
+      "steps": ["step_executive_hypothesis"],
+      "parallel": true
+    },
+    {
+      "index": 1,
+      "name": "行业基础",
+      "steps": ["step_ind_overview", "step_policy_scan", "step_value_chain"],
+      "parallel": true
+    },
+    {
+      "index": 2,
+      "name": "环节深度分析",
+      "steps_template": ["step_segment_deep_{seg}"],
+      "parallel": true,
+      "depends_on_wave": 1
+    },
+    {
+      "index": 3,
+      "name": "跨环节综合",
+      "steps": ["step_cross_compare", "step_catalyst", "step_consensus"],
+      "parallel": true,
+      "depends_on_wave": 2
+    },
+    {
+      "index": 4,
+      "name": "统稿",
+      "steps": ["step_master_synthesis"],
+      "parallel": false,
+      "depends_on_wave": 3
+    }
+  ],
+  "role_map": {
+    "step_executive_hypothesis": "ic_executive_hypothesis",
+    "step_ind_overview": "ic_market_overview",
+    "step_policy_scan": "ic_policy_risk",
+    "step_value_chain": "ic_supply_chain",
+    "step_segment_deep_{seg}": "ic_segment_deep",
+    "step_cross_compare": "ic_competitive",
+    "step_catalyst": "ic_catalyst",
+    "step_consensus": "ic_consensus",
+    "step_master_synthesis": "ic_report_synthesizer"
+  },
+  "step_deps_template": {
+    "step_executive_hypothesis": [],
+    "step_ind_overview": [],
+    "step_policy_scan": [],
+    "step_value_chain": [],
+    "step_segment_deep_{seg}": ["step_value_chain", "step_ind_overview"],
+    "step_cross_compare": ["__all_segment_deep__"],
+    "step_catalyst": ["__all_segment_deep__"],
+    "step_consensus": ["step_cross_compare", "__all_segment_deep__"],
+    "step_master_synthesis": ["step_cross_compare", "step_catalyst", "step_consensus"]
+  },
+  "connector_map": {
+    "ic_executive_hypothesis": ["westock-mcp"],
+    "ic_market_overview": ["tyc-mcp", "westock-mcp"],
+    "ic_policy_risk": ["tyc-mcp", "westock-mcp"],
+    "ic_supply_chain": ["tyc-mcp", "westock-mcp"],
+    "ic_segment_deep": ["tyc-mcp", "westock-mcp"],
+    "ic_competitive": ["tyc-mcp", "westock-mcp"],
+    "ic_catalyst": ["tyc-mcp", "westock-mcp"],
+    "ic_consensus": ["tyc-mcp", "westock-mcp"],
+    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+  },
+  "always_active_steps": ["step_executive_hypothesis", "step_value_chain", "step_master_synthesis"],
+  "step_timeouts": {
+    "step_executive_hypothesis": 600,
+    "step_value_chain": 1200,
+    "step_segment_deep_{seg}": 1200,
+    "step_master_synthesis": 1200
+  },
+  "default_timeout": 900
+}

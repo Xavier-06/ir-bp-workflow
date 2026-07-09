@@ -1,27 +1,21 @@
 #!/usr/bin/env python3
 """
-IC (Industry Coverage) Subagent Launcher — WorkBuddy 版本 v1
+IC (Industry Coverage) Subagent Launcher — WorkBuddy 版本 v2
 
-行业研究管线核心编排引擎。核心特性：
-1. 动态 Wave 生成 — value_chain step 完成后，根据产业链环节数动态展开后续 wave
-2. 两阶段统稿 — seg_synthesis_{seg_id} 先做环节小结，master_synthesis 再综合
-3. 断点续跑 — wave_manifest.json 持久化，支持从中断处恢复
-4. 模板引擎 — 6个维度模板 × N个环节 = 动态 step
+行业研究管线核心编排引擎。v2 重构：
+1. Archetype 驱动 — 5 种课题原型（chain_scan/tech_compare/company_deep/early_theme/commercial_mode）
+2. 扁平化 Wave — 砍掉 6 维度拆分，每环节/路线一个深度分析子代理
+3. Instruction Store 对齐 — roles/ 目录存放角色指令，archetypes/ 存放原型模板
+4. 动态 Wave 生成 — chain_scan/tech_compare 根据 value_chain/tech_landscape 输出动态展开
 
-Wave 编排：
-  Wave 0（静态·1个）: executive_hypothesis（投研假说先行）
-  Wave 1（静态·3个并行）: ind_overview / policy_scan / value_chain
-  Wave 2（动态·每环节×3维度）: competitive_{seg} / tech_{seg} / market_{seg}
-  Wave 3（动态·每环节×3维度）: financial_{seg} / valuation_{seg} / capital_{seg}
-  Wave 4（动态·每环节1个）: seg_synthesis_{seg}
-  Wave 5（静态·3个并行）: cross_chain_compare / catalyst_analysis / consensus_challenge
-  Wave 6（静态·3个并行）: investment_thesis / risk_assessment / scenario_sensitivity
-  Wave 7（静态·串行）: master_synthesis
-  Wave 8（静态·串行）: investment_playbook（投资手册交付）
+子代理数对比（v1→v2）：
+  chain_scan 3 环节: 32 → 11
+  tech_compare 3 路线: 30 → 10
+  company_deep: 32 → 9
+  early_theme: 32 → 7
+  commercial_mode: 32 → 10
 
-2026-05-29 v1: 初始版本
-2026-06-02 v2: P0升级（+Wave 0投研假说、+Wave 7投资手册、+分析师思维注入）
-2026-06-02 v3: P1P2升级（+Wave 5催化剂/共识挑战、+Wave 6场景敏感性、+P2深度增强）
+2026-07-09 v2: archetype-driven 重构，instruction store 对齐
 """
 from __future__ import annotations
 
@@ -42,119 +36,73 @@ INSTRUCTION_STORE = ROOT / 'instruction_store_ic'
 # ── 质量线 ──
 STEP_QUALITY_THRESHOLD = 3
 
-# ── 维度模板 ──
-SEGMENT_DIMS_W2 = ["competitive", "tech", "market"]
-SEGMENT_DIMS_W3 = ["financial", "valuation", "capital"]
+# ── Archetype 常量 ──
+ARCHETYPE_CHAIN_SCAN = "chain_scan"
+ARCHETYPE_TECH_COMPARE = "tech_compare"
+ARCHETYPE_COMPANY_DEEP = "company_deep"
+ARCHETYPE_EARLY_THEME = "early_theme"
+ARCHETYPE_COMMERCIAL_MODE = "commercial_mode"
 
-# ── 静态 Wave 定义 ──
-STATIC_WAVE_0 = ["step_executive_hypothesis"]
-STATIC_WAVE_1 = ["step_ind_overview", "step_policy_scan", "step_value_chain"]
-STATIC_WAVE_5 = ["step_cross_chain_compare", "step_catalyst_analysis", "step_consensus_challenge"]
-STATIC_WAVE_6 = ["step_investment_thesis", "step_risk_assessment", "step_scenario_sensitivity"]
-STATIC_WAVE_7 = ["step_master_synthesis"]
-STATIC_WAVE_8 = ["step_investment_playbook"]
+ALL_ARCHETYPES = [
+    ARCHETYPE_CHAIN_SCAN, ARCHETYPE_TECH_COMPARE, ARCHETYPE_COMPANY_DEEP,
+    ARCHETYPE_EARLY_THEME, ARCHETYPE_COMMERCIAL_MODE,
+]
 
-# ── 强制运行的结构性 step（不受 activated_steps 过滤影响）──
-# 这些 step 是管线骨架，不管课题性质如何都必须运行
-_ALWAYS_ACTIVE_STEPS = {
-    "step_executive_hypothesis",   # 投研假说先行
-    "step_value_chain",             # 产业链分析（dynamic wave 生成依赖）
-    "step_master_synthesis",        # 最终统稿
-}
-
-def _is_step_active(step_name: str, activated_steps: set[str]) -> bool:
-    """Check if a step should be active based on research plan's activated_steps.
-
-    Matching rules:
-    1. Exact match in activated_steps → active
-    2. For dynamic steps (step_dim_segid): match by base dimension name
-       e.g., step_competitive_upstream → matches step_competitive
-    3. Structural steps (_ALWAYS_ACTIVE_STEPS) → always active
-    4. Everything else → inactive (unless empty filter = all active)
-    """
-    if not activated_steps:
-        return True  # No filter → all steps active
-
-    if step_name in _ALWAYS_ACTIVE_STEPS:
-        return True
-
-    if step_name in activated_steps:
-        return True
-
-    # Dynamic step matching: strip segment suffix to get base name
-    # step_competitive_upstream_materials → step_competitive
-    parts = step_name.split("_")
-    # Try progressively shorter prefixes
-    for prefix_len in range(len(parts), 1, -1):
-        prefix = "_".join(parts[:prefix_len])
-        if prefix in activated_steps:
-            return True
-
-    return False
-
-
-def _filter_steps(steps: list[str], activated_steps: set[str]) -> list[str]:
-    """Filter a list of step names, keeping only active ones."""
-    if not activated_steps:
-        return steps  # No filter → all active
-    return [s for s in steps if _is_step_active(s, activated_steps)]
+# ── 默认 archetype（当无法判定时） ──
+DEFAULT_ARCHETYPE = ARCHETYPE_CHAIN_SCAN
 
 # ── ConnectorIds 授权 ──
-# 按 step 前缀授予 connectorIds。tyc-mcp（天眼查）+ westock-mcp（腾讯自选股）。
-# tdx（通达信）/ qcc（企查查）当前环境不可用。
-# ★ 从 ic_constants 导入，单一真实来源。
 from scripts.ic_constants import IC_ROLE_CONNECTOR_IDS, IC_DEFAULT_CONNECTOR_IDS
 
-def _get_step_connector_ids(step: str) -> list[str]:
-    """Get connectorIds for a step, matching by prefix."""
-    # 动态 step（如 step_competitive_upstream）匹配前缀
-    for prefix, ids in IC_ROLE_CONNECTOR_IDS.items():
-        if step.startswith(prefix):
-            return ids
-    return IC_DEFAULT_CONNECTOR_IDS  # default
+# ═══════════════════════════════════════════════════════
+# Archetype 模板加载
+# ═══════════════════════════════════════════════════════
 
-# ── 静态 step 的 STEP_DEPS（Wave 1 无依赖） ──
-STATIC_DEPS = {
-    "step_executive_hypothesis": [],
-    "step_ind_overview": [],
-    "step_policy_scan": [],
-    "step_value_chain": [],
-    "step_cross_chain_compare": [],       # 动态填充
-    "step_catalyst_analysis": [],         # 动态填充
-    "step_consensus_challenge": [],       # 动态填充
-    "step_investment_thesis": [],         # 动态填充
-    "step_risk_assessment": [],           # 动态填充
-    "step_scenario_sensitivity": [],      # 动态填充
-    "step_master_synthesis": [],          # 动态填充
-    "step_investment_playbook": [],       # 动态填充
-}
+def load_archetype_template(archetype: str) -> dict:
+    """加载 archetype JSON 模板。"""
+    path = INSTRUCTION_STORE / 'archetypes' / f'{archetype}.json'
+    if path.exists():
+        return json.loads(path.read_text(encoding='utf-8'))
+    print(f"  ⚠️ archetype 模板不存在: {path}，降级为 {DEFAULT_ARCHETYPE}")
+    path = INSTRUCTION_STORE / 'archetypes' / f'{DEFAULT_ARCHETYPE}.json'
+    if path.exists():
+        return json.loads(path.read_text(encoding='utf-8'))
+    return {}
 
-# ── 静态 step 超时 ──
-STEP_TIMEOUTS = {
-    "step_executive_hypothesis": 600,
-    "step_ind_overview": 900,
-    "step_policy_scan": 900,
-    "step_value_chain": 1200,
-    "step_catalyst_analysis": 900,
-    "step_consensus_challenge": 900,
-    "step_scenario_sensitivity": 900,
-    "step_investment_playbook": 1200,
-    # 动态 step 默认 900
-}
-DEFAULT_STEP_TIMEOUT = 900
 
-# 维度 → W2 指令 key
-DIM_W2_ROLE = {
-    "competitive": "行业_环节分析_W2",
-    "tech": "行业_环节分析_W2",
-    "market": "行业_环节分析_W2",
-}
-# 维度 → W3 指令 key
-DIM_W3_ROLE = {
-    "financial": "行业_环节分析_W3",
-    "valuation": "行业_环节分析_W3",
-    "capital": "行业_环节分析_W3",
-}
+def load_index() -> dict:
+    """加载 instruction_store_ic/index.json。"""
+    path = INSTRUCTION_STORE / 'index.json'
+    if path.exists():
+        return json.loads(path.read_text(encoding='utf-8'))
+    return {}
+
+
+def resolve_archetype(task_id: str) -> str:
+    """从 ic_research_plan.json 或 ic_topic_metadata.json 读取 archetype。"""
+    # 优先读 research plan
+    plan_path = TASKS_DIR / f'{task_id}-ic_research_plan.json'
+    if plan_path.exists():
+        try:
+            plan = json.loads(plan_path.read_text(encoding='utf-8'))
+            arch = plan.get("archetype", "")
+            if arch and arch in ALL_ARCHETYPES:
+                return arch
+        except Exception:
+            pass
+
+    # 次选 topic metadata
+    meta_path = TASKS_DIR / f'{task_id}-ic_topic_metadata.json'
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding='utf-8'))
+            arch = meta.get("archetype", "")
+            if arch and arch in ALL_ARCHETYPES:
+                return arch
+        except Exception:
+            pass
+
+    return DEFAULT_ARCHETYPE
 
 
 # ═══════════════════════════════════════════════════════
@@ -202,50 +150,101 @@ def wave_manifest_path(task_id: str) -> Path:
 
 
 # ═══════════════════════════════════════════════════════
-# 指令加载
+# 指令加载（v2: roles/ 子目录）
 # ═══════════════════════════════════════════════════════
 
 def load_instruction(role_key: str) -> str:
-    """加载角色指令（instruction_store_ic）"""
-    role_file = INSTRUCTION_STORE / f'{role_key}.md'
+    """加载角色指令（从 roles/ 子目录）。"""
+    role_file = INSTRUCTION_STORE / 'roles' / f'{role_key}.md'
     if role_file.exists():
         return role_file.read_text(encoding='utf-8')
     return f'Role instructions for {role_key} not found.'
 
 
-def _get_step_role_key(step_name: str) -> str:
-    """根据 step 名推断指令 key（优先读 index.json pipeline_bindings.ic）"""
-    index_path = INSTRUCTION_STORE / 'index.json'
-    if index_path.exists():
-        index = json.loads(index_path.read_text(encoding='utf-8'))
-        static_map = index.get('pipeline_bindings', {}).get('ic', {})
-        if step_name in static_map:
-            return static_map[step_name]
+def _get_step_role_key(step_name: str, archetype: str | None = None) -> str:
+    """根据 step 名 + archetype 查 role key。
 
-    # 动态 step: 解析维度
-    parts = step_name.replace("step_", "").split("_", 1)
-    if len(parts) == 2:
-        dim, seg_id = parts[0], parts[1]
-        if dim in SEGMENT_DIMS_W2:
-            return "行业_环节分析_W2"
-        if dim in SEGMENT_DIMS_W3:
-            return "行业_环节分析_W3"
-        if dim == "seg_synthesis":
-            return "行业_环节小结"
+    v2: 从 archetype 模板的 role_map 查。
+    支持精确匹配和模板匹配（如 step_segment_deep_{seg} → ic_segment_deep）。
+    """
+    if archetype is None:
+        # 尝试从 wave_manifest 读 archetype
+        wm = load_json(wave_manifest_path(_current_task_id_for_role))
+        if wm:
+            archetype = wm.get("archetype", DEFAULT_ARCHETYPE)
+        else:
+            archetype = DEFAULT_ARCHETYPE
+
+    template = load_archetype_template(archetype)
+    role_map = template.get("role_map", {})
+
+    # 1. 精确匹配
+    if step_name in role_map:
+        return role_map[step_name]
+
+    # 2. 模板匹配（step_segment_deep_upstream → step_segment_deep_{seg} → ic_segment_deep）
+    for template_key, role in role_map.items():
+        if "{seg}" in template_key or "{route}" in template_key:
+            # 提取 base: step_segment_deep_{seg} → step_segment_deep
+            base = template_key.replace("_{seg}", "").replace("_{route}", "")
+            if step_name.startswith(f"{base}_"):
+                return role
+
+    # 3. fallback: 用 index.json 的 connector_defaults 做模糊匹配
+    index = load_index()
+    connector_defaults = index.get("connector_defaults", {})
+
+    # 尝试从 step 名推断 role（去 step_ 前缀，取第一个有意义的部分）
+    clean = step_name.replace("step_", "")
+    parts = clean.split("_")
+
+    # 尝试 progressively longer prefixes
+    for prefix_len in range(len(parts), 0, -1):
+        prefix = "_".join(parts[:prefix_len])
+        candidate = f"ic_{prefix}"
+        if candidate in connector_defaults:
+            return candidate
 
     return step_name
 
 
+# 全局变量 hack — 在 launch_step 时设置，供 _get_step_role_key fallback 使用
+_current_task_id_for_role = ""
+
+
+def _get_step_connector_ids(step: str, archetype: str | None = None) -> list[str]:
+    """获取 step 的 connectorIds。
+
+    v2: 先查 archetype 模板的 connector_map，再查 index.json 的 connector_defaults。
+    """
+    role_key = _get_step_role_key(step, archetype)
+
+    # 1. 从 archetype 模板的 connector_map 查
+    template = load_archetype_template(archetype or DEFAULT_ARCHETYPE)
+    connector_map = template.get("connector_map", {})
+    if role_key in connector_map:
+        return connector_map[role_key]
+
+    # 2. 从 index.json 的 connector_defaults 查
+    index = load_index()
+    defaults = index.get("connector_defaults", {})
+    if role_key in defaults:
+        return defaults[role_key]
+
+    # 3. 从 ic_constants 查（兼容旧 step 前缀匹配）
+    for prefix, ids in IC_ROLE_CONNECTOR_IDS.items():
+        if step.startswith(prefix):
+            return ids
+
+    return IC_DEFAULT_CONNECTOR_IDS
+
+
 # ═══════════════════════════════════════════════════════
-# 动态 Wave 生成（核心）
+# 动态解析：segments / routes
 # ═══════════════════════════════════════════════════════
 
 def parse_segments_from_value_chain(task_id: str) -> list[dict]:
-    """从 value_chain step 的输出中解析 segments JSON。
-
-    寻找 ```json block，提取 segments 数组。
-    如果解析失败，降级为固定三段（上游/中游/下游）。
-    """
+    """从 value_chain step 的输出中解析 segments JSON。"""
     vc_path = step_output_path(task_id, "step_value_chain")
     if not vc_path.exists():
         print("  ⚠️ value_chain 输出不存在，降级为固定三段")
@@ -253,14 +252,12 @@ def parse_segments_from_value_chain(task_id: str) -> list[dict]:
 
     text = vc_path.read_text(encoding='utf-8')
 
-    # 提取 json block
     json_blocks = re.findall(r'```json\s*\n(.*?)\n\s*```', text, re.DOTALL)
     for block in json_blocks:
         try:
             data = json.loads(block)
             segments = data.get("segments", [])
             if segments and len(segments) >= 2:
-                # 规范化 segment id：确保是合法的 ASCII 标识符
                 for seg in segments:
                     raw_id = seg.get("id", "")
                     normalized = _normalize_seg_id(raw_id)
@@ -273,7 +270,6 @@ def parse_segments_from_value_chain(task_id: str) -> list[dict]:
         except json.JSONDecodeError:
             continue
 
-    # 尝试整体解析
     try:
         data = json.loads(text)
         segments = data.get("segments", [])
@@ -292,21 +288,47 @@ def parse_segments_from_value_chain(task_id: str) -> list[dict]:
     return _fallback_segments()
 
 
+def parse_routes_from_tech_landscape(task_id: str) -> list[dict]:
+    """从 tech_landscape step 的输出中解析 competing_routes JSON。"""
+    tl_path = step_output_path(task_id, "step_tech_landscape")
+    if not tl_path.exists():
+        print("  ⚠️ tech_landscape 输出不存在，降级为固定两路线")
+        return _fallback_routes()
+
+    text = tl_path.read_text(encoding='utf-8')
+
+    json_blocks = re.findall(r'```json\s*\n(.*?)\n\s*```', text, re.DOTALL)
+    for block in json_blocks:
+        try:
+            data = json.loads(block)
+            routes = data.get("competing_routes", [])
+            if routes and len(routes) >= 2:
+                for route in routes:
+                    raw_id = route.get("id", "")
+                    normalized = _normalize_seg_id(raw_id)
+                    if not normalized:
+                        idx = routes.index(route)
+                        normalized = f"route_{idx + 1}"
+                    route["id"] = normalized
+                print(f"  ✅ 解析到 {len(routes)} 条技术路线: {[r['name'] for r in routes]}")
+                return routes
+        except json.JSONDecodeError:
+            continue
+
+    print("  ⚠️ tech_landscape JSON 解析失败，降级为固定两路线")
+    return _fallback_routes()
+
+
 def _normalize_seg_id(raw_id: str) -> str:
-    """规范化 segment id: lowercase + underscore + 无中文（纯ASCII）"""
+    """规范化 segment/route id: lowercase + underscore + 纯 ASCII"""
     if not raw_id:
         return ""
-    # 只保留 ASCII 字母、数字、下划线、连字符，其余替换为下划线
     normalized = re.sub(r'[^a-zA-Z0-9_\-]', '_', raw_id).lower().strip('_')
-    # 去除连续下划线
     normalized = re.sub(r'_+', '_', normalized)
-    # 去除前后下划线
-    normalized = normalized.strip('_')
-    return normalized
+    return normalized.strip('_')
 
 
 def _fallback_segments() -> list[dict]:
-    """降级方案：固定三段"""
     return [
         {"id": "upstream", "name": "上游", "description": "上游原材料与核心部件",
          "key_companies": [], "profit_pool_pct": 30, "concentration": "",
@@ -320,124 +342,168 @@ def _fallback_segments() -> list[dict]:
     ]
 
 
-def build_dynamic_wave_plan(task_id: str, step_filter: set[str] | None = None) -> dict:
-    """Wave 1 完成后调用。读取 value_chain 输出，生成完整动态计划。
+def _fallback_routes() -> list[dict]:
+    return [
+        {"id": "route_a", "name": "路线A", "description": "主流技术路线",
+         "maturity": "mass_production", "key_players": [], "key_metrics": {}},
+        {"id": "route_b", "name": "路线B", "description": "新兴技术路线",
+         "maturity": "pilot", "key_players": [], "key_metrics": {}},
+    ]
 
-    返回完整 wave_manifest。
-    step_filter: 从 research plan 的 activated_steps 传入，用于过滤无关维度。
+
+# ═══════════════════════════════════════════════════════
+# 动态 Wave 生成（v2: archetype 驱动）
+# ═══════════════════════════════════════════════════════
+
+def build_dynamic_wave_plan(task_id: str, step_filter: set[str] | None = None,
+                               archetype: str | None = None) -> dict:
+    """v2: 读 archetype 模板，动态生成 wave plan。
+
+    chain_scan: 从 value_chain 解析 segments → 展开 segment_deep_{seg}
+    tech_compare: 从 tech_landscape 解析 routes → 展开 route_deep_{route}
+    其他: 直接用静态模板
     """
-    segments = parse_segments_from_value_chain(task_id)
-    all_seg_ids = [s["id"] for s in segments]
+    if archetype is None:
+        archetype = resolve_archetype(task_id)
 
-    # Wave 2: 竞争/技术/市场 × N segments
-    dynamic_wave2 = []
-    for seg in segments:
-        for dim in SEGMENT_DIMS_W2:
-            step = f"step_{dim}_{seg['id']}"
-            if _is_step_active(step, step_filter or set()):
-                dynamic_wave2.append(step)
+    template = load_archetype_template(archetype)
+    if not template:
+        print(f"  ❌ archetype 模板加载失败: {archetype}")
+        return {}
 
-    # Wave 3: 财务/估值/资本 × N segments
-    dynamic_wave3 = []
-    for seg in segments:
-        for dim in SEGMENT_DIMS_W3:
-            step = f"step_{dim}_{seg['id']}"
-            if _is_step_active(step, step_filter or set()):
-                dynamic_wave3.append(step)
+    waves_config = template.get("waves", [])
+    is_dynamic = template.get("is_dynamic", False)
+    dynamic_source = template.get("dynamic_source", "")
+    always_active = set(template.get("always_active_steps", []))
 
-    # Wave 4: 环节小结 × N segments（两阶段统稿的第一阶段）
-    dynamic_wave4 = []
-    for seg in segments:
-        step = f"step_seg_synthesis_{seg['id']}"
-        if _is_step_active(step, step_filter or set()):
-            dynamic_wave4.append(step)
+    # 解析动态实体（segments 或 routes）
+    dynamic_items = []
+    if is_dynamic and dynamic_source == "value_chain_segments":
+        dynamic_items = parse_segments_from_value_chain(task_id)
+    elif is_dynamic and dynamic_source == "tech_routes":
+        dynamic_items = parse_routes_from_tech_landscape(task_id)
 
-    # 完整 waves — 静态 waves 也应用 filter，动态 waves 已在上面过滤
-    sf = step_filter or set()
-    waves = [
-        _filter_steps(STATIC_WAVE_0, sf),   # Wave 0: 投研假说
-        STATIC_WAVE_1,   # Wave 1: 静态（已在上层 filtered）
-        dynamic_wave2,   # Wave 2: 动态竞争/技术/市场
-        dynamic_wave3,   # Wave 3: 动态财务/估值/资本
-        dynamic_wave4,   # Wave 4: 环节小结
-        _filter_steps(STATIC_WAVE_5, sf),   # Wave 5: 跨环节对比+催化剂+共识挑战
-        _filter_steps(STATIC_WAVE_6, sf),   # Wave 6: 投资论点+风险评估+场景敏感性
-        _filter_steps(STATIC_WAVE_7, sf),   # Wave 7: 统稿
-        _filter_steps(STATIC_WAVE_8, sf),   # Wave 8: 投资手册
-    ]
-
-    # ── 构建 STEP_DEPS ──
+    # 展开 waves
+    waves = []
     step_deps = {}
+    all_dynamic_steps = []
 
-    # Wave 0 deps: 无依赖
-    step_deps["step_executive_hypothesis"] = []
+    for wave_cfg in waves_config:
+        wave_idx = wave_cfg.get("index", len(waves))
+        static_steps = wave_cfg.get("steps", [])
+        steps_template = wave_cfg.get("steps_template", [])
 
-    # 静态 deps
-    step_deps["step_ind_overview"] = []
-    step_deps["step_policy_scan"] = []
-    step_deps["step_value_chain"] = []
+        if steps_template and dynamic_items:
+            # 动态 wave: 展开模板
+            expanded = []
+            for item in dynamic_items:
+                item_id = item.get("id", "")
+                for tpl in steps_template:
+                    step = tpl.replace("{seg}", item_id).replace("{route}", item_id)
+                    expanded.append(step)
+                    all_dynamic_steps.append(step)
+            wave_steps = expanded
+        else:
+            wave_steps = static_steps
 
-    # Wave 2 deps: 依赖 value_chain
-    for seg in segments:
-        for dim in SEGMENT_DIMS_W2:
-            step_deps[f"step_{dim}_{seg['id']}"] = ["step_value_chain"]
+        # 应用 step_filter（always_active 不受影响）
+        if step_filter:
+            filtered = []
+            for s in wave_steps:
+                if s in always_active or s in step_filter:
+                    filtered.append(s)
+                else:
+                    # 动态 step 做前缀匹配
+                    base = s.rsplit("_", 1)[0] if "_" in s else s
+                    if base in step_filter or s in step_filter:
+                        filtered.append(s)
+                    else:
+                        filtered.append(s)  # 保留——宁可多跑也不漏
+            wave_steps = filtered
 
-    # Wave 3 deps: 依赖同环节的 Wave 2 输出
-    for seg in segments:
-        sid = seg["id"]
-        step_deps[f"step_financial_{sid}"] = [f"step_competitive_{sid}", f"step_market_{sid}"]
-        step_deps[f"step_valuation_{sid}"] = [f"step_financial_{sid}"]
-        step_deps[f"step_capital_{sid}"] = [f"step_competitive_{sid}", f"step_tech_{sid}"]
+        waves.append(wave_steps)
 
-    # Wave 4 deps: 环节小结依赖同环节所有维度
-    for seg in segments:
-        sid = seg["id"]
-        step_deps[f"step_seg_synthesis_{sid}"] = [
-            f"step_competitive_{sid}", f"step_tech_{sid}", f"step_market_{sid}",
-            f"step_financial_{sid}", f"step_valuation_{sid}", f"step_capital_{sid}",
-        ]
+    # 构建 step_deps
+    deps_template = template.get("step_deps_template", template.get("step_deps", {}))
 
-    # Wave 5 deps: 跨环节对比+催化剂+共识挑战，依赖所有环节小结
-    step_deps["step_cross_chain_compare"] = all_seg_synthesis
-    step_deps["step_catalyst_analysis"] = all_seg_synthesis
-    step_deps["step_consensus_challenge"] = all_seg_synthesis + ["step_cross_chain_compare"]
-
-    # Wave 6 deps: 投资论点+风险评估+场景敏感性
-    step_deps["step_investment_thesis"] = (all_seg_synthesis + all_valuation + all_capital
-                                           + all_financial + ["step_ind_overview", "step_policy_scan"]
-                                           + ["step_consensus_challenge"])
-    step_deps["step_risk_assessment"] = (all_competitive + all_seg_synthesis
-                                         + ["step_ind_overview"] + all_financial
-                                         + all_capital + ["step_policy_scan"])
-    step_deps["step_scenario_sensitivity"] = (all_financial + all_valuation
-                                              + ["step_cross_chain_compare"])
-
-    # Wave 7 deps: 统稿依赖 Wave 5 + Wave 6 全部
-    step_deps["step_master_synthesis"] = [
-        "step_cross_chain_compare", "step_catalyst_analysis", "step_consensus_challenge",
-        "step_investment_thesis", "step_risk_assessment", "step_scenario_sensitivity"
-    ]
-
-    # Wave 8 deps: 投资手册依赖统稿
-    step_deps["step_investment_playbook"] = [
-        "step_master_synthesis"
-    ]
+    for step_name_flat in _flatten_waves(waves):
+        if step_name_flat in deps_template:
+            # 静态 step
+            raw_deps = deps_template[step_name_flat]
+            resolved = _resolve_deps(raw_deps, dynamic_items, archetype, template)
+            step_deps[step_name_flat] = resolved
+        else:
+            # 动态 step: 从 deps_template 的模板 key 推断
+            dep_key = _find_deps_template_key(step_name_flat, deps_template)
+            if dep_key:
+                raw_deps = deps_template[dep_key]
+                resolved = _resolve_deps(raw_deps, dynamic_items, archetype, template)
+                step_deps[step_name_flat] = resolved
+            else:
+                step_deps[step_name_flat] = []
 
     manifest = {
         "generated_at": datetime.now().isoformat(timespec='seconds'),
         "dynamic_generated": True,
-        "current_wave_index": 2,  # Wave 0 + Wave 1 已完成
-        "segments": segments,
+        "archetype": archetype,
+        "current_wave_index": 2 if is_dynamic else 1,
+        "segments": dynamic_items if dynamic_source == "value_chain_segments" else [],
+        "routes": dynamic_items if dynamic_source == "tech_routes" else [],
         "waves": waves,
         "step_deps": step_deps,
-        "completed_steps": list(STATIC_WAVE_0) + list(STATIC_WAVE_1),  # Wave 0 + Wave 1 已完成
+        "completed_steps": _get_initial_completed(waves, is_dynamic),
         "total_waves": len(waves),
+        "step_filter": list(step_filter) if step_filter else [],
     }
 
     save_json(wave_manifest_path(task_id), manifest)
-    print(f"  ✅ 动态 Wave 计划已生成: {len(segments)} 个环节, {sum(len(w) for w in waves)} 个 step, {len(waves)} 个 Wave")
-
+    total_steps = sum(len(w) for w in waves)
+    print(f"  ✅ [{archetype}] Wave 计划已生成: {total_steps} steps, {len(waves)} waves")
     return manifest
+
+
+def _flatten_waves(waves: list[list[str]]) -> list[str]:
+    return [s for w in waves for s in w]
+
+
+def _get_initial_completed(waves: list[list[str]], is_dynamic: bool) -> list[str]:
+    """初始已完成 steps（Wave 0 + Wave 1 如果已跑完）。"""
+    completed = []
+    if len(waves) >= 1:
+        completed.extend(waves[0])
+    if is_dynamic and len(waves) >= 2:
+        completed.extend(waves[1])
+    return completed
+
+
+def _resolve_deps(raw_deps: list, dynamic_items: list[dict], archetype: str, template: dict) -> list[str]:
+    """解析依赖中的特殊标记（如 __all_segment_deep__）。"""
+    resolved = []
+    dynamic_source = template.get("dynamic_source", "")
+
+    for dep in raw_deps:
+        if dep == "__all_segment_deep__" and dynamic_source == "value_chain_segments":
+            for item in dynamic_items:
+                resolved.append(f"step_segment_deep_{item['id']}")
+        elif dep == "__all_route_deep__" and dynamic_source == "tech_routes":
+            for item in dynamic_items:
+                resolved.append(f"step_route_deep_{item['id']}")
+        elif "{seg}" in dep or "{route}" in dep:
+            for item in dynamic_items:
+                resolved.append(dep.replace("{seg}", item["id"]).replace("{route}", item["id"]))
+        else:
+            resolved.append(dep)
+    return resolved
+
+
+def _find_deps_template_key(step_name: str, deps_template: dict) -> str | None:
+    """为动态 step 找到对应的 deps 模板 key。"""
+    for key in deps_template:
+        if "{seg}" in key or "{route}" in key:
+            base = key.replace("_{seg}", "").replace("_{route}", "")
+            if step_name.startswith(f"{base}_"):
+                return key
+    return None
 
 
 # ═══════════════════════════════════════════════════════
@@ -459,21 +525,44 @@ def deps_ready(task_id: str, step: str, step_deps: dict) -> tuple[bool, list[str
 # ═══════════════════════════════════════════════════════
 
 def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
-                     segments: list[dict] | None = None) -> str:
-    """构建子代理任务 brief"""
-    role_key = _get_step_role_key(step)
+                     archetype: str | None = None,
+                     segments: list[dict] | None = None,
+                     routes: list[dict] | None = None) -> str:
+    """构建子代理任务 brief。v2: 从 archetype role_map 加载指令。"""
+    global _current_task_id_for_role
+    _current_task_id_for_role = task_id
+
+    if archetype is None:
+        archetype = resolve_archetype(task_id)
+
+    role_key = _get_step_role_key(step, archetype)
     instruction = load_instruction(role_key)
 
     output_path = step_output_path(task_id, step)
 
-    # 解析当前 step 的环节信息
-    seg_name, seg_id, seg_info = _parse_step_segment(step, segments or [])
+    # 解析当前 step 的环节/路线信息
+    seg_name, seg_id, seg_info = _parse_step_segment(step, segments or routes or [])
     dimension = _parse_step_dimension(step)
 
-    # 如果是模板指令，替换占位符
-    if "{seg_name}" in instruction or "{dimension}" in instruction:
+    # 模板占位符替换
+    if "{seg_name}" in instruction or "{seg_description}" in instruction:
         instruction = instruction.replace("{seg_name}", seg_name or "未知环节")
-        instruction = instruction.replace("{dimension}", _DIMENSION_CN.get(dimension, dimension))
+        instruction = instruction.replace("{seg_description}", seg_info.get("description", "") if seg_info else "")
+        instruction = instruction.replace("{seg_key_companies}",
+                                          ", ".join(seg_info.get("key_companies", [])) if seg_info else "")
+        instruction = instruction.replace("{seg_profit_pool_pct}",
+                                          str(seg_info.get("profit_pool_pct", "")) if seg_info else "")
+
+    if "{route_name}" in instruction or "{route_description}" in instruction:
+        instruction = instruction.replace("{route_name}", seg_name or "未知路线")
+        instruction = instruction.replace("{route_description}", seg_info.get("description", "") if seg_info else "")
+        instruction = instruction.replace("{route_key_players}",
+                                          ", ".join(seg_info.get("key_players", [])) if seg_info else "")
+        instruction = instruction.replace("{route_maturity}",
+                                          seg_info.get("maturity", "") if seg_info else "")
+
+    if "{dimension}" in instruction:
+        instruction = instruction.replace("{dimension}", _DIMENSION_CN.get(dimension, dimension or ""))
 
     brief_lines = [
         f'# Step Brief: {role_key} ({step})',
@@ -481,9 +570,8 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
         f'Task: {task_id}',
         f'Entity: {entity}',
         f'Query: {query}',
-        f'Industry: {entity}',
-        f'Segment: {seg_name or "N/A"}',
-        f'Dimension: {dimension or "N/A"}',
+        f'Archetype: {archetype}',
+        f'Segment/Route: {seg_name or "N/A"}',
         f'',
         f'## ⚠️ CRITICAL: 输出文件路径（必须写入此路径）',
         f'',
@@ -507,31 +595,21 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
         f'4. **前序 step 输出有 gap** → 自己补充搜索填补',
         f'5. **唯一完成条件** → 将完整报告写入上方指定的输出文件路径',
         f'',
-        f'### 补搜工具优先级（NeoData/yfinance 均需 Bash 调用，见工具指南）',
-        f'1. `NeoData 金融搜索`（Bash: `from scripts.search_gateway import neodata_search`）— A/HK 股首选',
-        f'2. `yfinance`（Bash: `from scripts.search_gateway import yfinance_summary`）— 估值指标、美股数据',
-        f'3. `web_search` — 通用搜索（WorkBuddy 内置工具，直接用）',
-        f'4. DuckDuckGo / SearXNG — 备用搜索',
+        f'### 补搜工具优先级',
+        f'1. `westock-mcp` — 行业/公司/财务/估值数据',
+        f'2. `tyc-mcp` — 工商/股东/专利/风险信息',
+        f'3. `web_search` — 通用搜索',
         f'',
         f'### 补搜纪律',
         f'- 最多补搜 3 轮',
         f'- 补搜结果必须标注来源 URL',
         f'- 仍搜不到的标注"经 X 次搜索未找到独立来源"',
         f'',
-        f'## Pre-search Results（输入参考，只读）',
-        f'',
     ]
-
-    # Pre-search
-    search_path = TASKS_DIR / f'{task_id}-search-{step}.md'
-    if search_path.exists():
-        brief_lines.append(search_path.read_text(encoding='utf-8'))
-    else:
-        brief_lines.append('_No pre-search results._')
 
     # Prior steps
     manifest = load_json(wave_manifest_path(task_id))
-    step_deps = manifest.get("step_deps", {}) if manifest else STATIC_DEPS
+    step_deps = manifest.get("step_deps", {}) if manifest else {}
 
     for dep in step_deps.get(step, []):
         dep_path = step_output_path(task_id, dep)
@@ -554,28 +632,29 @@ _DIMENSION_CN = {
     "financial": "财务基准",
     "valuation": "估值基准",
     "capital": "资本动向",
+    "segment_deep": "环节深度分析",
+    "route_deep": "路线深度分析",
+    "seg_synthesis": "环节小结",
 }
 
 
-def _parse_step_segment(step: str, segments: list[dict]) -> tuple[str | None, str | None, dict | None]:
-    """解析 step 属于哪个环节。返回 (seg_name, seg_id, seg_info)"""
+def _parse_step_segment(step: str, items: list[dict]) -> tuple[str | None, str | None, dict | None]:
+    """解析 step 属于哪个环节/路线。返回 (name, id, info)"""
     clean = step.replace("step_", "")
-    for seg in segments:
-        sid = seg["id"]
-        # 匹配 dim_seg_id 或 seg_synthesis_seg_id
+    for item in items:
+        sid = item["id"]
         if clean.endswith(f"_{sid}") or clean == f"seg_synthesis_{sid}":
-            return seg["name"], sid, seg
+            return item.get("name"), sid, item
     return None, None, None
 
 
 def _parse_step_dimension(step: str) -> str | None:
     """解析 step 的分析维度"""
     clean = step.replace("step_", "")
-    for dim in SEGMENT_DIMS_W2 + SEGMENT_DIMS_W3:
-        if clean.startswith(f"{dim}_"):
+    for dim in ["segment_deep", "route_deep", "competitive", "tech", "market",
+                 "financial", "valuation", "capital", "seg_synthesis"]:
+        if clean.startswith(f"{dim}_") or clean == dim:
             return dim
-    if clean.startswith("seg_synthesis_"):
-        return "seg_synthesis"
     return None
 
 
@@ -585,21 +664,29 @@ def _parse_step_dimension(step: str) -> str | None:
 
 def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
                 timeout: int = 900, dry_run: bool = False, market: str = 'cn',
-                segments: list[dict] | None = None) -> dict:
+                archetype: str | None = None,
+                segments: list[dict] | None = None,
+                routes: list[dict] | None = None) -> dict:
     """启动单个子代理 step"""
+    global _current_task_id_for_role
+    _current_task_id_for_role = task_id
+
+    if archetype is None:
+        archetype = resolve_archetype(task_id)
+
     output_path = step_output_path(task_id, step)
     receipt_path = step_spawn_receipt_path(task_id, step)
     manifest = step_manifest_path(task_id, step)
 
     # 检查依赖
     wm = load_json(wave_manifest_path(task_id))
-    step_deps = wm.get("step_deps", {}) if wm else STATIC_DEPS
+    step_deps = wm.get("step_deps", {}) if wm else {}
     ready, missing = deps_ready(task_id, step, step_deps)
     if not ready:
         return {'step': step, 'status': 'blocked', 'reason': f'Dependencies not ready: {missing}'}
 
     # 构建 brief
-    brief = build_step_brief(task_id, step, entity, query, segments)
+    brief = build_step_brief(task_id, step, entity, query, archetype, segments, routes)
     brief_path = TASKS_DIR / f'{task_id}-brief-{step}.md'
     brief_path.write_text(brief, encoding='utf-8')
 
@@ -612,8 +699,8 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
             p.unlink()
 
     # 写入 manifest
-    role_key = _get_step_role_key(step)
-    system_prompt = build_step_prompt(step, entity, market, segments)
+    role_key = _get_step_role_key(step, archetype)
+    system_prompt = build_step_prompt(step, entity, market, archetype, segments, routes)
 
     manifest_data = {
         'task_id': task_id,
@@ -621,9 +708,10 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
         'role': role_key,
         'entity': entity,
         'query': query,
+        'archetype': archetype,
         'market': market,
         'system_prompt': system_prompt,
-        'connectorIds': _get_step_connector_ids(step),
+        'connectorIds': _get_step_connector_ids(step, archetype),
         'brief_path': str(brief_path),
         'output_path': str(output_path),
         'timeout': timeout,
@@ -667,21 +755,25 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
 
 
 def build_step_prompt(step: str, entity: str, market: str = 'cn',
-                      segments: list[dict] | None = None) -> str:
+                      archetype: str | None = None,
+                      segments: list[dict] | None = None,
+                      routes: list[dict] | None = None) -> str:
     """构建子代理系统级提示词"""
-    role_key = _get_step_role_key(step)
-    seg_name, seg_id, seg_info = _parse_step_segment(step, segments or [])
+    role_key = _get_step_role_key(step, archetype)
+    items = segments or routes or []
+    seg_name, seg_id, seg_info = _parse_step_segment(step, items)
     dimension = _parse_step_dimension(step)
 
     base = (
         f"You are an expert industry research analyst specializing in {role_key}. "
         f"You are working on step '{step}' of an industry research pipeline for '{entity}' (market: {market}). "
+        f"Archetype: {archetype or 'unknown'}. "
     )
 
     if seg_name:
-        base += f"You are analyzing the '{seg_name}' segment of the {entity} industry. "
+        base += f"You are analyzing the '{seg_name}' segment/route. "
 
-    if dimension and dimension != "seg_synthesis":
+    if dimension and dimension not in ("seg_synthesis",):
         base += f"Your focus dimension is: {_DIMENSION_CN.get(dimension, dimension)}. "
 
     base += (
@@ -691,13 +783,12 @@ def build_step_prompt(step: str, entity: str, market: str = 'cn',
         f"If you cannot find specific data, SUPPLEMENTARY SEARCH FIRST before writing '未找到独立外部证据'. "
         f"Use thinking=high — reason carefully before writing each section.\n\n"
         f"CRITICAL: You must autonomously close the loop. When you discover data gaps during analysis:\n"
-        f"1. Search for the missing data yourself (Bash: NeoData → yfinance → web_search)\n"
+        f"1. Search for the missing data yourself (westock-mcp → tyc-mcp → web_search)\n"
         f"2. Integrate the found data into your analysis\n"
         f"3. Only mark as '待核实' after 3 rounds of supplementary search still yield nothing\n"
         f"Do NOT return to the coordinator for search instructions — you ARE the search agent.\n\n"
     )
 
-    # 角色专属规则
     step_rules = _get_step_rules(step, seg_name, seg_info)
     return base + step_rules
 
@@ -706,7 +797,6 @@ def _get_step_rules(step: str, seg_name: str | None, seg_info: dict | None) -> s
     """根据 step 类型返回 ANTI-DEFECT RULES"""
     dimension = _parse_step_dimension(step)
 
-    # value_chain 特殊规则
     if step == "step_value_chain":
         return (
             'ANTI-DEFECT RULES:\n'
@@ -719,127 +809,80 @@ def _get_step_rules(step: str, seg_name: str | None, seg_info: dict | None) -> s
             '5. PROFIT POOL: Each segment must have a profit_pool_pct (percentage). Total should approximate 100%.\n'
         )
 
-    # 竞争格局规则
+    if step == "step_tech_landscape":
+        return (
+            'ANTI-DEFECT RULES:\n'
+            '1. STRUCTURED JSON OUTPUT: You MUST include a ```json block containing competing_routes array.\n'
+            '2. ROUTE ID FORMAT: Route IDs must be lowercase_with_underscores, NO Chinese characters.\n'
+            '3. ROUTE COUNT: Typically 2-5 routes. Each route must have name, description, maturity, key_players.\n'
+            '4. MATURITY LEVELS: Use "lab", "pilot", or "mass_production" — no other values.\n'
+        )
+
+    if dimension == "segment_deep":
+        return (
+            'ANTI-DEFECT RULES:\n'
+            '1. COVER ALL 5 DIMENSIONS: competitive, tech, market, financial, investment mapping — each must have data anchors.\n'
+            '2. DATA ANCHORS: Every dimension must have at least 1 specific number with source.\n'
+            '3. TABLES REQUIRED: Must include a competitor tier table and a financial comparison table.\n'
+            '4. NO VAGUE CLAIMS: "市场前景广阔" without numbers = defect.\n'
+        )
+
+    if dimension == "route_deep":
+        return (
+            'ANTI-DEFECT RULES:\n'
+            '1. COVER ALL 5 DIMENSIONS: performance, cost, ecosystem, adoption, supply chain — each must have data anchors.\n'
+            '2. QUANTIFY EVERYTHING: "性能优异" without numbers = defect.\n'
+            '3. PARAMETER TABLE REQUIRED: Must include comparison table with specific metrics.\n'
+            '4. COST CROSSOVER: Must estimate when this route reaches cost parity with alternatives.\n'
+        )
+
     if dimension == "competitive":
         return (
             'ANTI-DEFECT RULES:\n'
-            '1. MARKET SHARE DATA: Every market share claim must have a source. '
-            '"CR3 > 80%" without source is insufficient.\n'
+            '1. MARKET SHARE DATA: Every market share claim must have a source.\n'
             '2. COMPETITOR STATUS: Verify current financing/IPO status of every competitor listed.\n'
             '3. CONCENTRATION METRICS: Include CR3/CR5/HHI where available with sources.\n'
         )
 
-    # 市场规模规则
     if dimension == "market":
         return (
             'ANTI-DEFECT RULES:\n'
-            '1. SCENARIO TABLE REQUIRED: You MUST produce a scenario table '
-            '(当前/5年后 × 乐观/中性/保守) with specific numbers.\n'
+            '1. SCENARIO TABLE REQUIRED: (当前/5年后 × 乐观/中性/保守) with specific numbers.\n'
             '2. TAM/SAM/SOM: All three layers must have numbers with sources.\n'
             '3. GLOBAL ≠ CHINA: Never derive China market size by dividing global by population ratio.\n'
         )
 
-    # 估值规则
-    if dimension == "valuation":
-        return (
-            'ANTI-DEFECT RULES:\n'
-            '1. PE/PB/PS must distinguish between static/TTM/forward. Default to TTM unless specified.\n'
-            '2. Historical percentile must have at least 3 years of data.\n'
-            '3. Comparable companies must have their listing status verified.\n'
-        )
-
-    # 统稿规则
     if step == "step_master_synthesis":
         return (
             'ANTI-DEFECT RULES:\n'
-            '1. PRESERVE TABLES: Core comparison tables from segment analyses must be preserved verbatim. '
-            'Do not compress tables into narrative text.\n'
-            '2. SOURCE INTEGRITY: Merge all sources from all steps into the appendix. '
-            'Total source count in final report must be ≥ sum of individual step sources minus duplicates.\n'
-            '3. CROSS-SEGMENT ONLY: Deduplication should only apply across segments, not within a segment.\n'
+            '1. PRESERVE TABLES: Core comparison tables from segment/route analyses must be preserved verbatim.\n'
+            '2. SOURCE INTEGRITY: Merge all sources into the appendix. Total source count ≥ sum of individual step sources minus duplicates.\n'
+            '3. CROSS-SEGMENT SYNTHESIS: Your value is making dimensions talk to each other, not just concatenating.\n'
         )
 
-    # 环节小结规则
-    if dimension == "seg_synthesis":
-        return (
-            'ANTI-DEFECT RULES:\n'
-            '1. You are summarizing ONE segment only. Read all 6 dimension outputs for this segment.\n'
-            '2. Produce: Investment highlights + Risk points + Key data summary table.\n'
-            '3. Keep it concise (2000-3000 chars) — this will be fed into the master synthesis.\n'
-        )
-
-    # 投研假说规则
     if step == "step_executive_hypothesis":
         return (
             'ANTI-DEFECT RULES:\n'
-            '1. FALSIFIABLE HYPOTHESIS: Every hypothesis must have a falsification condition. '
-            'No "always true" claims (e.g., "the industry will grow").\n'
-            '2. LOGICAL CHAIN: Each hypothesis must have: premise → deduction → conclusion. '
-            'No jumping directly to conclusions.\n'
+            '1. FALSIFIABLE HYPOTHESIS: Every hypothesis must have a falsification condition.\n'
+            '2. LOGICAL CHAIN: Each hypothesis must have: premise → deduction → conclusion.\n'
             '3. QUANTITATIVE ANCHORS: At least one specific number threshold per hypothesis.\n'
             '4. VERIFIABLE QUESTIONS: ≥5 questions that can be answered Yes/No or with specific values.\n'
-            '5. MARKET CONSENSUS: Cite ≥2 actual analyst views (with sources) — do not fabricate a straw-man consensus.\n'
         )
 
-    # 投资手册规则
-    if step == "step_investment_playbook":
+    if step == "step_catalyst" or step == "step_catalyst_analysis":
         return (
             'ANTI-DEFECT RULES:\n'
-            '1. READ MASTER SYNTHESIS FIRST: Your primary input is the master synthesis output. '
-            'Read it in full before anything.\n'
-            '2. EXECUTIVE SUMMARY FIRST: The 1-page summary must be complete independently — '
-            'a fund manager should be able to screenshot it and act.\n'
-            '3. TARGET PRICE DERIVATION: Every stock recommendation must have ≥2 valuation methods with explicit parameters. '
-            'Never give a target price without showing how you derived it.\n'
-            '4. RATING SYSTEM: Use Strong Buy / Buy / Hold / Underperform / Sell. '
-            'Do NOT invent new rating labels.\n'
-            '5. KPI PANEL: ≥8 trackable indicators with thresholds + source + update frequency. '
-            'Pure qualitative indicators (e.g., "management confidence") must be paired with quantitative proxies.\n'
-            '6. DISCLAIMER: Always include "本报告不构成投资建议" at the end.\n'
+            '1. TIME-ANCHORED: Every catalyst must have a time window (Q1/Q2/Q3/Q4).\n'
+            '2. CATALYST ≠ NEWS: Forward-looking triggers only, not past events.\n'
+            '3. CONDUCTION CHAIN: Every high-impact catalyst must include: event → impact → quantitative estimate.\n'
         )
 
-    # 催化剂分析规则
-    if step == "step_catalyst_analysis":
+    if step == "step_consensus" or step == "step_consensus_challenge":
         return (
             'ANTI-DEFECT RULES:\n'
-            '1. TIME-ANCHORED: Every catalyst must have a time window (Q1/Q2/Q3/Q4). No vague "future" entries.\n'
-            '2. CATALYST ≠ NEWS: Catalysts are forward-looking triggers, not past events. '
-            'Do not list things that already happened.\n'
-            '3. CONDUCTION CHAIN: Every 4-5 star catalyst must include a full conduction chain analysis '
-            '(event → impact → quantitative estimate).\n'
-            '4. BEAR CATALYSTS: Include at least 1-2 bear (downside) catalysts. '
-            'Not everything is bullish.\n'
-            '5. PRICE-IN ASSESSMENT: For each catalyst, assess how much the market has already priced in.\n'
-        )
-
-    # 共识挑战规则
-    if step == "step_consensus_challenge":
-        return (
-            'ANTI-DEFECT RULES:\n'
-            '1. REAL SOURCES: Every consensus statement must cite ≥2 actual analyst views with sources. '
-            'No fabricated "market believes" claims.\n'
-            '2. FALSIFIABLE DIFFERENCE: Every differentiated view must include a verifiable falsification condition '
-            'with a specific time window.\n'
-            '3. RESPECT CONSENSUS: Do not construct straw-man consensus views just to knock them down. '
-            'Accurately represent what the market actually believes.\n'
-            '4. ERROR TYPE CLASSIFICATION: Classify each potential error by type '
-            '(linear extrapolation / structural misjudgment / overreaction / underreaction / survivorship bias / fallacy of composition).\n'
-            '5. ≥3 DIFFERENTIATED VIEWS: At least 3 concrete, specific points where we differ from consensus.\n'
-        )
-
-    # 场景敏感性规则
-    if step == "step_scenario_sensitivity":
-        return (
-            'ANTI-DEFECT RULES:\n'
-            '1. HYPOTHESIS-DRIVEN: All scenario variations must be driven by changes in identifiable assumptions, '
-            'not arbitrary number tweaks. Never do "optimistic = base × 1.2".\n'
-            '2. PROBABILITY WEIGHTS: Three scenario probabilities must sum to 100%. '
-            'Explain the reasoning behind each probability assignment.\n'
-            '3. SENSITIVITY MATRIX: At least 5 assumptions × bidirectional (±) = ≥10 rows in the sensitivity matrix. '
-            'Each row must include an elasticity coefficient.\n'
-            '4. INFLECTION POINTS: Identify ≥2 specific assumption thresholds where the investment conclusion reverses. '
-            'Include current distance to each threshold.\n'
-            '5. DECISION TREE: Include a clear decision tree with specific action recommendations for each branch.\n'
+            '1. REAL SOURCES: Every consensus statement must cite ≥2 actual analyst views with sources.\n'
+            '2. FALSIFIABLE DIFFERENCE: Every differentiated view must include a verifiable falsification condition.\n'
+            '3. ≥3 DIFFERENTIATED VIEWS: At least 3 concrete points where we differ from consensus.\n'
         )
 
     return ''
@@ -893,6 +936,12 @@ def _check_step_quality(task_id: str, step: str) -> dict:
             score = max(0, score - 2)
             issues.append('缺少结构化 segments JSON block')
 
+    # tech_landscape 特殊检查
+    if step == "step_tech_landscape":
+        if '```json' not in text and '"competing_routes"' not in text:
+            score = max(0, score - 2)
+            issues.append('缺少结构化 competing_routes JSON block')
+
     return {
         'score': score,
         'content_length': content_len,
@@ -905,55 +954,70 @@ def _check_step_quality(task_id: str, step: str) -> dict:
 
 
 def check_step_quality(task_id: str, step: str) -> dict:
-    """公开接口：检查 step 输出质量"""
     return _check_step_quality(task_id, step)
 
 
 # ═══════════════════════════════════════════════════════
-# 核心：launch_next_wave
+# 核心：launch_next_wave（v2: archetype 驱动）
 # ═══════════════════════════════════════════════════════
 
 def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: str = 'cn',
                      sequential: bool = False, step_filter: set[str] | None = None) -> dict:
     """统一入口 — 根据当前状态决定发射哪个 wave。
 
-    状态机：
-    1. 首次调用 → 发射 Wave 1（静态3个step）
-    2. Wave 1 完成 → 触发动态生成（build_dynamic_wave_plan）
-    3. 后续 Wave → 正常发射
-    4. 所有 Wave 完成 → 返回 all_done
+    v2: archetype 驱动。
+    - 首次调用 → 从 research plan 读 archetype → 生成 Wave 0
+    - Wave 0 完成 → Wave 1
+    - Wave 1 完成 → 动态 archetype 触发 build_dynamic_wave_plan
+    - 后续正常推进
 
-    sequential=True: 每次只发射当前 wave 的第一个待处理 step，
-    完成后再调下一次 → 避免并行 Task 子代理触发 API 429。
-    返回 has_more 标志需继续调用。
-
-    step_filter: research plan 中的 activated_steps 集合，用于跳过无关维度。
-    只影响静态和动态 step 的激活决策——结构性 step 不受影响。
+    sequential=True: 每次只发射当前 wave 的第一个待处理 step。
+    step_filter: activated_steps 集合。
     """
-    manifest = load_json(wave_manifest_path(task_id))
+    global _current_task_id_for_role
+    _current_task_id_for_role = task_id
 
-    # ── 状态 1：首次调用，Wave 0 还没跑 ──
+    manifest = load_json(wave_manifest_path(task_id))
+    archetype = resolve_archetype(task_id)
+
+    # ── 状态 1：首次调用，没有 manifest ──
     if manifest is None:
-        # 应用 step_filter 到初始 waves
-        w0 = _filter_steps(STATIC_WAVE_0, step_filter or set())
-        w1 = _filter_steps(STATIC_WAVE_1, step_filter or set())
+        template = load_archetype_template(archetype)
+        waves_config = template.get("waves", [])
+
+        # 初始化前 2 个 wave（Wave 0 + Wave 1）
+        initial_waves = []
+        initial_deps = {}
+        deps_template = template.get("step_deps_template", template.get("step_deps", {}))
+        always_active = set(template.get("always_active_steps", []))
+
+        for i, wave_cfg in enumerate(waves_config[:2]):
+            steps = wave_cfg.get("steps", [])
+            # 应用 step_filter
+            if step_filter:
+                steps = [s for s in steps if s in step_filter or s in always_active or not step_filter]
+            initial_waves.append(steps)
+            for s in steps:
+                if s in deps_template:
+                    initial_deps[s] = deps_template[s]
+                else:
+                    initial_deps[s] = []
+
         manifest = {
             "generated_at": datetime.now().isoformat(timespec='seconds'),
             "dynamic_generated": False,
+            "archetype": archetype,
             "current_wave_index": 0,
             "segments": [],
-            "waves": [w0, w1] if w0 and w1 else ([w0] if w0 else ([w1] if w1 else [])),
-            "step_deps": {
-                "step_executive_hypothesis": [],
-                "step_ind_overview": [],
-                "step_policy_scan": [],
-                "step_value_chain": [],
-            },
+            "routes": [],
+            "waves": initial_waves,
+            "step_deps": initial_deps,
             "completed_steps": [],
-            "total_waves": 2,
+            "total_waves": len(initial_waves),
             "step_filter": list(step_filter) if step_filter else [],
         }
         save_json(wave_manifest_path(task_id), manifest)
+        print(f"  🌊 [{archetype}] 初始 Wave 计划: {len(initial_waves)} waves", flush=True)
 
     current_idx = manifest["current_wave_index"]
     waves = manifest["waves"]
@@ -969,31 +1033,31 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
 
     current_wave = waves[current_idx]
 
-    # ── 状态 2：STATIC_WAVE_1 完成 → 触发动态生成 ──
-    if not manifest.get("dynamic_generated"):
-        # 检查 Wave 1 是否真的完成了
-        w1_completed = all(
-            step_output_path(task_id, step).exists() and step_output_path(task_id, step).stat().st_size > 100
-            for step in STATIC_WAVE_1
-        )
-        if w1_completed:
-            # 从 manifest 恢复 step_filter（sequtial 调用时 step_filter 可能为 None）
-            saved_filter = set(manifest.get("step_filter", []))
-            effective_filter = step_filter or saved_filter
+    # ── 状态 2：动态 archetype 的 Wave 1 完成 → 触发动态生成 ──
+    is_dynamic = load_archetype_template(archetype).get("is_dynamic", False)
+    if is_dynamic and not manifest.get("dynamic_generated"):
+        # 检查 Wave 1 是否完成
+        if len(waves) >= 2:
+            w1_steps = waves[1]
+            w1_completed = all(
+                step_output_path(task_id, step).exists() and step_output_path(task_id, step).stat().st_size > 100
+                for step in w1_steps
+            )
+            if w1_completed:
+                saved_filter = set(manifest.get("step_filter", []))
+                effective_filter = step_filter or saved_filter
 
-            # Wave 1 完成 + 之前没有动态生成 → 触发
-            manifest = build_dynamic_wave_plan(task_id, step_filter=effective_filter)
-            waves = manifest["waves"]
-            current_wave = waves[manifest["current_wave_index"]]
-            # 更新 completed_steps
-            for step in STATIC_WAVE_0:
-                if step not in manifest["completed_steps"]:
-                    manifest["completed_steps"].append(step)
-            for step in STATIC_WAVE_1:
-                if step not in manifest["completed_steps"]:
-                    manifest["completed_steps"].append(step)
-            save_json(wave_manifest_path(task_id), manifest)
-            print(f"  🌊 动态 Wave 已生成，共 {len(waves)} 波", flush=True)
+                manifest = build_dynamic_wave_plan(task_id, step_filter=effective_filter, archetype=archetype)
+                waves = manifest["waves"]
+                current_wave = waves[manifest["current_wave_index"]]
+
+                # 标记 Wave 0 + Wave 1 完成
+                for w_idx in range(2):
+                    for step in waves[w_idx]:
+                        if step not in manifest["completed_steps"]:
+                            manifest["completed_steps"].append(step)
+                save_json(wave_manifest_path(task_id), manifest)
+                print(f"  🌊 [{archetype}] 动态 Wave 已生成，共 {len(waves)} 波", flush=True)
 
     # ── 正常发射当前 wave ──
     pending_steps = []
@@ -1004,14 +1068,14 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 pending_steps.append(step_name)
 
     if not pending_steps:
-        # 当前 wave 已完成，推进到下一 wave
         manifest["current_wave_index"] = current_idx + 1
         save_json(wave_manifest_path(task_id), manifest)
-        return launch_next_wave(task_id, entity, query, market, sequential=sequential)  # 递归
+        return launch_next_wave(task_id, entity, query, market, sequential=sequential)
 
     # 发射 pending steps
     step_deps = manifest.get("step_deps", {})
     segments = manifest.get("segments", [])
+    routes = manifest.get("routes", [])
     results = []
     has_more = False
 
@@ -1020,15 +1084,27 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
         if not ready:
             results.append({'step': step, 'status': 'blocked', 'missing': missing})
             if sequential:
-                continue  # 跳过被阻塞的，继续找第一个可发射的
+                continue
             continue
 
-        timeout = STEP_TIMEOUTS.get(step, DEFAULT_STEP_TIMEOUT)
-        result = launch_step(task_id, step, entity, query, timeout, market=market, segments=segments)
+        # 从 archetype 模板读 timeout
+        template = load_archetype_template(archetype)
+        timeouts = template.get("step_timeouts", {})
+        default_timeout = template.get("default_timeout", 900)
+        # 尝试精确匹配，再尝试模板匹配
+        timeout = timeouts.get(step, default_timeout)
+        for tpl_key, tpl_timeout in timeouts.items():
+            if "{seg}" in tpl_key or "{route}" in tpl_key:
+                base = tpl_key.replace("_{seg}", "").replace("_{route}", "")
+                if step.startswith(f"{base}_"):
+                    timeout = tpl_timeout
+                    break
+
+        result = launch_step(task_id, step, entity, query, timeout, market=market,
+                            archetype=archetype, segments=segments, routes=routes)
         results.append(result)
 
         if sequential:
-            # 只发射一个 step，标记后续还有待处理
             if i + 1 < len(pending_steps):
                 has_more = True
             break
@@ -1039,7 +1115,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
     task_instructions = []
     for r in dispatched:
         step = r['step']
-        role = _get_step_role_key(step)
+        role = _get_step_role_key(step, archetype)
         brief_path = r.get('brief_path', '')
         output_path = r.get('output_path', '')
 
@@ -1052,7 +1128,6 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'唯一完成条件：上述文件成功写入且内容完整。\n\n'
         )
 
-        # ── 统一注入：所有有依赖的 step 都列出前序文件路径 ──
         step_deps_list = step_deps.get(step, [])
         if step_deps_list:
             prior_paths = []
@@ -1063,7 +1138,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'⚠️ 前序 Step 完整输出文件（你必须逐一读取，不是跳过，是强制）：\n'
                 + '\n'.join(prior_paths) + '\n'
                 f'\n'
-                f'brief 中的 "Prior Step Output" 部分也列出了这些路径。你必须用 Read 工具读取每个文件的完整内容——这些是你分析的核心输入数据。\n'
+                f'brief 中的 "Prior Step Output" 部分也列出了这些路径。你必须用 Read 工具读取每个文件的完整内容。\n'
                 f'\n'
             )
 
@@ -1072,117 +1147,47 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'1. 读取 brief 文件：{brief_path}\n'
         )
 
-        # seg_synthesis 专用指令
-        if step.startswith("step_seg_synthesis_"):
-            prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 综合该环节6个维度的分析，撰写环节小结（2000-3000字）\n'
-                f'4. 产出：投资亮点 + 风险点 + 关键数据汇总表\n'
-                f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
-            )
-
-        # cross_chain_compare 专用指令
-        elif step == "step_cross_chain_compare":
-            prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 对比各环节的竞争格局、利润率、集中度、增长阶段，找出跨环节规律和结构性机会\n'
-                f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
-            )
-
-        # catalyst_analysis 专用指令 (Wave 5)
-        elif step == "step_catalyst_analysis":
-            prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 构建催化剂事件日历（12个月内，按Q分布）\n'
-                f'4. 对4-5星催化剂做传导链分析（事件→影响→量化）\n'
-                f'5. 产出预期差矩阵 + 催化剂热力图\n'
-                f'6. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
-            )
-
-        # consensus_challenge 专用指令 (Wave 5)
-        elif step == "step_consensus_challenge":
-            prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 构建市场共识画像（6维度，每条有≥2家机构来源）\n'
-                f'4. 挑战共识中的潜在错误（≥3条，各有错误类型分类）\n'
-                f'5. 对Top 3差异化观点做详细逻辑展开+证伪条件\n'
-                f'6. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
-            )
-
-        # investment_thesis 专用指令
-        elif step == "step_investment_thesis":
-            prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 形成投资论点（包含：核心看多逻辑、关键催化剂、估值锚定、风险收益比）\n'
-                f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
-            )
-
-        # risk_assessment 专用指令
-        elif step == "step_risk_assessment":
-            prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 识别各环节及跨环节的风险点（技术/竞争/政策/资本/宏观），给出风险矩阵\n'
-                f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
-            )
-
-        # scenario_sensitivity 专用指令 (Wave 6)
-        elif step == "step_scenario_sensitivity":
-            prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 定义三个场景（基准/乐观/悲观），各有触发条件和假设差异\n'
-                f'4. 构建敏感性矩阵（≥5假设×双向=≥10行，含弹性系数）\n'
-                f'5. 识别≥2个投资结论逆转的拐点阈值\n'
-                f'6. 产出概率加权期望值 + 决策树\n'
-                f'7. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
-            )
-
-        # master_synthesis 统稿硬约束
-        elif step == "step_master_synthesis":
+        # step 专用指令
+        if step == "step_master_synthesis":
             prompt_body += (
                 f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
                 f'3. 综合为完整的行业深度研报\n'
                 f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
                 f'⚠️ 统稿保留硬约束：\n'
                 f'- 核心对比表必须原文保留，不得删除或压缩\n'
-                f'- 所有step的来源必须合并到"来源附录"，来源总数不得少于各step来源去重后总数\n'
-                f'- 去重只做跨环节，不做环节内压缩\n\n'
+                f'- 所有step的来源必须合并到"来源附录"\n'
+                f'- 去重只做跨环节/跨路线，不做环节内压缩\n\n'
             )
-
-        # executive_hypothesis 专用指令 (Wave 0)
         elif step == "step_executive_hypothesis":
             prompt_body += (
                 f'2. 根据 brief 中的角色指令，快速扫描行业基本面（最多2轮搜索）\n'
                 f'3. 构建核心投资假说（必须有对立面和量化锚点）\n'
-                f'4. 产出≥5个待验证问题，分配给后续Agent\n'
+                f'4. 产出≥5个待验证问题\n'
                 f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
-
-        # investment_playbook 专用指令 (Wave 7)
-        elif step == "step_investment_playbook":
+        elif step == "step_value_chain":
             prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 基于所有前序分析，输出投资手册：\n'
-                f'   - Part 1: 一页纸投资摘要（独立完整，可截图使用）\n'
-                f'   - Part 2: 二级市场标的推荐（附评级+目标价+估值推导）\n'
-                f'   - Part 3: 一级市场配置地图\n'
-                f'   - Part 4: 组合配置建议（三种风险偏好）\n'
-                f'   - Part 5: KPI跟踪面板（≥8个指标+阈值）\n'
+                f'2. 根据 brief 执行产业链分析\n'
+                f'3. ⚠️ 必须包含 ```json block（segments 定义），否则管线无法继续\n'
                 f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
-
-        elif step_deps_list:
-            # 有依赖的常规 step（competitive/tech/market/financial/valuation/capital）
+        elif step == "step_tech_landscape":
             prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件（不是跳过，是强制）\n'
-                f'3. 根据 brief 中的角色指令执行分析，前序 step 的完整数据是你的核心输入\n'
-                f'4. 如发现数据缺口，用 web_search 补搜（最多 3 轮）\n'
+                f'2. 根据 brief 执行技术全景扫描\n'
+                f'3. ⚠️ 必须包含 ```json block（competing_routes 定义），否则管线无法继续\n'
+                f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
+            )
+        elif step_deps_list:
+            prompt_body += (
+                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
+                f'3. 根据 brief 中的角色指令执行分析\n'
+                f'4. 如发现数据缺口，用 westock-mcp / tyc-mcp / web_search 补搜（最多 3 轮）\n'
                 f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         else:
-            # 无依赖的 step（ind_overview/policy_scan/value_chain）
             prompt_body += (
-                f'2. 根据 brief 中的角色指令和预搜索数据，执行完整分析\n'
-                f'3. 如发现数据缺口，用 web_search 补搜（最多 3 轮）\n'
+                f'2. 根据 brief 中的角色指令，执行完整分析\n'
+                f'3. 如发现数据缺口，用 westock-mcp / tyc-mcp / web_search 补搜（最多 3 轮）\n'
                 f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
 
@@ -1212,6 +1217,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
     return {
         'wave_index': current_idx,
         'wave_label': f'Wave {current_idx + 1}/{len(waves)}',
+        'archetype': archetype,
         'steps': results,
         'dispatched_count': len(dispatched),
         'has_more': has_more,
@@ -1230,7 +1236,6 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
 # ═══════════════════════════════════════════════════════
 
 def get_pipeline_status(task_id: str) -> dict:
-    """返回管线当前状态快照。"""
     manifest = load_json(wave_manifest_path(task_id))
     if manifest is None:
         return {"task_id": task_id, "status": "not_started"}
@@ -1258,6 +1263,7 @@ def get_pipeline_status(task_id: str) -> dict:
 
     return {
         'task_id': task_id,
+        'archetype': manifest.get("archetype", "unknown"),
         'steps': steps_status,
         'current_wave': current_wave if not all_done else 'all_done',
         'total_waves': total_waves,
@@ -1265,21 +1271,19 @@ def get_pipeline_status(task_id: str) -> dict:
         'total_steps': len(step_deps),
         'all_steps_done': all_done,
         'segments': manifest.get("segments", []),
+        'routes': manifest.get("routes", []),
         'next_action': 'finalize' if all_done else f'launch_wave_{current_wave}',
     }
 
 
 def finalize_pipeline(task_id: str, entity: str = '', market: str = 'cn') -> dict:
-    """Phase 5：统稿完成后的交付流程"""
-    from pathlib import Path as _P
-    import shutil
-
+    """交付流程"""
     status = get_pipeline_status(task_id)
     if not status.get('all_steps_done'):
         incomplete = [s for s, v in status['steps'].items() if v != 'completed']
         return {'status': 'not_ready', 'incomplete_steps': incomplete}
 
-    result = {'status': 'finalizing', 'task_id': task_id}
+    result = {'status': 'finalizing', 'task_id': task_id, 'archetype': status.get('archetype')}
 
     # 质量门禁
     try:
@@ -1300,21 +1304,20 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'cn') -> dic
             else: sc = 0
             scores[step] = sc
         total = sum(scores.values())
-        qg = {'scores': scores, 'total': total, 'max': len(all_steps) * 3, 'pass': total >= len(all_steps) * 2, 'issues': issues}
+        qg = {'scores': scores, 'total': total, 'max': len(all_steps) * 3,
+              'pass': total >= len(all_steps) * 2, 'issues': issues}
         result['quality_gate'] = qg
     except Exception as e:
         result['quality_gate_error'] = str(e)
 
     # 复制到桌面
-    from pathlib import Path as _P
-    desktop = _P.home() / 'Desktop'
+    desktop = Path.home() / 'Desktop'
     master_md = step_output_path(task_id, "step_master_synthesis")
     deliver_path = None
 
     if master_md.exists():
         entity_clean = entity.replace(' ', '_').replace('/', '_') or task_id
 
-        # 尝试生成 DOCX
         try:
             from scripts.build_ic_industry_report_docx import build_ic_report
             docx_path = build_ic_report(task_id)
@@ -1326,16 +1329,14 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'cn') -> dic
             result['docx_error'] = str(e)
             print(f"  ⚠️ DOCX 生成失败（回退到 markdown）: {e}")
 
-        # 如果 DOCX 失败，复制 markdown 到桌面
         if not deliver_path:
             dst = desktop / f'{entity_clean}_行业深度研究.md'
+            import shutil
             shutil.copy2(master_md, dst)
             deliver_path = str(dst)
             print(f"  📄 已复制 Markdown 到桌面: {dst.name}")
 
         result['desktop_path'] = deliver_path
-
-    # 通知 — 已移除（开源发布版本不含消息推送）
 
     result['status'] = 'delivered'
     result['message'] = f"行业研报已生成并复制到桌面: {deliver_path or '(markdown)'}"
@@ -1347,7 +1348,7 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'cn') -> dic
 # ═══════════════════════════════════════════════════════
 
 def main():
-    ap = argparse.ArgumentParser(description='IC Subagent Launcher — 行业研究管线 v1')
+    ap = argparse.ArgumentParser(description='IC Subagent Launcher — 行业研究管线 v2 (archetype-driven)')
     ap.add_argument('--task-id', required=True, help='Task ID')
     ap.add_argument('--step', help='Single step to launch')
     ap.add_argument('--entity', default='', help='Industry name')
@@ -1357,6 +1358,7 @@ def main():
     ap.add_argument('--check-quality', action='store_true', help='Check quality of completed step')
     ap.add_argument('--status', action='store_true', help='Show pipeline status')
     ap.add_argument('--finalize', action='store_true', help='Finalize pipeline (delivery)')
+    ap.add_argument('--archetype', default='', help='Override archetype (chain_scan/tech_compare/company_deep/early_theme/commercial_mode)')
 
     args = ap.parse_args()
 

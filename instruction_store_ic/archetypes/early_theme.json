@@ -1,0 +1,67 @@
+{
+  "archetype": "early_theme",
+  "name": "早期主题",
+  "description": "数据稀缺的前瞻方向，侧重技术可行性和里程碑",
+  "is_dynamic": false,
+  "waves": [
+    {
+      "index": 0,
+      "name": "投研假说",
+      "steps": ["step_executive_hypothesis"],
+      "parallel": true
+    },
+    {
+      "index": 1,
+      "name": "基础扫描",
+      "steps": ["step_tech_overview", "step_key_players", "step_supply_sketch"],
+      "parallel": true
+    },
+    {
+      "index": 2,
+      "name": "深度评估",
+      "steps": ["step_feasibility", "step_timeline"],
+      "parallel": true,
+      "depends_on_wave": 1
+    },
+    {
+      "index": 3,
+      "name": "统稿",
+      "steps": ["step_master_synthesis"],
+      "parallel": false,
+      "depends_on_wave": 2
+    }
+  ],
+  "role_map": {
+    "step_executive_hypothesis": "ic_executive_hypothesis",
+    "step_tech_overview": "ic_tech_product",
+    "step_key_players": "ic_competitive",
+    "step_supply_sketch": "ic_supply_chain",
+    "step_feasibility": "ic_feasibility",
+    "step_timeline": "ic_feasibility",
+    "step_master_synthesis": "ic_report_synthesizer"
+  },
+  "step_deps": {
+    "step_executive_hypothesis": [],
+    "step_tech_overview": [],
+    "step_key_players": [],
+    "step_supply_sketch": [],
+    "step_feasibility": ["step_tech_overview", "step_key_players"],
+    "step_timeline": ["step_tech_overview", "step_supply_sketch"],
+    "step_master_synthesis": ["step_feasibility", "step_timeline"]
+  },
+  "connector_map": {
+    "ic_executive_hypothesis": ["westock-mcp"],
+    "ic_tech_product": ["westock-mcp"],
+    "ic_competitive": ["tyc-mcp", "westock-mcp"],
+    "ic_supply_chain": ["tyc-mcp", "westock-mcp"],
+    "ic_feasibility": ["westock-mcp"],
+    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+  },
+  "always_active_steps": ["step_executive_hypothesis", "step_master_synthesis"],
+  "step_timeouts": {
+    "step_executive_hypothesis": 600,
+    "step_feasibility": 1200,
+    "step_master_synthesis": 1200
+  },
+  "default_timeout": 900
+}

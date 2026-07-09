@@ -1,56 +1,80 @@
 {
   "meta": {
-    "version": 1,
-    "created_at": "2026-07-08",
+    "version": 2,
+    "created_at": "2026-07-09",
     "task_type": "ic_课题研究",
-    "description": "IC 课题研究管线指令库 v1 — 6 角色 / 3 Wave 架构，映射课题池 48 个课题"
+    "description": "IC 课题研究管线指令库 v2 — 5 archetype × 13 role 动态编排",
+    "migration_note": "v1 的 6 角色平铺结构已废弃，改为 archetype-driven 三级映射"
   },
-  "roles": [
-    {
-      "key": "ic_market_overview",
-      "name": "市场全景分析师 (Wave 1)",
-      "file": "ic_market_overview.md",
-      "description": "市场规模测算、增速、TAM/SAM/SOM、关键数据点收集、需求侧分析"
+  "archetypes": {
+    "chain_scan": {
+      "name": "产业链扫描",
+      "file": "archetypes/chain_scan.json",
+      "description": "成熟行业全景研究，有产业链环节分解。子代理数: 11 (3环节) ~ 15 (5环节)",
+      "keywords": ["产业链", "价值量", "上游", "中游", "下游", "供应链", "环节", "全景"],
+      "example_topics": ["AI芯片产业链", "AI服务器产业链", "绿氢产业链", "人形机器人产业链"]
     },
-    {
-      "key": "ic_competitive_landscape",
-      "name": "竞争格局分析师 (Wave 1)",
-      "file": "ic_competitive_landscape.md",
-      "description": "玩家格局、市场份额、商业模式对比、龙头企业深度画像"
+    "tech_compare": {
+      "name": "技术路线比较",
+      "file": "archetypes/tech_compare.json",
+      "description": "多条技术路线PK。子代理数: 10 (3路线) ~ 14 (5路线)",
+      "keywords": ["技术路线", "比较", "vs", "PK", "路线", "对比", "技术选型"],
+      "example_topics": ["GPU vs ASIC", "电解槽技术路线", "减速器vs丝杠", "端到端自动驾驶"]
     },
-    {
-      "key": "ic_tech_product",
-      "name": "技术产品分析师 (Wave 1)",
-      "file": "ic_tech_product.md",
-      "description": "技术路线对比、关键技术参数、产品演进、专利分析、标准制定"
+    "company_deep": {
+      "name": "公司深度",
+      "file": "archetypes/company_deep.json",
+      "description": "单/少公司跟踪研究。子代理数: 9 (固定)",
+      "keywords": ["公司", "业务", "收入", "客户", "财务", "跟踪"],
+      "example_topics": ["思摩尔业务全景", "传思生物吸入技术平台", "国产AI芯片公司竞争力"]
     },
-    {
-      "key": "ic_supply_chain",
-      "name": "产业链分析师 (Wave 2)",
-      "file": "ic_supply_chain.md",
-      "description": "产业链上中下游解构、价值分布、关键环节、瓶颈、国产替代路径"
+    "early_theme": {
+      "name": "早期主题",
+      "file": "archetypes/early_theme.json",
+      "description": "数据稀缺的前瞻方向。子代理数: 7 (固定)",
+      "keywords": ["可行性", "里程碑", "时间表", "早期", "前瞻", "概念"],
+      "example_topics": ["可控核聚变", "核聚变里程碑", "氢储运技术"]
     },
-    {
-      "key": "ic_policy_risk",
-      "name": "政策风险分析师 (Wave 2)",
-      "file": "ic_policy_risk.md",
-      "description": "政策法规扫描、监管趋势、地缘风险、出口管制、风险评估矩阵"
-    },
-    {
-      "key": "ic_report_synthesizer",
-      "name": "课题统稿师 (Wave 3)",
-      "file": "ic_report_synthesizer.md",
-      "description": "综合全部维度输出为结构化课题研究报告"
+    "commercial_mode": {
+      "name": "商业模式研究",
+      "file": "archetypes/commercial_mode.json",
+      "description": "聚焦变现逻辑和单元经济。子代理数: 10 (固定)",
+      "keywords": ["商业模式", "收费", "定价", "单元经济", "变现", "付费"],
+      "example_topics": ["算力租赁商业模式", "AI Agent商业化", "服务机器人商业化"]
     }
-  ],
-  "pipeline_bindings": {
-    "ic_topic": {
-      "ic_market_overview": "ic_market_overview",
-      "ic_competitive_landscape": "ic_competitive_landscape",
-      "ic_tech_product": "ic_tech_product",
-      "ic_supply_chain": "ic_supply_chain",
-      "ic_policy_risk": "ic_policy_risk",
-      "ic_report_synthesizer": "ic_report_synthesizer"
-    }
+  },
+  "role_files": {
+    "ic_executive_hypothesis": "roles/ic_executive_hypothesis.md",
+    "ic_market_overview": "roles/ic_market_overview.md",
+    "ic_competitive": "roles/ic_competitive.md",
+    "ic_tech_product": "roles/ic_tech_product.md",
+    "ic_supply_chain": "roles/ic_supply_chain.md",
+    "ic_policy_risk": "roles/ic_policy_risk.md",
+    "ic_segment_deep": "roles/ic_segment_deep.md",
+    "ic_tech_landscape": "roles/ic_tech_landscape.md",
+    "ic_route_deep": "roles/ic_route_deep.md",
+    "ic_business_overview": "roles/ic_business_overview.md",
+    "ic_feasibility": "roles/ic_feasibility.md",
+    "ic_unit_economics": "roles/ic_unit_economics.md",
+    "ic_catalyst": "roles/ic_catalyst.md",
+    "ic_consensus": "roles/ic_consensus.md",
+    "ic_report_synthesizer": "roles/ic_report_synthesizer.md"
+  },
+  "connector_defaults": {
+    "ic_executive_hypothesis": ["westock-mcp"],
+    "ic_market_overview": ["tyc-mcp", "westock-mcp"],
+    "ic_competitive": ["tyc-mcp", "westock-mcp"],
+    "ic_tech_product": ["tyc-mcp", "westock-mcp"],
+    "ic_supply_chain": ["tyc-mcp", "westock-mcp"],
+    "ic_policy_risk": ["tyc-mcp", "westock-mcp"],
+    "ic_segment_deep": ["tyc-mcp", "westock-mcp"],
+    "ic_tech_landscape": ["tyc-mcp", "westock-mcp"],
+    "ic_route_deep": ["tyc-mcp", "westock-mcp"],
+    "ic_business_overview": ["tyc-mcp", "westock-mcp"],
+    "ic_feasibility": ["westock-mcp"],
+    "ic_unit_economics": ["westock-mcp"],
+    "ic_catalyst": ["tyc-mcp", "westock-mcp"],
+    "ic_consensus": ["tyc-mcp", "westock-mcp"],
+    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
   }
 }

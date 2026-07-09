@@ -1,0 +1,80 @@
+{
+  "archetype": "tech_compare",
+  "name": "技术路线比较",
+  "description": "多条技术路线 PK，环节=技术路线",
+  "is_dynamic": true,
+  "dynamic_source": "tech_routes",
+  "waves": [
+    {
+      "index": 0,
+      "name": "投研假说",
+      "steps": ["step_executive_hypothesis"],
+      "parallel": true
+    },
+    {
+      "index": 1,
+      "name": "技术全景",
+      "steps": ["step_ind_overview", "step_tech_landscape"],
+      "parallel": true
+    },
+    {
+      "index": 2,
+      "name": "路线深度分析",
+      "steps_template": ["step_route_deep_{route}"],
+      "parallel": true,
+      "depends_on_wave": 1
+    },
+    {
+      "index": 3,
+      "name": "跨路线综合",
+      "steps": ["step_cross_compare", "step_catalyst", "step_consensus"],
+      "parallel": true,
+      "depends_on_wave": 2
+    },
+    {
+      "index": 4,
+      "name": "统稿",
+      "steps": ["step_master_synthesis"],
+      "parallel": false,
+      "depends_on_wave": 3
+    }
+  ],
+  "role_map": {
+    "step_executive_hypothesis": "ic_executive_hypothesis",
+    "step_ind_overview": "ic_market_overview",
+    "step_tech_landscape": "ic_tech_landscape",
+    "step_route_deep_{route}": "ic_route_deep",
+    "step_cross_compare": "ic_competitive",
+    "step_catalyst": "ic_catalyst",
+    "step_consensus": "ic_consensus",
+    "step_master_synthesis": "ic_report_synthesizer"
+  },
+  "step_deps_template": {
+    "step_executive_hypothesis": [],
+    "step_ind_overview": [],
+    "step_tech_landscape": [],
+    "step_route_deep_{route}": ["step_tech_landscape", "step_ind_overview"],
+    "step_cross_compare": ["__all_route_deep__"],
+    "step_catalyst": ["__all_route_deep__"],
+    "step_consensus": ["step_cross_compare", "__all_route_deep__"],
+    "step_master_synthesis": ["step_cross_compare", "step_catalyst", "step_consensus"]
+  },
+  "connector_map": {
+    "ic_executive_hypothesis": ["westock-mcp"],
+    "ic_market_overview": ["tyc-mcp", "westock-mcp"],
+    "ic_tech_landscape": ["tyc-mcp", "westock-mcp"],
+    "ic_route_deep": ["tyc-mcp", "westock-mcp"],
+    "ic_competitive": ["tyc-mcp", "westock-mcp"],
+    "ic_catalyst": ["tyc-mcp", "westock-mcp"],
+    "ic_consensus": ["tyc-mcp", "westock-mcp"],
+    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+  },
+  "always_active_steps": ["step_executive_hypothesis", "step_tech_landscape", "step_master_synthesis"],
+  "step_timeouts": {
+    "step_executive_hypothesis": 600,
+    "step_tech_landscape": 1200,
+    "step_route_deep_{route}": 1200,
+    "step_master_synthesis": 1200
+  },
+  "default_timeout": 900
+}
