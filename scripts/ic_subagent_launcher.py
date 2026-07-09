@@ -54,6 +54,25 @@ DEFAULT_ARCHETYPE = ARCHETYPE_CHAIN_SCAN
 # ── ConnectorIds 授权 ──
 from scripts.ic_constants import IC_ROLE_CONNECTOR_IDS, IC_DEFAULT_CONNECTOR_IDS
 
+# ── Tool Guide 缓存 ──
+_TOOL_GUIDE_CACHE: str = ""
+_TOOL_GUIDE_MTIME: float = 0.0
+
+
+def _load_tool_guide(runtime_root: Path | None = None) -> str:
+    """热加载 instruction_store_ic/_common_tool_guide.md（mtime 缓存）。"""
+    global _TOOL_GUIDE_CACHE, _TOOL_GUIDE_MTIME
+    root = runtime_root or ROOT
+    guide_path = root / "instruction_store_ic" / "_common_tool_guide.md"
+    if not guide_path.exists():
+        return ""
+    current_mtime = guide_path.stat().st_mtime
+    if _TOOL_GUIDE_CACHE and current_mtime == _TOOL_GUIDE_MTIME:
+        return _TOOL_GUIDE_CACHE
+    _TOOL_GUIDE_CACHE = guide_path.read_text(encoding="utf-8")
+    _TOOL_GUIDE_MTIME = current_mtime
+    return _TOOL_GUIDE_CACHE
+
 # ═══════════════════════════════════════════════════════
 # Archetype 模板加载
 # ═══════════════════════════════════════════════════════
@@ -596,9 +615,13 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
         f'5. **唯一完成条件** → 将完整报告写入上方指定的输出文件路径',
         f'',
         f'### 补搜工具优先级',
-        f'1. `westock-mcp` — 行业/公司/财务/估值数据',
-        f'2. `tyc-mcp` — 工商/股东/专利/风险信息',
-        f'3. `web_search` — 通用搜索',
+        f'1. `westock-mcp` — 行业/公司/财务/估值数据（MCP 直接调用）',
+        f'2. `tyc-mcp` — 工商/股东/专利/风险信息（MCP 直接调用）',
+        f'3. NeoData（Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; ..."`）— A/HK股行业深度研报/宏观数据',
+        f'4. 腾讯新闻（Bash: `sh ~/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search "关键词" --limit 5`）— 突发新闻/实时动态',
+        f'5. `web_search` — 通用搜索（内置工具，兜底）',
+        f'',
+        f'⚠️ NeoData/腾讯新闻/yfinance 是 Bash 脚本调用，不是直接工具。完整 Bash 代码块见 System Prompt 中的工具指南。',
         f'',
         f'### 补搜纪律',
         f'- 最多补搜 3 轮',
@@ -783,11 +806,16 @@ def build_step_prompt(step: str, entity: str, market: str = 'cn',
         f"If you cannot find specific data, SUPPLEMENTARY SEARCH FIRST before writing '未找到独立外部证据'. "
         f"Use thinking=high — reason carefully before writing each section.\n\n"
         f"CRITICAL: You must autonomously close the loop. When you discover data gaps during analysis:\n"
-        f"1. Search for the missing data yourself (westock-mcp → tyc-mcp → web_search)\n"
+        f"1. Search for the missing data yourself (westock-mcp → tyc-mcp → NeoData(Bash) → 腾讯新闻(Bash) → web_search)\n"
         f"2. Integrate the found data into your analysis\n"
         f"3. Only mark as '待核实' after 3 rounds of supplementary search still yield nothing\n"
         f"Do NOT return to the coordinator for search instructions — you ARE the search agent.\n\n"
     )
+
+    # 注入 _common_tool_guide.md — 子代理需要 Bash 调用示例才能使用 NeoData/腾讯新闻/yfinance
+    tool_guide = _load_tool_guide()
+    if tool_guide:
+        base += f"\n\n## 数据源使用指南（Bash 调用示例）\n\n{tool_guide}\n\n"
 
     step_rules = _get_step_rules(step, seg_name, seg_info)
     return base + step_rules
@@ -1181,13 +1209,13 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             prompt_body += (
                 f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
                 f'3. 根据 brief 中的角色指令执行分析\n'
-                f'4. 如发现数据缺口，用 westock-mcp / tyc-mcp / web_search 补搜（最多 3 轮）\n'
+                f'4. 如发现数据缺口，用 westock-mcp / tyc-mcp / NeoData(Bash) / 腾讯新闻(Bash) / web_search 补搜（最多 3 轮，Bash 调用示例见 System Prompt 工具指南）\n'
                 f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         else:
             prompt_body += (
                 f'2. 根据 brief 中的角色指令，执行完整分析\n'
-                f'3. 如发现数据缺口，用 westock-mcp / tyc-mcp / web_search 补搜（最多 3 轮）\n'
+                f'3. 如发现数据缺口，用 westock-mcp / tyc-mcp / NeoData(Bash) / 腾讯新闻(Bash) / web_search 补搜（最多 3 轮，Bash 调用示例见 System Prompt 工具指南）\n'
                 f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
 
