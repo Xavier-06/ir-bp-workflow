@@ -319,7 +319,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
     entity = job_ctx.entity
     market = job_ctx.market
 
-    # Read research plan to get step filter
+    # Read research plan to get step filter + archetype
     tasks_dir = runtime_root / "data" / "tasks"
     plan_path = tasks_dir / f"{job_ctx.job_id}-ic_research_plan.json"
     step_filter: set[str] | None = None
@@ -330,6 +330,9 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
             if activated:
                 step_filter = set(activated)
                 print(f"  🎯 [ic-dispatch] 步骤过滤器: {sorted(step_filter)}", flush=True)
+            archetype = plan.get("archetype", "")
+            if archetype:
+                print(f"  🏷️ [ic-dispatch] archetype: {archetype} ({plan.get('archetype_reasoning', '')})", flush=True)
         except Exception:
             pass
 
@@ -1277,14 +1280,30 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - 如果某个维度搜索结果少于 3 条有效证据，主动追加搜索
 - 所有搜索关键词必须中英双语覆盖
 
+## 任务一：判定 Archetype（最高优先级）
+
+基于课题特征判定研究原型。这是自然语言判断，不是关键词匹配：
+
+| 原型 | 判定信号 | 举例 |
+|------|---------|------|
+| early_theme | 实验室/概念阶段，商业化>5年，财务数据极度稀缺 | 可控核聚变、氢储运 |
+| company_deep | 围绕1-2家公司，核心问题"这家公司怎么样" | 思摩尔、传思生物 |
+| commercial_mode | 核心问题是"怎么赚钱"，聚焦变现逻辑 | 算力租赁、AI Agent商业化 |
+| tech_compare | 对比2+条技术路线，回答"哪条更可能胜出" | GPU vs ASIC、电解槽路线 |
+| chain_scan | 以上都不符合，产业链有清晰环节分解 | AI芯片产业链、绿氢产业链 |
+
+如果不确定，默认选 chain_scan。
+
 ## 分析任务
 
 生成研究计划写入 `{tasks_dir / f'{job_ctx.job_id}-ic_research_plan.json'}`：
 
 ```json
 {{
-  "schema_version": "ic_research_plan.v2",
+  "schema_version": "ic_research_plan.v5",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}",
+  "archetype": "chain_scan|tech_compare|company_deep|early_theme|commercial_mode",
+  "archetype_reasoning": "一句话说明为什么选这个原型",
   "data_sources_used": ["westock-mcp:行业数据/研报", "tyc-mcp:公司验证", "web_search:公开信息", "tencent_news:实时动态"],
   "research_dimensions": [
     {{"dimension": "行业规模与增长", "key_questions": [...], "data_sources": [...], "priority": "high"}}
@@ -1297,6 +1316,8 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
   "plan_status": "ready"
 }}
 ```
+
+⚠️ archetype 字段必填，这是管线编排的核心依据。
 
 维度至少覆盖6个: 行业规模与增长、竞争格局、政策与监管、技术趋势、产业链分析、关键公司画像、财务基准对标、风险与催化剂。每个维度须包含 key_questions/data_sources/priority。
 
@@ -1331,13 +1352,22 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
             # 基本校验
             has_dimensions = len(plan.get("research_dimensions", [])) > 0
             has_claims = len(plan.get("claim_matrix", [])) > 0
+            archetype = plan.get("archetype", "")
             if has_dimensions and has_claims:
+                # archetype 校验：缺失则降级为 chain_scan
+                if not archetype or archetype not in ("chain_scan", "tech_compare", "company_deep", "early_theme", "commercial_mode"):
+                    plan["archetype"] = "chain_scan"
+                    plan["archetype_reasoning"] = "collect 阶段未检测到有效 archetype，降级为默认"
+                    print(f"  ⚠️ [ic phase04_collect] archetype 缺失或无效，降级为 chain_scan", flush=True)
+                else:
+                    print(f"  🏷️ [ic phase04_collect] archetype: {archetype}", flush=True)
                 plan["plan_status"] = "ready"
                 plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 return {
                     "ok": True, "mode": "ic_research_plan",
                     "phase": "phase04_research_plan_collect", "job_id": job_ctx.job_id,
                     "result": {"plan_path": str(plan_path), "enrichment": "subagent_generated",
+                                "archetype": plan.get("archetype", "chain_scan"),
                                 "dimensions": len(plan.get("research_dimensions", [])),
                                 "claims": len(plan.get("claim_matrix", []))},
                 }

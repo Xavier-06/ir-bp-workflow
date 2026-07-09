@@ -26,13 +26,15 @@ def build_empty_skeleton(
     LLM 在 enrichment 阶段填充所有字段。
     """
     return {
-        "schema_version": "ic_research_plan.v4",
+        "schema_version": "ic_research_plan.v5",
         "task_id": task_id,
         "entity": entity,
         "topic_metadata": topic_metadata,
         "plan_status": "pending_enrichment",
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         # ── 以下字段全空，由 LLM 填充 ──
+        "archetype": "",
+        "archetype_reasoning": "",
         "core_questions": [],
         "claim_matrix": [],
         "fact_requirements": [],
@@ -46,8 +48,12 @@ def build_empty_skeleton(
 # ── Enrichment 合并 ─────────────────────────────────────
 
 REQUIRED_TOP_KEYS = {
-    "core_questions", "claim_matrix", "fact_requirements",
+    "archetype", "core_questions", "claim_matrix", "fact_requirements",
     "activated_steps", "deactivated_steps",
+}
+
+VALID_ARCHETYPES = {
+    "chain_scan", "tech_compare", "company_deep", "early_theme", "commercial_mode",
 }
 
 
@@ -62,6 +68,11 @@ def validate_enrichment(enrichment: dict[str, Any]) -> list[str]:
     for key in REQUIRED_TOP_KEYS:
         if key not in enrichment:
             errors.append(f"缺少必需字段: {key}")
+
+    # archetype 校验
+    archetype = enrichment.get("archetype", "")
+    if archetype and archetype not in VALID_ARCHETYPES:
+        errors.append(f"archetype 无效: {archetype} (可选: {', '.join(sorted(VALID_ARCHETYPES))})")
 
     # core_questions 校验
     for i, q in enumerate(enrichment.get("core_questions", [])):
