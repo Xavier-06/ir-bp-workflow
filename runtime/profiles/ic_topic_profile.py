@@ -1160,3 +1160,30 @@ class ICTopicProfile(PipelineProfile):
             "phase15_synthesis_dispatch_prepare": ["wave2_gate.json", "shared_state.json", "fact_store.json"],
             "phase17_debate_review": ["ic_topic_report.md"],
         }
+
+    def phase_outputs(self) -> dict[str, list[str]]:
+        """声明每个 phase 产出的关键文件（相对 workspace.root）。
+
+        kernel 用它构建反查表 file → producer_phase，
+        在依赖缺失时精准回填到产出该文件的 phase，而非盲选前置。
+        """
+        return {
+            "phase01_topic_intake": ["research_plan.json"],
+            "phase02_presearch": ["presearch_results.json"],
+            "phase03_extract": [],
+            "phase04_fact_store_bootstrap": ["fact_store.json"],
+            "phase05_wave1_dispatch_prepare": [],
+            "phase06_wave1_dispatch_collect": [],
+            "phase07_wave1_evidence_gate": ["wave1_gate.json"],
+            "phase08_wave1_fact_store_merge": ["fact_store.json"],
+            "phase09_wave1_shared_state_refresh": ["shared_state.json"],
+            "phase10_wave2_dispatch_prepare": [],
+            "phase11_wave2_dispatch_collect": [],
+            "phase12_wave2_evidence_gate": ["wave2_gate.json"],
+            "phase13_wave2_fact_store_merge": ["fact_store.json"],
+            "phase14_wave2_shared_state_refresh": ["shared_state.json"],
+            "phase15_synthesis_dispatch_prepare": [],
+            "phase16_synthesis_dispatch_collect": ["ic_topic_report.md"],
+            "phase17_debate_review": ["debate_review.json"],
+            "phase18_delivery": [],
+        }

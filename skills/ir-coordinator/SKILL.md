@@ -28,7 +28,8 @@ allowed-tools:
 4. **Never delegate understanding** — 你必须理解每个 step 的产出
 5. **验证必须是 adversarial** — 不是"检查一下"，是"想尽办法推翻"
 6. **子代理必须用 team 模式派发（sequential，逐个）** — 同步 task() 会 code=10003 挂掉
-7. **Research Plan Gate 是派发前硬门禁** — 任何 IR 子代理派发前必须 `prepare_research_plan/ensure_research_plan_ready`，且 `{task_id}-research_plan.json` 中 `plan_status == ready`、`validation.ready == true`；否则禁止派发。
+7. **Research Plan 由管线自动生成（v5.3）** — phase04_research_plan 自动派发子代理（有 westock-mcp/tyc-mcp 搜索能力）生成 research_plan.json，phase04_research_plan_collect 负责校验和落盘。**Coordinator 不应手动调用 `prepare_research_plan()`**，否则会在子代理派发前创建旧版脚本 plan，导致 collect 阶段冲突。让管线自己走完 phase04 即可。
+8. **Presearch 已废弃（v5.3 路径B）** — IR/BP/IC 三条管线的 phase03 presearch 全部砍掉，搜索由 phase04 子代理全权执行（westock-mcp + tyc-mcp + web_search + tencent_news）。Coordinator 不需要为 presearch 做任何准备工作。
 
 ## 环境常量
 
@@ -199,9 +200,9 @@ token 有效期 12 小时。长管线跑完可能过期。
 
 ```
 PipelineOrchestrator
-├── IR 管线 (7 phases) → 详情读 references/pipeline/ir-pipeline.md
-├── IC 管线 (8 phases) → 详情读 references/pipeline/ic-pipeline.md
-└── BP 管线 (33 phases) → 详情读 references/pipeline/bp-pipeline.md
+├── IR 管线 (v5.3: 砍presearch, 子代理全权搜索) → 详情读 references/pipeline/ir-pipeline.md
+├── IC 管线 (v1.5: 砍presearch+extract, 子代理全权搜索) → 详情读 references/pipeline/ic-pipeline.md
+└── BP 管线 (v5.3: 砍presearch, 子代理全权搜索) → 详情读 references/pipeline/bp-pipeline.md
 ```
 
 ## 触发条件

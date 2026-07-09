@@ -223,12 +223,8 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     brief = {
         "entity": entity, "market": market, "ticker": ticker,
         "english_name": english_name, "query": query,
-        "presearch_available": (tasks_dir / f"{job_ctx.job_id}-presearch_results.json").exists(),
     }
     brief_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    presearch_path = tasks_dir / f"{job_ctx.job_id}-presearch_results.json"
-    has_presearch = presearch_path.exists()
 
     instruction = f"""\
 PHASE04 IR RESEARCH PLAN — 派发子代理
@@ -237,7 +233,7 @@ Agent tool 参数：
 - name = 'ir-research-planner'
 - team_name = 'ir-{job_ctx.job_id}'
 - mode = 'bypassPermissions'
-- connectorIds = ['westock-mcp']
+- connectorIds = ['westock-mcp', 'tyc-mcp']
 - prompt = 下面的完整 prompt
 
 ### 子代理 Prompt:
@@ -248,7 +244,7 @@ Agent tool 参数：
 
 在搜索之前, 你必须先读 brief 文件和所有输入, 提取:
 - entity(标的名称), ticker(股票代码), market(市场), english_name(英文名)
-- 如果有 presearch 数据也先读
+- 你是唯一的数据搜索者，所有数据源都需要你自己查
 
 ## 搜索策略（必须严格按顺序）
 
@@ -260,16 +256,26 @@ Agent tool 参数：
 ### Step 2: 行业数据 (westock-mcp)
 - `data_sector` 查所属行业 → PE分位/成分股/涨跌幅
 
+### Step 2.5: 公司工商验证 (tyc-mcp)
+- `tyc-mcp.search_companies`: query "{entity}" → 获取 company_id
+- `tyc-mcp.get_company_basic_profile`: 注册资本、成立日期、经营范围、股东结构、融资历史、法律风险
+- 如果 tyc 找不到（小市值/非上市公司）：记录在 search_summary 中，继续后续步骤
+
 ### Step 3: 资金面（大盘股可查，小盘股跳过）
 - `data_fund_flow` 查 {entity} → 主力资金净流入
 
-### Step 4: Web 补搜
+### Step 4: Web 补搜（中英双语，结构化源优先）
+优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（web_search 仅作兜底，最多 8 轮）:
 - `"{{entity}}" 竞争格局 市场份额 2025 2026`
 - `"{{entity}}" 风险 挑战 负面 2025`  
 - `"{{entity}}" 商业模式 护城河`
 - `"{{entity}}" 管理层 大股东 股权结构`
 - `"{{entity}}" 催化剂 即将发生 事件`
-- 如果 {'有' if has_presearch else '没有'} presearch 数据，先读它了解已有覆盖
+- `"{{entity}}" competitive landscape market share {year}`
+- `"{{entity}}" risk bear case downside {year}`
+- `"{{entity}}" business model moat competitive advantage`
+- tencent_news: 搜 "{entity}" 最新动态、突发事件、财报公告
+- 你是唯一的搜索者（没有上游 presearch 预搜索），请系统性地完成以上所有搜索
 
 ## 分析任务
 
@@ -289,7 +295,7 @@ step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, st
   "schema_version": "ir_research_plan.v3",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}", "market": "{market}",
   "query": "{query}", "ticker": "{ticker}", "english_name": "{english_name}",
-  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "web_search:公开信息"],
+  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "web_search:公开信息", "tencent_news:实时动态"],
   "core_questions": [...], "strategic_questions": [...],
   "fact_requirements": [...], "section_requirements": {{}},
   "coverage_matrix": {{}}, "plan_status": "ready",
@@ -304,8 +310,7 @@ step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, st
         "phase": "phase04_research_plan", "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
-            "presearch_path": str(presearch_path) if has_presearch else None,
-            "subagent_connector_ids": ["westock-mcp"],
+            "subagent_connector_ids": ["westock-mcp", "tyc-mcp"],
             "task_dir": str(tasks_dir),
         },
         "instruction": instruction,
@@ -410,102 +415,22 @@ def _run_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dict[s
 
 
 def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    if os.environ.get("IRBP_BG_CHILD") == "1":
-        return _run_presearch_inner(runtime_root, job_ctx)
-    from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase03_presearch")
-    if cached is not None:
-        print(f"  📦 [ir] 使用缓存的 presearch 结果", flush=True)
-        return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase03_presearch", pipeline="ir")
+    """Phase 03: presearch — 已废弃（v5.3 路径B），搜索全部交给 phase04 子代理。
 
-
-def _run_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """presearch 实际执行逻辑 — v5.1: 使用统一 presearch_query_builder。
-
-    数据源: web_search + tencent_news + westock_finance/sector/report + neodata
+    v5.3 改动: 与 IC 管线对齐，砍掉 presearch。IR 子代理全权搜索:
+    westock-mcp(行情/财务/研报/行业/资金流) + tyc-mcp(工商) + web_search + tencent_news。
     """
-    from scripts.presearch_query_builder import execute_presearch
-
-    metadata = job_ctx.metadata or {}
-    ticker = metadata.get("ticker", "")
-    english_name = metadata.get("english_name", "")
-
-    # 自动解析 ticker 和英文名
-    if not ticker:
-        try:
-            from tasks.valuation_enricher import _resolve_ticker, _CN_TO_EN_SEARCH
-            resolved = _resolve_ticker(job_ctx.entity)
-            if resolved:
-                ticker = resolved
-            if not english_name:
-                english_name = _CN_TO_EN_SEARCH.get(job_ctx.entity, "")
-        except Exception:
-            pass
-
-    tasks_dir = runtime_root / "data" / "tasks"
-    tasks_dir.mkdir(parents=True, exist_ok=True)
-
-    result = execute_presearch(
-        pipeline="ir",
-        task_id=job_ctx.job_id,
-        entity=job_ctx.entity,
-        market=job_ctx.market,
-        ticker=ticker,
-        english_name=english_name,
-        output_dir=tasks_dir,
-    )
+    print(f"  ⏭️  [ir] phase03 presearch 已跳过（搜索由 phase04 子代理全权执行）", flush=True)
     return {
         "ok": True,
-        "mode": "legacy_wrapped",
+        "mode": "skipped_subagent_search",
         "phase": "phase03_presearch",
         "job_id": job_ctx.job_id,
-        "result": result,
-        "query_context": {
-            "ticker": ticker,
-            "english_name": english_name,
-        },
+        "result": {"skipped": True, "reason": "subagent_handles_all_search"},
     }
 
 
-def _run_extract(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    from scripts.ir_extract_content import extract_from_presearch
-
-    metadata = job_ctx.metadata or {}
-    max_pages = metadata.get("max_extract_pages", 15)
-    result = extract_from_presearch(
-        task_id=job_ctx.job_id,
-        entity=job_ctx.entity,
-        max_pages=max_pages,
-    )
-    ok_count = result.get("ok_count", 0)
-    total = result.get("total_urls", 0)
-
-    # Sync extraction results to workspace
-    ws = _workspace_for(job_ctx)
-    if ws is not None:
-        try:
-            extract_facts = runtime_root / "data" / "tasks" / f"{job_ctx.job_id}_body_content" / "ir_extracted_facts.json"
-            if extract_facts.exists():
-                shutil.copy2(extract_facts, ws.extraction_dir / "ir_extracted_facts.json")
-        except Exception:
-            pass
-
-    return {
-        "ok": ok_count > 0,
-        "mode": "legacy_wrapped",
-        "phase": "phase05_extract",
-        "job_id": job_ctx.job_id,
-        "result": {
-            "total_urls": total,
-            "ok_count": ok_count,
-            "agg_entities": result.get("agg_entities", []),
-            "agg_financials": result.get("agg_financials", []),
-            "agg_events": result.get("agg_events", []),
-            "agg_risks": result.get("agg_risks", []),
-            "agg_valuation_views": result.get("agg_valuation_views", []),
-        },
-    }
+# [v5.3] _run_presearch_inner + _run_extract 已删除: presearch+extract砍掉, 子代理全权搜索
 
 
 # ═══════════════════════════════════════════════════════════
@@ -2082,10 +2007,9 @@ def _IR_FULL_PHASE_HANDLERS(runtime_root: Path) -> dict[str, Any]:
     return {
         "phase01_preflight": lambda job_ctx: _run_preflight(runtime_root, job_ctx),
         "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),
-        "phase03_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),
+        # [v5.3] phase03_presearch + phase05_extract 已删除: 子代理全权搜索
         "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
         "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
-        "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
         "phase06_fact_store_bootstrap": lambda job_ctx: _run_fact_store_bootstrap(runtime_root, job_ctx),
         "phase07_precompute": lambda job_ctx: _run_precompute(runtime_root, job_ctx),
         "phase08_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
@@ -2171,10 +2095,8 @@ class IRProfile(PipelineProfile):
         full = {
             "phase01_preflight": [],
             "phase02_company_verify": ["{task_id}-ir_company_verify.json"],
-            "phase04_research_plan": [],  # v5.2: 子代理直接生成plan, 不产生skeleton
+            "phase04_research_plan": [],  # v5.3: 子代理直接生成plan
             "phase04_research_plan_collect": ["{task_id}-research_plan.json"],
-            "phase03_presearch": [],
-            "phase05_extract": [],
             "phase06_fact_store_bootstrap": ["{task_id}-fact_store.json"],
             "phase07_precompute": [],
             "phase08_dispatch_prepare": [],

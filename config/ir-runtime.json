@@ -1,0 +1,11 @@
+{
+  "routing": {
+    "subagent_policy": {
+      "enabled": true
+    },
+    "thinking_policy": {
+      "default_subagent_thinking": "high",
+      "default_main_reasoning": "high"
+    }
+  }
+}

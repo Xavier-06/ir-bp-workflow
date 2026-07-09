@@ -174,84 +174,10 @@ def _run_multi_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[s
     }
 
 
-# ═══════════════════════════════════════════════════════════
-# Phase 1: Industry Presearch — 行业数据预搜索
-# ═══════════════════════════════════════════════════════════
-
-def _run_industry_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 1: 行业数据预搜索（NeoData + SearchGateway）"""
-    if os.environ.get("IRBP_BG_CHILD") == "1":
-        return _run_industry_presearch_inner(runtime_root, job_ctx)
-    from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase03_presearch")
-    if cached is not None:
-        print(f"  📦 [ic] 使用缓存的 presearch 结果", flush=True)
-        return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase03_presearch", pipeline="ic")
+# [v1.5] phase03_presearch 已删除: 子代理全权搜索, 脚本presearch无用
 
 
-def _run_industry_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """presearch actual execution — v1.0: unified presearch_query_builder.
-
-    Data sources: web_search + tencent_news + westock sector/finance + tyc + neodata
-    Queries driven by topic metadata (core_question, sub_questions, key_companies).
-    """
-    from scripts.presearch_query_builder import execute_presearch
-
-    tasks_dir = runtime_root / "data" / "tasks"
-    tasks_dir.mkdir(parents=True, exist_ok=True)
-
-    # Read topic metadata for IC-specific query generation
-    topic_metadata = None
-    topic_path = tasks_dir / "ic_topic_metadata.json"
-    if topic_path.exists():
-        try:
-            topic_metadata = json.loads(topic_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-
-    result = execute_presearch(
-        pipeline="ic",
-        task_id=job_ctx.job_id,
-        entity=job_ctx.entity,
-        market=job_ctx.market,
-        query=job_ctx.query or "",
-        topic_metadata=topic_metadata,
-        output_dir=tasks_dir,
-    )
-    return {
-        "ok": True,
-        "mode": "ic_presearch",
-        "phase": "phase03_presearch",
-        "job_id": job_ctx.job_id,
-        "result": result,
-    }
-
-
-# ═══════════════════════════════════════════════════════════
-# Phase 1.5: Content Extraction
-# ═══════════════════════════════════════════════════════════
-
-def _run_extract(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 1.5: URL 内容提取（行业研究导向）"""
-    from scripts.ir_extract_content import extract_from_presearch
-
-    result = extract_from_presearch(
-        task_id=job_ctx.job_id,
-        entity=job_ctx.entity,
-        max_pages=15,
-        pipeline='ic',
-    )
-    ok_count = result.get("ok_count", 0)
-    total = result.get("total_urls", 0)
-
-    return {
-        "ok": ok_count > 0,
-        "mode": "legacy_wrapped",
-        "phase": "phase04_extract",
-        "job_id": job_ctx.job_id,
-        "result": {"total_urls": total, "ok_count": ok_count},
-    }
+# [v1.5] phase03b_extract 已删除: presearch已砍无URL可提取
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1254,16 +1180,16 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     entity = job_ctx.entity or topic_metadata.get("entity", "")
     core_q = topic_metadata.get("core_question", "")
     sub_qs = topic_metadata.get("sub_questions", [])
+    research_content = topic_metadata.get("research_content", [])
     companies = topic_metadata.get("key_companies", [])
-    has_presearch = (tasks_dir / f"{job_ctx.job_id}-presearch_results.json").exists()
 
-    # 写 brief 文件
+    # 写 brief 文件（v1.4: 不再含 presearch 引用，子代理全权搜索）
     brief_path = tasks_dir / f"{job_ctx.job_id}-ic_phase04_brief.json"
     brief = {
         "entity": entity, "core_question": core_q,
         "sub_questions": sub_qs if isinstance(sub_qs, list) else [],
+        "research_content": research_content if isinstance(research_content, list) else [],
         "key_companies": companies if isinstance(companies, list) else [],
-        "presearch_available": has_presearch,
         "metadata_path": str(topic_path),
     }
     brief_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -1286,7 +1212,8 @@ Agent tool 参数：
 
 搜索之前必须先读 brief 文件(`*_ic_phase04_brief.json`), 从中提取:
 - core_question(核心课题), sub_questions(子问题列表), key_companies(关键公司列表)
-- 如果有 presearch 数据也先读
+- research_content(研究内容列表) — 定义了课题的具体研究方向和维度，research plan 的 research_dimensions 必须 1:1 覆盖其中每一项
+- 你是唯一的数据搜索者，没有上游 presearch 帮你做初步搜索，所有数据源都需要你自己查
 
 ## 搜索策略（按顺序执行）
 
@@ -1300,14 +1227,47 @@ Agent tool 参数：
 - 对每个公司: tyc-mcp.search_companies -> get_company_basic_profile
 - 记录: 注册资本、成立日期、经营范围、股东、融资历史、与课题的相关性
 
-### Step 3: Web 补搜（中英双语, 具体查询）
-- 从 core_question 提取关键词 -> "{提取的关键词} 产业政策 监管 2025 2026"
-- 从 core_question 提取关键词 -> "{提取的关键词} 竞争格局 市场份额 产业链"
-- 从 core_question 提取关键词 -> "{提取的关键词} industry policy regulation market size"
-- 对每个 sub_question 转化为 1-2 条搜索词（去掉问号, 保留核心名词）
-- 对每个 key_company -> "{company_name} {行业关键词} 业务 财务 融资"
-- 如果有 presearch 数据先读它, 跳过 presearch 已经覆盖好的关键词
-- tencent_news: 搜课题关键词最新动态
+### Step 3: Web 全量搜索（结构化源优先，web_search 兜底，中英双语）
+
+你是唯一的搜索者（没有上游 presearch 预搜索），请系统性地完成以下搜索:
+- 结构化源优先: westock-mcp / 天眼查 已有数据优先使用
+- web_search 作为兜底和补充，最多 10 轮:
+
+**A. 行业宏观搜索（必做）:**
+- web_search: "{entity} 行业 市场规模 TAM SAM SOM {year}"
+- web_search: "{entity} industry market size growth forecast {year}"
+- web_search: "{entity} 产业政策 监管 补贴 {year}"
+- web_search: "{entity} industry policy regulation subsidy {year}"
+
+**B. 竞争格局搜索（必做）:**
+- web_search: "{entity} 竞争格局 CR3 CR5 市场份额 TOP"
+- web_search: "{entity} competitive landscape market share ranking"
+- web_search: "{entity} 龙头 排名 对比 优劣势"
+
+**C. 产业链搜索（必做）:**
+- web_search: "{entity} 产业链 上游 中游 下游 环节"
+- web_search: "{entity} supply chain value chain segments"
+- web_search: "{entity} 国产替代 自主可控 卡脖子"
+
+**D. 研究内容定向搜索（必做）:**
+- 对 brief 中 `research_content` 的每一项，生成 1-2 条搜索词:
+  - 例: "GPU/ASIC/NPU/FPGA各品类定位" → web_search: "AI芯片 GPU ASIC NPU 品类 定位 用途"
+  - 例: "各环节全球市场份额与龙头公司" → web_search: "AI芯片产业链 各环节 市场份额 龙头公司"
+
+**E. 子问题搜索（必做）:**
+- 对 brief 中每个 `sub_question` 转化为 1-2 条搜索词（去掉问号, 保留核心名词）
+
+**F. 关键公司搜索（必做）:**
+- 对 brief 中每个 `key_company` → web_search: "{company} {entity} 业务 市场 融资 {year}"
+
+**G. 新闻搜索（必做）:**
+- tencent_news: 搜 "{entity}" 最新动态、政策变化、行业事件
+- tencent_news: 搜每个 key_company 最新动态
+
+**H. 搜索质量控制:**
+- 每条搜索结果记录来源类型（westock/tyc/web/tencent_news）
+- 如果某个维度搜索结果少于 3 条有效证据，主动追加搜索
+- 所有搜索关键词必须中英双语覆盖
 
 ## 分析任务
 
@@ -1317,7 +1277,7 @@ Agent tool 参数：
 {{
   "schema_version": "ic_research_plan.v2",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}",
-  "data_sources_used": ["westock-mcp:行业数据/研报", "tyc-mcp:公司验证", "web_search:公开信息"],
+  "data_sources_used": ["westock-mcp:行业数据/研报", "tyc-mcp:公司验证", "web_search:公开信息", "tencent_news:实时动态"],
   "research_dimensions": [
     {{"dimension": "行业规模与增长", "key_questions": [...], "data_sources": [...], "priority": "high"}}
   ],
@@ -1331,6 +1291,12 @@ Agent tool 参数：
 ```
 
 维度至少覆盖6个: 行业规模与增长、竞争格局、政策与监管、技术趋势、产业链分析、关键公司画像、财务基准对标、风险与催化剂。每个维度须包含 key_questions/data_sources/priority。
+
+## 研究内容覆盖（硬约束）
+
+brief 中的 `research_content` 列表定义了课题的具体研究方向。你的 `research_dimensions` 必须为 `research_content` 中的每一项设立对应的维度。
+例如: 若 research_content 包含 "GPU/ASIC/NPU/FPGA各品类定位与用途"，则必须有一个维度专门分析芯片品类。
+`claim_matrix` 也必须围绕 research_content 设计 claim，确保每个研究方向都有对应的验证 claim。
 """
 
     return {
@@ -1339,7 +1305,6 @@ Agent tool 参数：
         "phase": "phase04_research_plan", "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
-            "presearch_available": has_presearch,
             "subagent_connector_ids": ["westock-mcp", "tyc-mcp"],
             "task_dir": str(tasks_dir),
         },
@@ -1377,7 +1342,14 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
     # 降级
     print(f"  ⚠️ [ic phase04_collect] 子代理未产出 plan，使用空骨架降级", flush=True)
     from scripts.ic_research_planner import build_empty_skeleton
-    skeleton = build_empty_skeleton(task_id=job_ctx.job_id, entity=job_ctx.entity)
+    topic_path = tasks_dir / "ic_topic_metadata.json"
+    fallback_topic_meta: dict[str, Any] = {}
+    if topic_path.exists():
+        try:
+            fallback_topic_meta = json.loads(topic_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    skeleton = build_empty_skeleton(task_id=job_ctx.job_id, entity=job_ctx.entity, topic_metadata=fallback_topic_meta)
     plan_path.write_text(json.dumps(skeleton, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {
         "ok": True, "mode": "ic_research_plan",
@@ -1434,10 +1406,9 @@ class ICProfile(PipelineProfile):
         all_handlers = {
             "phase01_topic_intake": lambda job_ctx: _run_topic_intake(runtime_root, job_ctx),
             "phase02_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
-            "phase03_presearch": lambda job_ctx: _run_industry_presearch(runtime_root, job_ctx),
+            # [v1.5] phase03_presearch + phase03b_extract 已删除: 子代理全权搜索
             "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
             "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
-            "phase05_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
             "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
             "phase07_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
             "phase08_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
@@ -1468,3 +1439,45 @@ class ICProfile(PipelineProfile):
         )
         self.runtime_root = runtime_root
         self.research_tier = effective_tier
+        self._active_phases = set(active_handlers.keys())
+
+    def phase_prerequisites(self) -> dict[str, list[str]]:
+        """声明 phase 间的关键产物依赖（对标 BP/IR profile）。
+
+        kernel 在 start_phase 跳过前置 phase 时，自动回填缺失产物。
+        """
+        return {
+            "phase04_research_plan": ["ic_topic_metadata.json"],
+            "phase06_precompute": ["{task_id}-ic_research_plan.json"],
+            "phase07_dispatch_prepare": ["{task_id}-ic_research_plan.json"],
+            "phase09_evidence_gate": ["{task_id}-ic_research_plan.json"],
+            "phase10_claim_coverage": ["{task_id}-ic_research_plan.json"],
+            "phase10b_cross_dimension_gate": ["{task_id}-ic_research_plan.json"],
+        }
+
+    def phase_outputs(self) -> dict[str, list[str]]:
+        """声明每个 phase 产出的关键文件（相对 workspace.root）。
+
+        kernel 用它构建反查表 file → producer_phase，
+        在依赖缺失时精准回填到产出该文件的 phase，而非盲选前置。
+        """
+        return {
+            "phase01_topic_intake": ["ic_topic_metadata.json"],
+            "phase02_multi_company_verify": [],
+            "phase04_research_plan": [],  # 子代理直接生成 plan
+            "phase04_research_plan_collect": ["{task_id}-ic_research_plan.json"],
+            "phase06_precompute": [],
+            "phase07_dispatch_prepare": [],
+            "phase08_dispatch_collect": [],
+            "phase08b_fact_store_init": ["{task_id}-fact_store.json"],
+            "phase08b5_shared_state_init": ["{task_id}-shared_state.json"],
+            "phase09_evidence_gate": ["{task_id}-ic_evidence_gate.json"],
+            "phase09b_fact_store_merge": ["{task_id}-fact_store.json"],
+            "phase10_claim_coverage": ["{task_id}-ic_claim_coverage.json"],
+            "phase10b_cross_dimension_gate": ["{task_id}-ic_cross_dimension_gate.json"],
+            "phase11_debate_review": ["{task_id}-debate_review.json"],
+            "phase11b_final_assembly": ["{task_id}-final_report.md"],
+            "phase11c_readability_review": ["{task_id}-ic_readability_review.json"],
+            "phase11d_investment_judgment": ["{task_id}-ic_investment_judgment.json"],
+            "phase12_delivery": [],
+        }
