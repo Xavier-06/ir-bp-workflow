@@ -1182,6 +1182,7 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     sub_qs = topic_metadata.get("sub_questions", [])
     research_content = topic_metadata.get("research_content", [])
     companies = topic_metadata.get("key_companies", [])
+    year = time.strftime("%Y")
 
     # 写 brief 文件（v1.4: 不再含 presearch 引用，子代理全权搜索）
     brief_path = tasks_dir / f"{job_ctx.job_id}-ic_phase04_brief.json"
@@ -1258,7 +1259,7 @@ Agent tool 参数：
 - 对 brief 中每个 `sub_question` 转化为 1-2 条搜索词（去掉问号, 保留核心名词）
 
 **F. 关键公司搜索（必做）:**
-- 对 brief 中每个 `key_company` → web_search: "{company} {entity} 业务 市场 融资 {year}"
+- 对 brief 中每个 `key_company` → web_search: "{{company}} {entity} 业务 市场 融资 {year}"
 
 **G. 新闻搜索（必做，Bash 调用腾讯新闻）:**
 ```bash
