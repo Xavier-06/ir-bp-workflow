@@ -86,11 +86,34 @@ def _run_topic_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]
     topic_file = metadata.get("topic_file", "")
     entity = job_ctx.entity or metadata.get("entity", "")
 
+    # Bug fix (2026-07-09): orchestrator 走 run_ic_job() 时 query 被丢弃。
+    # 当没有 topic_file 但 job_ctx.query 含有结构化字段(核心问题/研究内容/关键子问题)，
+    # 把它写成临时 .md 让 parse_topic_metadata 解析，避免 research_content 为空。
+    topic_source = topic_file
+    query_tmp_path: Path | None = None
+    if not topic_file and job_ctx.query:
+        q = job_ctx.query.strip()
+        has_structured = any(kw in q for kw in ("核心问题", "研究内容", "关键子问题", "key_companies"))
+        if has_structured:
+            query_tmp_path = tasks_dir / f"{job_ctx.job_id}_query_as_topic.md"
+            # 给 markdown 解析器一个标题行 + 原始 query
+            query_tmp_path.write_text(
+                f"# {entity}\n\n{q}\n", encoding="utf-8"
+            )
+            topic_source = str(query_tmp_path)
+
     result = parse_topic_metadata(
-        topic_source=topic_file or entity,
+        topic_source=topic_source or entity,
         entity=entity,
         output_dir=tasks_dir,
     )
+
+    # 清理临时文件
+    if query_tmp_path and query_tmp_path.exists():
+        try:
+            query_tmp_path.unlink()
+        except Exception:
+            pass
 
     # 同时保留 scope 兼容性（legacy ic_presearch 需要）
     company_list = result.get("key_companies", [])

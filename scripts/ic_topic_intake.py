@@ -104,6 +104,45 @@ def _parse_markdown(path: Path, result: dict[str, Any]) -> None:
     - 内容1
     """
     text = path.read_text(encoding="utf-8")
+
+    # Bug fix (2026-07-09): 兼容管道分隔 / 关键字嵌入单行的格式
+    # 例: "行业研究 | 核心问题: xxx | 研究内容：\n- yyy"
+    #     或 "核心问题: A研究内容：\n- B" (无管道分隔)
+    # 策略: 按 字段关键字 + [：:] 把内容切段，每个字段独立成行
+    _FIELD_KEYWORDS = ("核心问题", "关键子问题", "子问题", "研究内容",
+                       "必要研究内容", "关键公司", "交付物", "验证",
+                       "催化", "风险", "适合")
+    _FIELD_RE = r'((?:核心问题|关键子问题|子问题|研究内容|必要研究内容|关键公司|交付物|验证|催化|风险|适合)[：:])'
+
+    _norm_lines: list[str] = []
+    for raw_line in text.split("\n"):
+        # 1) 先按 | 拆分(管道分隔)
+        if "|" in raw_line:
+            parts = [p.strip() for p in raw_line.split("|")]
+        else:
+            parts = [raw_line]
+
+        # 2) 每个 part 再按字段关键字切段(解决 "核心问题: xxx 研究内容：yyy" 这种行内拼接)
+        expanded: list[str] = []
+        for part in parts:
+            if not part:
+                continue
+            segs = re.split(_FIELD_RE, part)
+            # re.split 保留分隔符: ["", "核心问题:", " A", "研究内容：", "\n- yyy"]
+            buf = ""
+            for s in segs:
+                if re.match(_FIELD_RE, s):
+                    if buf.strip():
+                        expanded.append(buf)
+                    buf = s
+                else:
+                    buf += s
+            if buf.strip():
+                expanded.append(buf)
+
+        _norm_lines.extend(expanded)
+    text = "\n".join(_norm_lines)
+
     lines = text.split("\n")
 
     # 课题标题
@@ -118,9 +157,10 @@ def _parse_markdown(path: Path, result: dict[str, Any]) -> None:
         stripped = line.strip()
         if re.match(r'^核心问题[：:]', stripped):
             result["core_question"] = re.sub(r'^核心问题[：:]\s*', '', stripped)
-            # 核心问题可能跨行
+            # 核心问题可能跨行——遇到列表项或其他字段开头即终止
+            _STOP = r'^(关键子问题|子问题|研究|必要研究|验证|催化|风险|交付|[-*•]|\d+[.)、])'
             j = i + 1
-            while j < len(lines) and lines[j].strip() and not re.match(r'^(关键子问题|子问题|研究|必要研究|验证|催化|风险|交付)', lines[j].strip()):
+            while j < len(lines) and lines[j].strip() and not re.match(_STOP, lines[j].strip()):
                 result["core_question"] += " " + lines[j].strip()
                 j += 1
             break
