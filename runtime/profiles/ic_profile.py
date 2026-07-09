@@ -179,52 +179,34 @@ def _run_multi_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[s
 # ═══════════════════════════════════════════════════════════
 
 def _run_industry_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 1: 行业数据预搜索（NeoData + SearchGateway）"""
-    if os.environ.get("IRBP_BG_CHILD") == "1":
-        return _run_industry_presearch_inner(runtime_root, job_ctx)
-    from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase03_presearch")
-    if cached is not None:
-        print(f"  📦 [ic] 使用缓存的 presearch 结果", flush=True)
-        return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase03_presearch", pipeline="ic")
+    """Phase 03: presearch — 已废弃（v1.4 路径B），搜索全部交给 phase04 子代理。
 
-
-def _run_industry_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """presearch actual execution — v1.0: unified presearch_query_builder.
-
-    Data sources: web_search + tencent_news + westock sector/finance + tyc + neodata
-    Queries driven by topic metadata (core_question, sub_questions, key_companies).
+    v1.4 改动: 原 presearch 脚本搜索（只有 web+新闻，无 MCP）与 phase04 子代理搜索
+    （westock+tyc+web+tencent_news 全覆盖）大量重叠。砍掉 presearch，子代理全权搜索。
+    保留 phase 壳以维持下游依赖链（phase03b_extract / phase_outputs 声明）。
     """
-    from scripts.presearch_query_builder import execute_presearch
-
     tasks_dir = runtime_root / "data" / "tasks"
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    # Read topic metadata for IC-specific query generation
-    topic_metadata = None
-    topic_path = tasks_dir / "ic_topic_metadata.json"
-    if topic_path.exists():
-        try:
-            topic_metadata = json.loads(topic_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+    # 写空结果文件，满足下游 phase_prerequisites 声明
+    empty_result = {
+        "task_id": job_ctx.job_id,
+        "entity": job_ctx.entity,
+        "pipeline": "ic",
+        "results": {},
+        "summary": {"total_evidence": 0, "note": "presearch skipped — subagent handles all search"},
+        "total_evidence": 0,
+    }
+    result_path = tasks_dir / f"{job_ctx.job_id}-presearch_results.json"
+    result_path.write_text(json.dumps(empty_result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    result = execute_presearch(
-        pipeline="ic",
-        task_id=job_ctx.job_id,
-        entity=job_ctx.entity,
-        market=job_ctx.market,
-        query=job_ctx.query or "",
-        topic_metadata=topic_metadata,
-        output_dir=tasks_dir,
-    )
+    print(f"  ⏭️  [ic] phase03 presearch 已跳过（搜索由 phase04 子代理全权执行）", flush=True)
     return {
         "ok": True,
-        "mode": "ic_presearch",
+        "mode": "skipped_subagent_search",
         "phase": "phase03_presearch",
         "job_id": job_ctx.job_id,
-        "result": result,
+        "result": {"skipped": True, "reason": "subagent_handles_all_search"},
     }
 
 
@@ -233,24 +215,18 @@ def _run_industry_presearch_inner(runtime_root: Path, job_ctx: JobContext) -> di
 # ═══════════════════════════════════════════════════════════
 
 def _run_extract(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 1.5: URL 内容提取（行业研究导向）"""
-    from scripts.ir_extract_content import extract_from_presearch
+    """Phase 03b: URL 内容提取 — 已废弃（v1.4 路径B），presearch 已砍，无 URL 可提取。
 
-    result = extract_from_presearch(
-        task_id=job_ctx.job_id,
-        entity=job_ctx.entity,
-        max_pages=15,
-        pipeline='ic',
-    )
-    ok_count = result.get("ok_count", 0)
-    total = result.get("total_urls", 0)
-
+    v1.4 改动: presearch 砍掉后没有 URL 列表产出，extract 无可提取内容。
+    保留 phase 壳以维持执行链完整。子代理在搜索过程中会自行抓取需要的 URL 内容。
+    """
+    print(f"  ⏭️  [ic] phase03b extract 已跳过（presearch 已废弃，无 URL 可提取）", flush=True)
     return {
-        "ok": ok_count > 0,
-        "mode": "legacy_wrapped",
-        "phase": "phase04_extract",
+        "ok": True,
+        "mode": "skipped_no_presearch",
+        "phase": "phase03b_extract",
         "job_id": job_ctx.job_id,
-        "result": {"total_urls": total, "ok_count": ok_count},
+        "result": {"skipped": True, "reason": "presearch_removed"},
     }
 
 
@@ -1256,16 +1232,14 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     sub_qs = topic_metadata.get("sub_questions", [])
     research_content = topic_metadata.get("research_content", [])
     companies = topic_metadata.get("key_companies", [])
-    has_presearch = (tasks_dir / f"{job_ctx.job_id}-presearch_results.json").exists()
 
-    # 写 brief 文件
+    # 写 brief 文件（v1.4: 不再含 presearch 引用，子代理全权搜索）
     brief_path = tasks_dir / f"{job_ctx.job_id}-ic_phase04_brief.json"
     brief = {
         "entity": entity, "core_question": core_q,
         "sub_questions": sub_qs if isinstance(sub_qs, list) else [],
         "research_content": research_content if isinstance(research_content, list) else [],
         "key_companies": companies if isinstance(companies, list) else [],
-        "presearch_available": has_presearch,
         "metadata_path": str(topic_path),
     }
     brief_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -1289,7 +1263,7 @@ Agent tool 参数：
 搜索之前必须先读 brief 文件(`*_ic_phase04_brief.json`), 从中提取:
 - core_question(核心课题), sub_questions(子问题列表), key_companies(关键公司列表)
 - research_content(研究内容列表) — 定义了课题的具体研究方向和维度，research plan 的 research_dimensions 必须 1:1 覆盖其中每一项
-- 如果有 presearch 数据也先读
+- 你是唯一的数据搜索者，没有上游 presearch 帮你做初步搜索，所有数据源都需要你自己查
 
 ## 搜索策略（按顺序执行）
 
@@ -1303,9 +1277,11 @@ Agent tool 参数：
 - 对每个公司: tyc-mcp.search_companies -> get_company_basic_profile
 - 记录: 注册资本、成立日期、经营范围、股东、融资历史、与课题的相关性
 
-### Step 3: Web 补搜（结构化源优先，web_search 兜底，中英双语）
+### Step 3: Web 全量搜索（结构化源优先，web_search 兜底，中英双语）
 
-优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（web_search 仅作兜底，最多 10 轮）:
+你是唯一的搜索者（没有上游 presearch 预搜索），请系统性地完成以下搜索:
+- 结构化源优先: westock-mcp / 天眼查 已有数据优先使用
+- web_search 作为兜底和补充，最多 10 轮:
 
 **A. 行业宏观搜索（必做）:**
 - web_search: "{entity} 行业 市场规模 TAM SAM SOM {year}"
@@ -1338,8 +1314,10 @@ Agent tool 参数：
 - tencent_news: 搜 "{entity}" 最新动态、政策变化、行业事件
 - tencent_news: 搜每个 key_company 最新动态
 
-**H. presearch 去重:**
-- 如果有 presearch 数据先读它, 跳过 presearch 已经覆盖好的关键词
+**H. 搜索质量控制:**
+- 每条搜索结果记录来源类型（westock/tyc/web/tencent_news）
+- 如果某个维度搜索结果少于 3 条有效证据，主动追加搜索
+- 所有搜索关键词必须中英双语覆盖
 
 ## 分析任务
 
@@ -1377,7 +1355,6 @@ brief 中的 `research_content` 列表定义了课题的具体研究方向。你
         "phase": "phase04_research_plan", "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
-            "presearch_available": has_presearch,
             "subagent_connector_ids": ["westock-mcp", "tyc-mcp"],
             "task_dir": str(tasks_dir),
         },
