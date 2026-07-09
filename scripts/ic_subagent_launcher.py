@@ -190,9 +190,9 @@ def _get_step_role_key(step_name: str, archetype: str | None = None) -> str:
             if step_name.startswith(f"{base}_"):
                 return role
 
-    # 3. fallback: 用 index.json 的 connector_defaults 做模糊匹配
+    # 3. fallback: 用 index.json 的 mcp_connector_authorization 做模糊匹配
     index = load_index()
-    connector_defaults = index.get("connector_defaults", {})
+    connector_defaults = index.get("mcp_connector_authorization", {})
 
     # 尝试从 step 名推断 role（去 step_ 前缀，取第一个有意义的部分）
     clean = step_name.replace("step_", "")
@@ -215,7 +215,7 @@ _current_task_id_for_role = ""
 def _get_step_connector_ids(step: str, archetype: str | None = None) -> list[str]:
     """获取 step 的 connectorIds。
 
-    v2: 先查 archetype 模板的 connector_map，再查 index.json 的 connector_defaults。
+    v2: 先查 archetype 模板的 connector_map，再查 index.json 的 mcp_connector_authorization。
     """
     role_key = _get_step_role_key(step, archetype)
 
@@ -225,9 +225,9 @@ def _get_step_connector_ids(step: str, archetype: str | None = None) -> list[str
     if role_key in connector_map:
         return connector_map[role_key]
 
-    # 2. 从 index.json 的 connector_defaults 查
+    # 2. 从 index.json 的 mcp_connector_authorization 查
     index = load_index()
-    defaults = index.get("connector_defaults", {})
+    defaults = index.get("mcp_connector_authorization", {})
     if role_key in defaults:
         return defaults[role_key]
 

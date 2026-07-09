@@ -1,46 +1,35 @@
 {
   "meta": {
-    "version": 2,
+    "version": 3,
     "created_at": "2026-07-09",
     "task_type": "ic_课题研究",
-    "description": "IC 课题研究管线指令库 v2 — 5 archetype × 13 role 动态编排",
-    "migration_note": "v1 的 6 角色平铺结构已废弃，改为 archetype-driven 三级映射"
+    "description": "IC 课题研究管线指令库 v3 — archetype-driven 动态编排 + 数据源全景"
   },
   "archetypes": {
     "chain_scan": {
       "name": "产业链扫描",
       "file": "archetypes/chain_scan.json",
-      "description": "成熟行业全景研究，有产业链环节分解。子代理数: 11 (3环节) ~ 15 (5环节)",
-      "keywords": ["产业链", "价值量", "上游", "中游", "下游", "供应链", "环节", "全景"],
-      "example_topics": ["AI芯片产业链", "AI服务器产业链", "绿氢产业链", "人形机器人产业链"]
+      "description": "成熟行业全景研究，有清晰的产业链环节分解（上游/中游/下游）。value_chain step 解析出 segments 后动态展开。"
     },
     "tech_compare": {
       "name": "技术路线比较",
       "file": "archetypes/tech_compare.json",
-      "description": "多条技术路线PK。子代理数: 10 (3路线) ~ 14 (5路线)",
-      "keywords": ["技术路线", "比较", "vs", "PK", "路线", "对比", "技术选型"],
-      "example_topics": ["GPU vs ASIC", "电解槽技术路线", "减速器vs丝杠", "端到端自动驾驶"]
+      "description": "多条技术路线 PK。tech_landscape step 解析出 competing_routes 后动态展开。"
     },
     "company_deep": {
       "name": "公司深度",
       "file": "archetypes/company_deep.json",
-      "description": "单/少公司跟踪研究。子代理数: 9 (固定)",
-      "keywords": ["公司", "业务", "收入", "客户", "财务", "跟踪"],
-      "example_topics": ["思摩尔业务全景", "传思生物吸入技术平台", "国产AI芯片公司竞争力"]
+      "description": "单或少量公司跟踪研究，围绕业务线/财务/竞争力展开，无产业链分解。"
     },
     "early_theme": {
       "name": "早期主题",
       "file": "archetypes/early_theme.json",
-      "description": "数据稀缺的前瞻方向。子代理数: 7 (固定)",
-      "keywords": ["可行性", "里程碑", "时间表", "早期", "前瞻", "概念"],
-      "example_topics": ["可控核聚变", "核聚变里程碑", "氢储运技术"]
+      "description": "数据稀缺的前瞻方向，侧重技术可行性与里程碑时间表，不做详细财务/估值分析。"
     },
     "commercial_mode": {
       "name": "商业模式研究",
       "file": "archetypes/commercial_mode.json",
-      "description": "聚焦变现逻辑和单元经济。子代理数: 10 (固定)",
-      "keywords": ["商业模式", "收费", "定价", "单元经济", "变现", "付费"],
-      "example_topics": ["算力租赁商业模式", "AI Agent商业化", "服务机器人商业化"]
+      "description": "聚焦变现逻辑、单元经济模型、定价策略与客户结构。"
     }
   },
   "role_files": {
@@ -60,7 +49,8 @@
     "ic_consensus": "roles/ic_consensus.md",
     "ic_report_synthesizer": "roles/ic_report_synthesizer.md"
   },
-  "connector_defaults": {
+  "mcp_connector_authorization": {
+    "_comment": "仅控制 WorkBuddy 子代理的 MCP connector 授权。非 MCP 数据源（NeoData/腾讯新闻/yfinance/web_search）通过 Bash 调用，不需要在此声明。完整数据源清单见 _common_tool_guide.md。",
     "ic_executive_hypothesis": ["westock-mcp"],
     "ic_market_overview": ["tyc-mcp", "westock-mcp"],
     "ic_competitive": ["tyc-mcp", "westock-mcp"],
@@ -76,5 +66,53 @@
     "ic_catalyst": ["tyc-mcp", "westock-mcp"],
     "ic_consensus": ["tyc-mcp", "westock-mcp"],
     "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+  },
+  "data_sources": {
+    "_comment": "IC 管线全部可用数据源清单。connector 字段标识是否需要 MCP 授权。",
+    "westock-mcp": {
+      "type": "mcp",
+      "connector": true,
+      "coverage": "A/HK/美股行情/财务/板块/产业链/研报/评级/资金流/北向持仓",
+      "latency": "T+0"
+    },
+    "tyc-mcp": {
+      "type": "mcp",
+      "connector": true,
+      "coverage": "企业工商/股东/司法/专利/招投标/董监高 160+维度",
+      "latency": "T+0"
+    },
+    "tencent_news": {
+      "type": "bash",
+      "connector": false,
+      "coverage": "突发新闻/实时动态/热点榜（分钟级时效）",
+      "latency": "分钟级",
+      "call": "sh ~/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search \"{关键词}\" --limit 5"
+    },
+    "neodata": {
+      "type": "bash",
+      "connector": false,
+      "coverage": "A/HK股行业数据/深度研报/宏观数据/市场规模",
+      "latency": "T+0~T+1",
+      "call": "cd ~/.workbuddy/ir_runtime && python3 -c \"from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search('查询语句'), ensure_ascii=False))\""
+    },
+    "yfinance": {
+      "type": "python",
+      "connector": false,
+      "coverage": "美股估值指标/财务/历史数据",
+      "latency": "T+0",
+      "call": "cd ~/.workbuddy/ir_runtime && python3 -c \"import yfinance as yf; t=yf.Ticker('AAPL'); print(t.info)\""
+    },
+    "web_search": {
+      "type": "builtin",
+      "connector": false,
+      "coverage": "通用搜索/arxiv论文/政策文件/技术文献",
+      "latency": "实时"
+    },
+    "web_fetch": {
+      "type": "builtin",
+      "connector": false,
+      "coverage": "网页全文抓取",
+      "latency": "实时"
+    }
   }
 }
