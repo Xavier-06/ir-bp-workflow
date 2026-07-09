@@ -268,13 +268,18 @@ Agent tool 参数：
 ### Step 3: 资金面（大盘股可查，小盘股跳过）
 - `data_fund_flow` 查 {entity} → 主力资金净流入
 
-### Step 4: Web 补搜
+### Step 4: Web 补搜（中英双语，结构化源优先）
+优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（web_search 仅作兜底，最多 8 轮）:
 - `"{{entity}}" 竞争格局 市场份额 2025 2026`
 - `"{{entity}}" 风险 挑战 负面 2025`  
 - `"{{entity}}" 商业模式 护城河`
 - `"{{entity}}" 管理层 大股东 股权结构`
 - `"{{entity}}" 催化剂 即将发生 事件`
-- 如果 {'有' if has_presearch else '没有'} presearch 数据，先读它了解已有覆盖
+- `"{{entity}}" competitive landscape market share {year}`
+- `"{{entity}}" risk bear case downside {year}`
+- `"{{entity}}" business model moat competitive advantage`
+- tencent_news: 搜 "{entity}" 最新动态、突发事件、财报公告
+- 如果 {'有' if has_presearch else '没有'} presearch 数据，先读它了解已有覆盖，跳过已覆盖的关键词
 
 ## 分析任务
 
@@ -294,7 +299,7 @@ step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, st
   "schema_version": "ir_research_plan.v3",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}", "market": "{market}",
   "query": "{query}", "ticker": "{ticker}", "english_name": "{english_name}",
-  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "web_search:公开信息"],
+  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "web_search:公开信息", "tencent_news:实时动态"],
   "core_questions": [...], "strategic_questions": [...],
   "fact_requirements": [...], "section_requirements": {{}},
   "coverage_matrix": {{}}, "plan_status": "ready",

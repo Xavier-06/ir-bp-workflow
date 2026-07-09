@@ -1303,14 +1303,43 @@ Agent tool 参数：
 - 对每个公司: tyc-mcp.search_companies -> get_company_basic_profile
 - 记录: 注册资本、成立日期、经营范围、股东、融资历史、与课题的相关性
 
-### Step 3: Web 补搜（中英双语, 具体查询）
-- 从 core_question 提取关键词 -> "{提取的关键词} 产业政策 监管 2025 2026"
-- 从 core_question 提取关键词 -> "{提取的关键词} 竞争格局 市场份额 产业链"
-- 从 core_question 提取关键词 -> "{提取的关键词} industry policy regulation market size"
-- 对每个 sub_question 转化为 1-2 条搜索词（去掉问号, 保留核心名词）
-- 对每个 key_company -> "{company_name} {行业关键词} 业务 财务 融资"
+### Step 3: Web 补搜（结构化源优先，web_search 兜底，中英双语）
+
+优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（web_search 仅作兜底，最多 10 轮）:
+
+**A. 行业宏观搜索（必做）:**
+- web_search: "{entity} 行业 市场规模 TAM SAM SOM {year}"
+- web_search: "{entity} industry market size growth forecast {year}"
+- web_search: "{entity} 产业政策 监管 补贴 {year}"
+- web_search: "{entity} industry policy regulation subsidy {year}"
+
+**B. 竞争格局搜索（必做）:**
+- web_search: "{entity} 竞争格局 CR3 CR5 市场份额 TOP"
+- web_search: "{entity} competitive landscape market share ranking"
+- web_search: "{entity} 龙头 排名 对比 优劣势"
+
+**C. 产业链搜索（必做）:**
+- web_search: "{entity} 产业链 上游 中游 下游 环节"
+- web_search: "{entity} supply chain value chain segments"
+- web_search: "{entity} 国产替代 自主可控 卡脖子"
+
+**D. 研究内容定向搜索（必做）:**
+- 对 brief 中 `research_content` 的每一项，生成 1-2 条搜索词:
+  - 例: "GPU/ASIC/NPU/FPGA各品类定位" → web_search: "AI芯片 GPU ASIC NPU 品类 定位 用途"
+  - 例: "各环节全球市场份额与龙头公司" → web_search: "AI芯片产业链 各环节 市场份额 龙头公司"
+
+**E. 子问题搜索（必做）:**
+- 对 brief 中每个 `sub_question` 转化为 1-2 条搜索词（去掉问号, 保留核心名词）
+
+**F. 关键公司搜索（必做）:**
+- 对 brief 中每个 `key_company` → web_search: "{company} {entity} 业务 市场 融资 {year}"
+
+**G. 新闻搜索（必做）:**
+- tencent_news: 搜 "{entity}" 最新动态、政策变化、行业事件
+- tencent_news: 搜每个 key_company 最新动态
+
+**H. presearch 去重:**
 - 如果有 presearch 数据先读它, 跳过 presearch 已经覆盖好的关键词
-- tencent_news: 搜课题关键词最新动态
 
 ## 分析任务
 
@@ -1320,7 +1349,7 @@ Agent tool 参数：
 {{
   "schema_version": "ic_research_plan.v2",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}",
-  "data_sources_used": ["westock-mcp:行业数据/研报", "tyc-mcp:公司验证", "web_search:公开信息"],
+  "data_sources_used": ["westock-mcp:行业数据/研报", "tyc-mcp:公司验证", "web_search:公开信息", "tencent_news:实时动态"],
   "research_dimensions": [
     {{"dimension": "行业规模与增长", "key_questions": [...], "data_sources": [...], "priority": "high"}}
   ],
