@@ -174,60 +174,10 @@ def _run_multi_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[s
     }
 
 
-# ═══════════════════════════════════════════════════════════
-# Phase 1: Industry Presearch — 行业数据预搜索
-# ═══════════════════════════════════════════════════════════
-
-def _run_industry_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 03: presearch — 已废弃（v1.4 路径B），搜索全部交给 phase04 子代理。
-
-    v1.4 改动: 原 presearch 脚本搜索（只有 web+新闻，无 MCP）与 phase04 子代理搜索
-    （westock+tyc+web+tencent_news 全覆盖）大量重叠。砍掉 presearch，子代理全权搜索。
-    保留 phase 壳以维持下游依赖链（phase03b_extract / phase_outputs 声明）。
-    """
-    tasks_dir = runtime_root / "data" / "tasks"
-    tasks_dir.mkdir(parents=True, exist_ok=True)
-
-    # 写空结果文件，满足下游 phase_prerequisites 声明
-    empty_result = {
-        "task_id": job_ctx.job_id,
-        "entity": job_ctx.entity,
-        "pipeline": "ic",
-        "results": {},
-        "summary": {"total_evidence": 0, "note": "presearch skipped — subagent handles all search"},
-        "total_evidence": 0,
-    }
-    result_path = tasks_dir / f"{job_ctx.job_id}-presearch_results.json"
-    result_path.write_text(json.dumps(empty_result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    print(f"  ⏭️  [ic] phase03 presearch 已跳过（搜索由 phase04 子代理全权执行）", flush=True)
-    return {
-        "ok": True,
-        "mode": "skipped_subagent_search",
-        "phase": "phase03_presearch",
-        "job_id": job_ctx.job_id,
-        "result": {"skipped": True, "reason": "subagent_handles_all_search"},
-    }
+# [v1.5] phase03_presearch 已删除: 子代理全权搜索, 脚本presearch无用
 
 
-# ═══════════════════════════════════════════════════════════
-# Phase 1.5: Content Extraction
-# ═══════════════════════════════════════════════════════════
-
-def _run_extract(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 03b: URL 内容提取 — 已废弃（v1.4 路径B），presearch 已砍，无 URL 可提取。
-
-    v1.4 改动: presearch 砍掉后没有 URL 列表产出，extract 无可提取内容。
-    保留 phase 壳以维持执行链完整。子代理在搜索过程中会自行抓取需要的 URL 内容。
-    """
-    print(f"  ⏭️  [ic] phase03b extract 已跳过（presearch 已废弃，无 URL 可提取）", flush=True)
-    return {
-        "ok": True,
-        "mode": "skipped_no_presearch",
-        "phase": "phase03b_extract",
-        "job_id": job_ctx.job_id,
-        "result": {"skipped": True, "reason": "presearch_removed"},
-    }
+# [v1.5] phase03b_extract 已删除: presearch已砍无URL可提取
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1456,8 +1406,7 @@ class ICProfile(PipelineProfile):
         all_handlers = {
             "phase01_topic_intake": lambda job_ctx: _run_topic_intake(runtime_root, job_ctx),
             "phase02_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
-            "phase03_presearch": lambda job_ctx: _run_industry_presearch(runtime_root, job_ctx),
-            "phase03b_extract": lambda job_ctx: _run_extract(runtime_root, job_ctx),
+            # [v1.5] phase03_presearch + phase03b_extract 已删除: 子代理全权搜索
             "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
             "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
             "phase06_precompute": lambda job_ctx: _run_industry_precompute(runtime_root, job_ctx),
@@ -1498,7 +1447,6 @@ class ICProfile(PipelineProfile):
         kernel 在 start_phase 跳过前置 phase 时，自动回填缺失产物。
         """
         return {
-            "phase03b_extract": ["{task_id}-presearch_results.json"],
             "phase04_research_plan": ["ic_topic_metadata.json"],
             "phase06_precompute": ["{task_id}-ic_research_plan.json"],
             "phase07_dispatch_prepare": ["{task_id}-ic_research_plan.json"],
@@ -1516,8 +1464,6 @@ class ICProfile(PipelineProfile):
         return {
             "phase01_topic_intake": ["ic_topic_metadata.json"],
             "phase02_multi_company_verify": [],
-            "phase03_presearch": ["{task_id}-presearch_results.json"],
-            "phase03b_extract": [],
             "phase04_research_plan": [],  # 子代理直接生成 plan
             "phase04_research_plan_collect": ["{task_id}-ic_research_plan.json"],
             "phase06_precompute": [],

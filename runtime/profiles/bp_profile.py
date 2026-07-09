@@ -127,31 +127,19 @@ def _run_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 
 
 def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    if os.environ.get("IRBP_BG_CHILD") == "1":
-        # v5.1: 使用统一 presearch_query_builder
-        from scripts.presearch_query_builder import execute_presearch
-        task_dir = _task_dir(runtime_root, job_ctx)
-        entity, market = _bp_entity_market(job_ctx)
-        result = execute_presearch(
-            pipeline="bp",
-            task_id=job_ctx.job_id,
-            entity=entity,
-            market=market,
-            output_dir=task_dir,
-        )
-        return {
-            "ok": True,
-            "mode": "presearch",
-            "phase": "phase03_presearch",
-            "job_id": job_ctx.job_id,
-            "result": result,
-        }
-    from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase03_presearch")
-    if cached is not None:
-        print(f"  📦 [bp] 使用缓存的 presearch 结果", flush=True)
-        return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase03_presearch", pipeline="bp")
+    """Phase 03: presearch — 已废弃（v5.3 路径B），搜索全部交给 phase04 子代理。
+
+    v5.3 改动: 与 IR/IC 管线对齐，砍掉 presearch。BP 子代理全权搜索:
+    tyc-mcp(工商/法律/融资) + westock-mcp(行业/研报) + web_search + tencent_news。
+    """
+    print(f"  ⏭️  [bp] phase03 presearch 已跳过（搜索由 phase04 子代理全权执行）", flush=True)
+    return {
+        "ok": True,
+        "mode": "skipped_subagent_search",
+        "phase": "phase03_presearch",
+        "job_id": job_ctx.job_id,
+        "result": {"skipped": True, "reason": "subagent_handles_all_search"},
+    }
 
 
 def _bp_entity_market(job_ctx: JobContext) -> tuple[str, str]:
@@ -189,9 +177,7 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     )
     brief_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    # Check presearch and skeleton availability
-    presearch_path = task_dir / "bp_presearch_results.json"
-    presearch_available = presearch_path.exists()
+    # Check skeleton availability
     skeleton_path = task_dir / "bp_research_plan_skeleton.json"
     has_skeleton = skeleton_path.exists()
 
@@ -199,7 +185,7 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     instruction = bp_build_research_plan_instruction(
         entity=entity, market=market, stage_tier=stage_tier,
         job_id=job_ctx.job_id, task_dir=task_dir, brief_path=brief_path,
-        presearch_available=presearch_available,
+        presearch_available=False,
         has_skeleton=has_skeleton,
         skeleton_path=skeleton_path if has_skeleton else None,
     )
@@ -213,7 +199,6 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
         "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
-            "presearch_path": str(presearch_path) if presearch_available else None,
             "subagent_connector_ids": ["tyc-mcp", "westock-mcp"],
             "task_dir": str(task_dir),
         },
@@ -3456,7 +3441,7 @@ class BPProfile(PipelineProfile):
         return {
             "phase01_document_intake": ["bp_step0_profile.json", "bp_claim_inventory.json"],
             "phase02_company_verify": ["company_verify_report.json"],
-            "phase03_presearch": ["bp_presearch_results.json"],
+            # [v5.3] phase03_presearch 已废弃: 子代理全权搜索
             "phase04_research_plan": [],  # v5.2: 子代理直接生成plan, skeleton仅作可选参考
             "phase04_research_plan_collect": ["bp_research_plan.json"],
             "phase05_bp_shared_page_init": ["bp_shared_diligence_page.md"],
