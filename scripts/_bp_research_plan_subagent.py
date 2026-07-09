@@ -138,7 +138,25 @@ def bp_build_research_plan_instruction(
         f'- web_search: "{entity} technology patents IP moat"\n'
         f'- web_search: "[industry from brief] 市场规模 增长 趋势"\n'
         f'- web_search: "[industry from brief] market size growth trend"\n'
-        "- tencent_news: latest news on entity and industry\n"
+        "\n"
+        "### Step 4: Tencent News (real-time Chinese news via Bash)\n"
+        "Run these two Bash commands to get latest news:\n"
+        "```bash\n"
+        f'cd {task_dir.parent.parent} && python3 -c "\n'
+        "import json, sys; sys.path.insert(0, \'.\')\n"
+        "from scripts.search_gateway import tencent_news_search\n"
+        f\'result = tencent_news_search(\'"{entity}" 融资 产品 合作 最新\', max_results=5)\n'
+        "print(json.dumps(result, ensure_ascii=False, indent=2))\n"
+        '"\n'
+        "```\n"
+        "```bash\n"
+        f'cd {task_dir.parent.parent} && python3 -c "\n'
+        "import json, sys; sys.path.insert(0, \'.\')\n"
+        "from scripts.search_gateway import tencent_news_search\n"
+        f\'result = tencent_news_search(\'"[industry from brief]" 行业 政策 动态\', max_results=5)\n'
+        "print(json.dumps(result, ensure_ascii=False, indent=2))\n"
+        '"\n'
+        "```\n"
         "\n"
         "## Analysis & Output\n"
         "\n"

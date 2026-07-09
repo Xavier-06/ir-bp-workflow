@@ -274,8 +274,18 @@ Agent tool 参数：
 - `"{{entity}}" competitive landscape market share {year}`
 - `"{{entity}}" risk bear case downside {year}`
 - `"{{entity}}" business model moat competitive advantage`
-- tencent_news: 搜 "{entity}" 最新动态、突发事件、财报公告
-- 你是唯一的搜索者（没有上游 presearch 预搜索），请系统性地完成以上所有搜索
+
+### Step 5: 腾讯新闻（实时中文新闻，Bash 调用）
+你是唯一的搜索者（没有上游 presearch），必须用 Bash 调腾讯新闻补充实时动态：
+```bash
+cd ~/.workbuddy/ir_runtime && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import tencent_news_search
+result = tencent_news_search('{entity} 最新动态 财报 事件', max_results=5)
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+- 你是唯一的搜索者，请系统性地完成以上所有搜索
 
 ## 分析任务
 

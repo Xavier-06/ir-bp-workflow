@@ -1260,9 +1260,16 @@ Agent tool 参数：
 **F. 关键公司搜索（必做）:**
 - 对 brief 中每个 `key_company` → web_search: "{company} {entity} 业务 市场 融资 {year}"
 
-**G. 新闻搜索（必做）:**
-- tencent_news: 搜 "{entity}" 最新动态、政策变化、行业事件
-- tencent_news: 搜每个 key_company 最新动态
+**G. 新闻搜索（必做，Bash 调用腾讯新闻）:**
+```bash
+cd ~/.workbuddy/ir_runtime && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import tencent_news_search
+result = tencent_news_search('{entity} 最新动态 政策 行业事件', max_results=5)
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+对每个 key_company 也用同样方式搜最新动态（替换查询词为公司名）。
 
 **H. 搜索质量控制:**
 - 每条搜索结果记录来源类型（westock/tyc/web/tencent_news）

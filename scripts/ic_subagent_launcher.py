@@ -507,10 +507,10 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
         f'4. **前序 step 输出有 gap** → 自己补充搜索填补',
         f'5. **唯一完成条件** → 将完整报告写入上方指定的输出文件路径',
         f'',
-        f'### 补搜工具优先级',
-        f'1. `NeoData 金融搜索` — A/HK 股首选',
-        f'2. `yfinance (Python)` — 估值指标、美股数据',
-        f'3. `web_search` — 通用搜索',
+        f'### 补搜工具优先级（NeoData/yfinance 均需 Bash 调用，见工具指南）',
+        f'1. `NeoData 金融搜索`（Bash: `from scripts.search_gateway import neodata_search`）— A/HK 股首选',
+        f'2. `yfinance`（Bash: `from scripts.search_gateway import yfinance_summary`）— 估值指标、美股数据',
+        f'3. `web_search` — 通用搜索（WorkBuddy 内置工具，直接用）',
         f'4. DuckDuckGo / SearXNG — 备用搜索',
         f'',
         f'### 补搜纪律',
@@ -691,7 +691,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'cn',
         f"If you cannot find specific data, SUPPLEMENTARY SEARCH FIRST before writing '未找到独立外部证据'. "
         f"Use thinking=high — reason carefully before writing each section.\n\n"
         f"CRITICAL: You must autonomously close the loop. When you discover data gaps during analysis:\n"
-        f"1. Search for the missing data yourself (NeoData → yfinance → web_search)\n"
+        f"1. Search for the missing data yourself (Bash: NeoData → yfinance → web_search)\n"
         f"2. Integrate the found data into your analysis\n"
         f"3. Only mark as '待核实' after 3 rounds of supplementary search still yield nothing\n"
         f"Do NOT return to the coordinator for search instructions — you ARE the search agent.\n\n"

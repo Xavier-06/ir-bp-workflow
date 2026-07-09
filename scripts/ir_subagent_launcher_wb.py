@@ -356,8 +356,8 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'"',
         f'```',
         f'- prefer=auto：金融查 NeoData → DDG → SearXNG；prefer=multi：四路合并最全',
-        f'- search_deep：搜索 + 自动抓正文一步到位',
-        f'- search_many：多关键词批量搜索',
+        f'- search_deep（Bash: `from scripts.search_gateway import search_deep`）：搜索 + 自动抓正文一步到位',
+        f'- search_many（Bash: `from scripts.search_gateway import search_many`）：多关键词批量搜索',
         f'',
         f'**2. 上市公司估值指标（PE/PB/PS/市值/股息率/beta）**',
         f'→ `yfinance`（精确估值数字）',
@@ -387,7 +387,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'',
         f'**5. 网页正文深度阅读**',
         f'→ `web_fetch`（WorkBuddy 内置工具）— 给 URL 返回正文',
-        f'→ `search_deep` — 搜索 + 自动抓 top N 正文，一步到位',
+        f'→ `search_deep`（Bash: `from scripts.search_gateway import search_deep`）— 搜索 + 自动抓 top N 正文，一步到位',
         f'',
         f'**6. 腾讯自选股 MCP (westock-mcp)（结构化金融数据源，已授权）**',
         f'- 这是 IR 最核心的结构化金融源，子代理**直接调用 MCP 工具**即可，无需 bash，也无需 web_search 兜底。',
@@ -443,22 +443,38 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'',
         f'**最低搜索量（质量门禁会校验，不达标 = 任务失败）：**',
         f'- ≥ 8 个独立搜索 query（不同角度：公司名+财务、公司名+行业、公司名+竞品、公司名+风险 等）',
-        f'- ≥ 3 个实际深读过的 URL（web_fetch 或 search_deep 抓到的正文，不是只看 snippet）',
+        f'- ≥ 3 个实际深读过的 URL（web_fetch 抓到的正文，不是只看 snippet）',
         f'- ≥ 3 个独立来源域名（不能全是同一个站点的页面）',
         f'',
         f'**搜索策略（必须按顺序执行）：**',
         f'0. **第零轮：时效锚定（最先执行，不可跳过）**',
-        f'   - 腾讯新闻 CLI: sh {skill_dir}/scripts/run-cli.sh search "{entity} 最新动态" --limit 5 — 分钟级突发新闻',
-        f'   - NeoData doc: neodata_search(\'{entity} 最新动态\', data_type=\'doc\') — 小时~天级深度分析',
+        f'   - 腾讯新闻（Bash 调用）:',
+        f'     ```bash',
+        f'     cd ~/.workbuddy/ir_runtime && python3 -c "',
+        f'     import json, sys; sys.path.insert(0, \'.\')',
+        f'     from scripts.search_gateway import tencent_news_search',
+        f'     result = tencent_news_search(\'{entity} 最新动态\', max_results=5)',
+        f'     print(json.dumps(result, ensure_ascii=False, indent=2))',
+        f'     "',
+        f'     ```',
+        f'   - NeoData doc（Bash 调用）:',
+        f'     ```bash',
+        f'     cd ~/.workbuddy/ir_runtime && python3 -c "',
+        f'     import json, sys; sys.path.insert(0, \'.\')',
+        f'     from scripts.search_gateway import neodata_search',
+        f'     result = neodata_search(\'{entity} 最新动态\', data_type=\'doc\')',
+        f'     print(json.dumps(result, ensure_ascii=False, indent=2))',
+        f'     "',
+        f'     ```',
         f'   - web_search: "{entity} {{当前年月}} 最新动态" — 锁定英文源和长尾信息',
         f'   - 如涉及产品/技术: web_search("{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
         f'   - 目的: 先知道"最新"是什么，后续分析才不会引用过期信息',
         f'   - 三层组合: 腾讯新闻(分钟级) → NeoData doc(深度) → web_search(兜底)',
-        f'1. **第一轮：广度扫描** — NeoData doc 拿研报/分析 + search_gateway prefer=multi 多关键词并行',
-        f'2. **第二轮：深度验证** — 对第一轮发现的关键 claim，用 web_fetch 或 search_deep 读全文验证',
+        f'1. **第一轮：广度扫描** — NeoData doc 拿研报/分析 + Bash 调 search_gateway prefer=multi 多关键词并行',
+        f'2. **第二轮：深度验证** — 对第一轮发现的关键 claim，用 web_fetch 读全文验证',
         f'3. **第三轮：交叉验证/反证** — 搜竞品对比、负面信息、行业报告、分析师观点',
         f'4. **TYC 天眼查必查项**（如标的涉及中国大陆企业）：工商信息、司法诉讼、专利、资质',
-        f'5. **金融数据必查**：NeoData api → yfinance 交叉验证',
+        f'5. **金融数据必查**：NeoData api（Bash） → yfinance（Bash） 交叉验证',
         f'',
         f'**输出必须包含搜索审计（search_audit）：**',
         f'在你的 Markdown 输出末尾加一个 `## 搜索审计` 章节，记录：',
@@ -542,17 +558,18 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
         f"If you cannot find specific data, SUPPLEMENTARY SEARCH FIRST before writing '未找到独立外部证据'. "
         f"Use thinking=high — reason carefully before writing each section.\n\n"
         f"CRITICAL: You must autonomously close the loop. When you discover data gaps during analysis:\n"
-        f"1. Search for the missing data yourself (NeoData via search_gateway → yfinance → web_search)\n"
+        f"1. Search for the missing data yourself (Bash: search_gateway → yfinance → web_search)\n"
         f"2. Integrate the found data into your analysis\n"
         f"3. Only mark as '待核实' after 3 rounds of supplementary search still yield nothing\n"
         f"Do NOT return to the coordinator for search instructions — you ARE the search agent.\n\n"
-        f"DATA SOURCE PRIORITY:\n"
-        f"- A/HK financials: NeoData api → yfinance → web_search\n"
-        f"- US stocks: yfinance → NeoData → web_search\n"
+        f"DATA SOURCE PRIORITY (all via Bash `cd ~/.workbuddy/ir_runtime && python3 -c ...`, see tool guide):\n"
+        f"- A/HK financials: NeoData api (Bash) → yfinance (Bash) → web_search\n"
+        f"- US stocks: yfinance (Bash) → NeoData (Bash) → web_search\n"
         f"- News/analysis/reports: NeoData doc (深度分析, 首选!) → web_search (突发新闻补充)\n"
         f"- Product/tech launches: NeoData doc + web_search (必须含当前年月)\n"
         f"- Company registry/legal: TYC MCP (已在 manifest 配置) → web_search\n"
-        f"- search_gateway auto-routes financial queries to NeoData Layer 0\n\n"
+        f"- Tencent News (Bash: tencent_news_search): real-time Chinese news\n"
+        f"- search_gateway (Bash) auto-routes financial queries to NeoData Layer 0\n\n"
         f"TEMPORAL ANCHORING (CRITICAL):\n"
         f"- Step 0: NeoData doc search '{entity} 最新动态' + web_search '{entity} YYYY年M月 最新动态'\n"
         f"- ALL search queries MUST include current year/month\n"
