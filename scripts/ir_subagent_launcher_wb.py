@@ -1425,24 +1425,41 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
                 f'3. 根据 brief 中的统稿规则，将 step1~step7 的内容汇总为一份完整研报\n'
                 f'   （step_macro 宏观判断需纳入投资摘要和风险章节）\n'
-                f'4. 如发现数据缺口或矛盾，优先用 westock-mcp / NeoData(Bash) / 天眼查 / 腾讯新闻(Bash) 等结构化源补搜验证（web_search 仅作兜底，最多 3 轮，Bash 调用示例见 System Prompt 工具指南）\n'
+                f'4. 如发现数据缺口或矛盾，用以下结构化源补搜（web_search 仅作兜底，最多 3 轮）\n'
                 f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         elif step_deps_list:
-            # 有依赖的 step（step2/3/4/5/6/6b/7）：强制读取前序文件
             prompt_body += (
                 f'2. 逐一读取上方列出的前序 step 完整输出文件（不是跳过，是强制）\n'
                 f'3. 根据 brief 中的角色指令执行分析，前序 step 的完整数据是你的核心输入\n'
-                f'4. 如发现数据缺口，优先用 westock-mcp / NeoData(Bash) / 天眼查 / 腾讯新闻(Bash) 等结构化源补搜验证（web_search 仅作兜底，最多 3 轮，Bash 调用示例见 System Prompt 工具指南）\n'
+                f'4. 搜索数据时按下方数据源路由表选工具（禁止只用 web_search）\n'
                 f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
         else:
-            # 无依赖的 step（step1_data, step_macro）：直接从 brief 开始
             prompt_body += (
                 f'2. 根据 brief 中的角色指令和预搜索数据，执行完整分析\n'
-                f'3. 如发现数据缺口，优先用 westock-mcp / NeoData(Bash) / 天眼查 / 腾讯新闻(Bash) 等结构化源补搜验证（web_search 仅作兜底，最多 3 轮，Bash 调用示例见 System Prompt 工具指南）\n'
+                f'3. 搜索数据时按下方数据源路由表选工具（禁止只用 web_search）\n'
                 f'4. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
             )
+
+        # ── 数据源路由硬约束（注入 prompt_body，确保子代理看到）──
+        prompt_body += (
+            f'【⚠️ 数据源路由（强制，违反即扣分）】\n\n'
+            f'搜索数据时**必须**按以下路由选择工具，禁止所有查询都走 web_search：\n\n'
+            f'| 查什么 | 首选工具 | 调用方式 | 兜底 |\n'
+            f'|--------|----------|----------|------|\n'
+            f'| A/HK 股行情/财务/估值/板块/产业链/研报/评级/资金流 | **westock-mcp** | MCP 直接调用 data_quote/data_finance/data_report/data_sector 等 | NeoData → web_search |\n'
+            f'| 企业工商/股东/高管/专利/司法/招投标 | **tyc-mcp** | search_companies → call_tool | web_search |\n'
+            f'| A/HK 股深度研报/行业数据/市场规模 | **NeoData** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search(\\"查询词\\"), ensure_ascii=False))"` | web_search |\n'
+            f'| 突发新闻/实时动态（分钟级） | **腾讯新闻** | Bash: `sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search "{{关键词}}" --limit 5` | web_search |\n'
+            f'| 美股估值/财务 | **yfinance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "import yfinance as yf; print(yf.Ticker(\\"AAPL\\").info)"` | westock-mcp → web_search |\n'
+            f'| 学术论文/政策文件/英文技术文档 | **web_search** | 直接调用 | web_fetch 读全文 |\n\n'
+            f'⚠️ 禁止行为：\n'
+            f'- 禁止用 web_search 搜公司财务数据（用 westock-mcp: data_finance）\n'
+            f'- 禁止用 web_search 搜公司股东信息（用 tyc-mcp: search_companies → call_tool）\n'
+            f'- 禁止用 web_search 搜行业板块走势（用 westock-mcp: data_sector）\n'
+            f'- 禁止用 web_search 搜最新新闻动态（用腾讯新闻 CLI）\n\n'
+        )
 
         prompt_body += (
             f'【输出要求】\n'
@@ -1451,7 +1468,12 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'- 多个 ## 章节\n'
             f'- 关键数据加粗\n'
             f'- ⚠️ 买方研究要求：每项分析必须落到投资含义（对 thesis/估值/风险的影响），禁止纯描述性资料堆砌\n'
-            f'- 禁止输出"Pre-search Results"格式的搜索备忘录——必须是正式分析报告'
+            f'- 禁止输出"Pre-search Results"格式的搜索备忘录——必须是正式分析报告\n'
+            f'- ⚠️ 报告末尾必须包含「搜索审计」章节，列出：\n'
+            f'  - 每次搜索用了哪个数据源（westock-mcp / tyc-mcp / NeoData / 腾讯新闻 / yfinance / web_search）\n'
+            f'  - 查询关键词\n'
+            f'  - 来源域名列表\n'
+            f'  - 如果全部来源都是 web_search，说明为什么没用结构化数据源（没有合理理由将被视为质量不合格）'
         )
 
         team_name = f'ir-{task_id}'
