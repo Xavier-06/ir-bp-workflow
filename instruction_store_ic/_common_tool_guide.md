@@ -342,3 +342,28 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 
 ### ic_report_synthesizer (统稿)
 **不搜索新数据**。综合全部前序 wave 输出。如需补充验证，仅通过 westock-mcp / tyc-mcp 定向查询，不超过 2 次。
+
+---
+
+## §5 搜索审计（强制 — 报告末尾必须包含）
+
+每个子代理的 Markdown 报告末尾必须包含「搜索审计」章节。这是质量门禁的评分项之一。
+
+```markdown
+## 搜索审计
+
+| 搜索内容 | 数据源 | 查询关键词 | 结果数 |
+|---------|--------|-----------|-------|
+| 行业市场规模 | westock-mcp: data_sector | "AI芯片 板块" | 15 条 |
+| 龙头财务数据 | NeoData | "英伟达 营收 毛利率" | 3 条 |
+| 最新政策动态 | 腾讯新闻 CLI | "芯片 出口管制 2026" | 5 条 |
+| 技术论文 | web_search | "arxiv HBM4 2026" | 2 条 |
+| ... | ... | ... | ... |
+
+来源域名: [arxiv.org, finance.sina.com, gov.cn, ...]
+```
+
+**审计规则**：
+- 如果全部来源都是 web_search → 必须在审计中说明为什么没用结构化数据源
+- 没有合理理由的全 web_search 报告 → evidence gate 扣分
+- 统稿角色（ic_report_synthesizer）不需要搜索审计
