@@ -10,6 +10,7 @@
 | **A/HK/美股实时行情/财务/券商研报/板块·产业链/资金流/北向/评级/新闻** | **腾讯自选股 MCP (westock-mcp)** | `mcp__westock-mcp__data_quote` / `data_finance` / `data_report` / `data_sector` / `data_industry_chain` / `data_fund_flow` / `data_north_holding` / `data_rating` / `data_news` | NeoData → web_search |
 | A/HK 股行情/财报/估值 | NeoData `api` | `neodata_search('公司名 营收 净利润 市值', data_type='api')` | yfinance → web_search |
 | 美股行情/估值/分红 | yfinance | `yf.Ticker('AAPL').info` | NeoData → web_search |
+| **美股英文新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** | `_yahoo_search('NVDA earnings AI chip', max_results=5)` | web_search |
 | **券商研报/行业深度/产业链** | **NeoData `doc` + 腾讯自选股 `data_report`/`data_sector`/`data_industry_chain`** | `neodata_search('公司名 最新动态', data_type='doc')`；行业/产业链数据优先 `mcp__westock-mcp__data_sector` / `data_industry_chain` / `data_report` | web_search |
 | **突发新闻/实时动态（分钟级）** | **腾讯新闻 CLI** | `sh {SKILL_DIR}/scripts/run-cli.sh search "关键词" --limit 5` | web_search |
 | **产品发布/技术动态/新闻分析** | NeoData `doc` + 腾讯新闻补充 | NeoData doc 拿深度分析，腾讯新闻补实时动态 | web_search |
@@ -29,12 +30,23 @@
   - **作为新闻/分析的首选数据源**，web_search 用于补充 NeoData 未覆盖的突发新闻和昨日动态
 - `data_type='all'` → 两者都取（搜索量更大但混合返回）
 
-### yfinance 能力边界
+### yfinance + Yahoo Finance 能力边界
 
-- **能拿**: 实时行情、市值、PE/PB/PS、EPS、股息率、beta、52 周高低、财务摘要
-- **不能拿**: 新闻、研报、分析师报告、产品动态
+- **yfinance 能拿**: 实时行情、市值、PE/PB/PS、EPS、股息率、beta、52 周高低、财务摘要
+- **Yahoo Finance `_yahoo_search` 能拿**: **美股英文新闻、earnings calls、分析师评级变动、产品动态**（免费无需 API key）
+- **不能拿**: A 股数据、中文新闻（中文新闻用腾讯新闻 CLI）
 - A/HK 股 ticker: `600519.SS`（沪）、`000001.SZ`（深）、`0700.HK`（港）
 - 美股: `AAPL`、`NVDA`、`MSFT`
+
+**Yahoo Finance 新闻搜索（美股竞品/earnings/分析师动态）**:
+```bash
+cd {RUNTIME_ROOT} && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import _yahoo_search
+result = _yahoo_search('NVDA earnings revenue AI chip 2025', max_results=5)
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
 
 ### 天眼查 MCP 能力边界
 

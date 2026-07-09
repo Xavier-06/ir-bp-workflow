@@ -31,11 +31,12 @@
 | 行业板块走势/指数/估值水平 | westock-mcp: `data_sector` | NeoData | web_search |
 | 产业链上下游图谱/环节梳理 | westock-mcp: `data_industry_chain` | web_search | — |
 | 行业市场规模/TAM/SAM/CAGR | NeoData | web_search("{行业} 市场规模 CAGR 2025") | — |
-| 券商行业研报/深度报告 | westock-mcp: `data_report` | NeoData | web_search |
-| 行业竞争格局/市占率/CR3/CR5 | web_search + westock-mcp 交叉验证 | NeoData | — |
-| 行业政策/法规/准入标准 | web_search("site:gov.cn {关键词}") | 腾讯新闻 CLI | — |
-| 行业突发新闻/最新动态 | 腾讯新闻 CLI | web_search | — |
-| 宏观数据(GDP/CPI/PMI/利率) | NeoData | web_search | — |
+| 券商行业研报/深度报告 | westock-mcp: `data_report` | **NeoData `data_type='doc'`** | web_search |
+| 行业竞争格局/市占率/CR3/CR5 | **NeoData `data_type='doc'`** + westock-mcp 交叉验证 | web_search | — |
+| 行业政策/法规/准入标准 | web_search("site:gov.cn {关键词}") | **NeoData `data_type='doc'`** | 腾讯新闻 CLI |
+| 行业突发新闻/最新动态 | 腾讯新闻 CLI | **NeoData `data_type='doc'`** | web_search |
+| 财经深度分析/政策解读 | **NeoData `data_type='doc'`**（200-500字深度摘要） | 腾讯新闻 CLI | web_search |
+| 宏观数据(GDP/CPI/PMI/利率) | NeoData `data_type='api'` | web_search | — |
 
 ### 投资/资本市场类
 
@@ -46,6 +47,7 @@
 | 北向持仓/外资动向 | westock-mcp: `data_north_holding` | — | web_search |
 | 重大事件(业绩会/产品发布/并购) | westock-mcp: `data_events` | 腾讯新闻 CLI | web_search |
 | 美股公司估值/财务 | yfinance (Python) | westock-mcp: `data_quote` | web_search |
+| **美股公司新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** (Bash) | 腾讯新闻 CLI(中文) | web_search |
 | A/HK 股估值快照(PE/PB/PS/换手率) | valuation_enricher (Bash) | westock-mcp: `data_quote` | — |
 | 可比公司财务对比(多公司横比) | westock-mcp: `data_finance` | NeoData | — |
 
@@ -151,39 +153,73 @@ sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh 
 - 中文为主，英文新闻覆盖弱
 - 搜索结果按时间排序，不按相关性
 
-### 2.4 NeoData (Bash) — 深度行业数据
+### 2.4 NeoData (Bash) — 深度行业数据 + 券商研报 + 财经新闻
 
-**一句话**：A/HK 股行业的"深度研报数据库"——市场规模/TAM/CAGR/行业对比/宏观数据，比 web_search 更专业、更结构化。
+**一句话**：A/HK 股行业的"深度研报数据库"——不只有结构化行情数据，**`data_type='doc'` 还能搜券商研报、行业深度报告、财经新闻、政策解读**，质量远优于 web_search。
 
-**调用方式**：Bash 脚本。
+**三种 data_type 及适用场景**：
+
+| data_type | 返回什么 | 什么时候用 |
+|-----------|---------|-----------|
+| `api`（默认） | 结构化行情/财报数据（市值/营收/利润/PE/PS 等精确数字） | 需要精确数字的估值、财务对比 |
+| **`doc`** | **券商研报 + 行业深度报告 + 财经新闻 + 政策分析**（200-500字/条，质量高） | **行业分析、竞争格局、政策解读、新闻舆情、供应链、估值逻辑** |
+| `all` | api + doc 两者 | 最全面，但结果较多 |
+
+**⚠️ `data_type='doc'` 是研报和新闻的主力数据源——不要只用 web_search 搜行业报告和新闻。**
+
+**调用方式**：
 
 ```bash
+# data_type='api' — 行情/财报结构化数据
 cd ~/.workbuddy/ir_runtime && python3 -c "
 import json, sys; sys.path.insert(0, '.')
 from scripts.search_gateway import neodata_search
-result = neodata_search('{查询语句}', max_results=5)
+result = neodata_search('公司名 营收 净利润 市值', data_type='api')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+
+# data_type='doc' — 券商研报/行业深度/财经新闻/政策分析（最常用！）
+cd ~/.workbuddy/ir_runtime && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('行业名 行业深度报告 市场规模 竞争格局', data_type='doc')
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+
+# data_type='all' — 两者同时
+cd ~/.workbuddy/ir_runtime && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import neodata_search
+result = neodata_search('查询语句', data_type='all')
 print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
 
-**最佳场景**：
-- 行业市场规模和增速（"中国新能源汽车市场规模 2025"）
-- TAM/SAM/SOM 测算依据
-- 行业研报/深度分析
-- 可比公司财务横评
-- 宏观经济数据
+**NeoData `data_type='doc'` 常用搜索场景**：
+
+| 搜什么 | 关键词示例 |
+|--------|-----------|
+| 行业深度报告 | `{行业名} 行业深度报告 市场规模 TAM 增速` |
+| 公司深度研报 | `{公司名} 深度报告 产品 客户 竞争` |
+| 财经新闻/行业动态 | `{公司名} 最新动态 融资 合作 订单` |
+| 行业新闻/政策变化 | `{行业名} 行业新闻 政策 监管 2025` |
+| 竞争格局/市场份额 | `{行业名} 竞争格局 市场份额 主要厂商` |
+| 供应链/上游材料 | `{材料名} 产能 供应 格局 价格` |
+| 政策/补贴/国产替代 | `{行业名} 政策 补贴 国产替代 自主可控` |
+| 估值/可比交易 | `{行业名} 估值 PE PS 行业平均 可比公司` |
+| 负面新闻/风险信号 | `{公司名} 诉讼 纠纷 风险 问题` |
 
 **⚠️ 局限**：
 - 主要覆盖 A/HK 股相关数据，美股弱
 - 非上市公司覆盖有限
-- 没有实时新闻
+- `publishedDate` 字段经常为空，需从 content 中提取时间线索
 - 调用可能较慢（5-15秒）
 
-### 2.5 yfinance (Python) — 美股估值专用
+### 2.5 yfinance (Python) — 美股估值 + Yahoo Finance 新闻
 
-**一句话**：美股公司的估值和财务快照。当 westock-mcp 对美股覆盖不够时，用它补充。
+**一句话**：美股公司的估值快照 + 英文金融新闻搜索。yfinance 拿估值数字，Yahoo Finance 搜英文新闻/earnings/分析师观点。
 
-**调用方式**：Python 脚本。
+**估值快照调用**：
 
 ```bash
 cd ~/.workbuddy/ir_runtime && python3 -c "
@@ -198,6 +234,26 @@ print(json.dumps({k: info.get(k) for k in [
 ] if info.get(k) is not None}, indent=2))
 "
 ```
+
+**Yahoo Finance 新闻搜索**（美股竞品新闻/earnings/分析师观点 — 免费无需 API key）：
+
+```bash
+cd ~/.workbuddy/ir_runtime && python3 -c "
+import json, sys; sys.path.insert(0, '.')
+from scripts.search_gateway import _yahoo_search
+result = _yahoo_search('NVDA earnings revenue AI chip', max_results=5)
+print(json.dumps(result, ensure_ascii=False, indent=2))
+"
+```
+
+**适用场景**：
+- 美股公司新闻/earnings calls/产品发布（英文源，比中文新闻更全）
+- 分析师评级变动/target price 调整
+- 竞品动态（如搜 "competitor name quarterly results"）
+
+**⚠️ 局限**：
+- yfinance: 部分数据有 15 分钟延迟，基本不支持 A 股
+- Yahoo 新闻: 只有英文，中文新闻用腾讯新闻 CLI
 
 **最佳场景**：
 - 美股公司 PE/PB/PS/EV-EBITDA

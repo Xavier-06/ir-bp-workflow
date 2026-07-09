@@ -880,8 +880,10 @@ def _build_inline_data_source_guide(role: str, step: str) -> str:
             '- 公司财务/行情/估值 → westock-mcp: data_finance / data_quote\n'
             '- 企业工商/股东/专利 → tyc-mcp: search_companies → call_tool\n'
             '- 行业研报/板块数据 → westock-mcp: data_report / data_sector\n'
-            '- 最新动态 → 腾讯新闻 CLI(Bash)\n'
-            '- 深度行业数据 → NeoData(Bash)\n'
+            '- **券商研报/行业深度报告/财经新闻** → NeoData Bash(`data_type="doc"`) — 质量远优于 web_search\n'
+            '- 中文实时新闻 → 腾讯新闻 CLI(Bash)\n'
+            '- **美股新闻/earnings/分析师** → Yahoo Finance Bash(`_yahoo_search`) — 英文金融新闻首选\n'
+            '- 美股估值 → yfinance(Bash)\n'
             '- web_search 仅作兜底，结构化源搜不到才用\n\n'
         )
 
