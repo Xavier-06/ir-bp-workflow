@@ -45,6 +45,7 @@
     "step_policy_scan": "ic_policy_risk",
     "step_value_chain": "ic_supply_chain",
     "step_segment_deep_{seg}": "ic_segment_deep",
+    "step_cross_cutting_{dim}": "ic_cross_cutting",
     "step_cross_compare": "ic_competitive",
     "step_catalyst": "ic_catalyst",
     "step_consensus": "ic_consensus",
@@ -56,10 +57,11 @@
     "step_policy_scan": [],
     "step_value_chain": [],
     "step_segment_deep_{seg}": ["step_value_chain", "step_ind_overview"],
-    "step_cross_compare": ["__all_segment_deep__"],
+    "step_cross_cutting_{dim}": ["step_value_chain", "__all_segment_deep__"],
+    "step_cross_compare": ["__all_segment_deep__", "__all_cross_cutting__"],
     "step_catalyst": ["__all_segment_deep__"],
-    "step_consensus": ["step_cross_compare", "__all_segment_deep__"],
-    "step_master_synthesis": ["step_cross_compare", "step_catalyst", "step_consensus"]
+    "step_consensus": ["step_cross_compare", "__all_segment_deep__", "__all_cross_cutting__"],
+    "step_master_synthesis": ["step_cross_compare", "step_catalyst", "step_consensus", "__all_cross_cutting__"]
   },
   "connector_map": {
     "ic_executive_hypothesis": ["westock-mcp"],

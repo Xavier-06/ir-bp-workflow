@@ -97,6 +97,33 @@ def load_index() -> dict:
     return {}
 
 
+def _load_research_content(task_id: str) -> list[str]:
+    """从 ic_topic_metadata.json 读取课题定义的 research_content 列表。
+
+    返回空列表表示该课题没有定义 research_content（如纯 entity fallback）。
+    """
+    meta_path = TASKS_DIR / 'ic_topic_metadata.json'
+    if not meta_path.exists():
+        return []
+    try:
+        meta = json.loads(meta_path.read_text(encoding='utf-8'))
+        rc = meta.get('research_content', [])
+        return rc if isinstance(rc, list) else []
+    except Exception:
+        return []
+
+
+def _get_cross_cutting_dim_info(task_id: str, dim_id: str) -> dict | None:
+    """从 wave_manifest.json 读取某个 cross_cutting 维度的信息。"""
+    manifest = load_json(wave_manifest_path(task_id))
+    if not manifest:
+        return None
+    for d in manifest.get('cross_cutting_dims', []):
+        if d.get('dim_id') == dim_id:
+            return d
+    return None
+
+
 def resolve_archetype(task_id: str) -> str:
     """从 ic_research_plan.json 或 ic_topic_metadata.json 读取 archetype。"""
     # 优先读 research plan
@@ -202,10 +229,10 @@ def _get_step_role_key(step_name: str, archetype: str | None = None) -> str:
         return role_map[step_name]
 
     # 2. 模板匹配（step_segment_deep_upstream → step_segment_deep_{seg} → ic_segment_deep）
+    #    支持 {seg} / {route} / {dim} 三种模板
     for template_key, role in role_map.items():
-        if "{seg}" in template_key or "{route}" in template_key:
-            # 提取 base: step_segment_deep_{seg} → step_segment_deep
-            base = template_key.replace("_{seg}", "").replace("_{route}", "")
+        if "{seg}" in template_key or "{route}" in template_key or "{dim}" in template_key:
+            base = template_key.replace("_{seg}", "").replace("_{route}", "").replace("_{dim}", "")
             if step_name.startswith(f"{base}_"):
                 return role
 
@@ -370,6 +397,112 @@ def _fallback_routes() -> list[dict]:
     ]
 
 
+def _detect_cross_cutting_dimensions(task_id: str, segments: list[dict]) -> list[dict]:
+    """从 research_plan.json 识别跨切面维度。
+
+    跨切面维度 = research_dimensions 中，key_questions 提到的实体名词
+    横跨 ≥2 个 segment 的 key_companies，或维度名本身暗示跨环节对比。
+
+    Returns:
+        list of dict: [{"dim_id": "chip_type", "name": "芯片品类定位与用途",
+                        "key_questions": [...], "related_segments": ["gpu_design", "asic_ai_accel"]}]
+    """
+    plan_path = TASKS_DIR / f'{task_id}-ic_research_plan.json'
+    if not plan_path.exists():
+        return []
+    try:
+        plan = json.loads(plan_path.read_text(encoding='utf-8'))
+    except Exception:
+        return []
+
+    dimensions = plan.get('research_dimensions', [])
+    if not dimensions:
+        return []
+
+    # 收集所有 segment 的 key_companies 集合（用于匹配）
+    seg_company_map: dict[str, set[str]] = {}
+    for seg in segments:
+        seg_id = seg.get('id', '')
+        companies = seg.get('key_companies', [])
+        if isinstance(companies, dict):
+            # 处理 {"global_leader": [...], "china_player": [...]} 格式
+            flat = set()
+            for v in companies.values():
+                if isinstance(v, list):
+                    flat.update(c.split('(')[0].strip() for c in v)
+            seg_company_map[seg_id] = flat
+        elif isinstance(companies, list):
+            seg_company_map[seg_id] = set(c.split('(')[0].strip() for c in companies)
+        else:
+            seg_company_map[seg_id] = set()
+
+    # 也收集 segment 名称/id 作为关键词
+    # 额外提取英文关键词别名（如 gpu_design → "gpu"，asic_ai_accel → "asic"）
+    seg_keywords: dict[str, str] = {}
+    seg_aliases: dict[str, list[str]] = {}
+    for seg in segments:
+        seg_id = seg.get('id', '')
+        seg_name = seg.get('name', '')
+        seg_keywords[seg_id] = (seg_name + ' ' + seg_id).lower()
+        # 从 id 中提取英文 token 作为别名（gpu_design → ["gpu", "design"]）
+        tokens = [t for t in re.split(r'[_/\-\s]+', seg_id) if t.isascii() and len(t) >= 2]
+        # 从 name 中提取英文 token（如 "NPU/FPGA加速" → ["npu", "fpga"]）
+        name_tokens = re.findall(r'[A-Za-z][A-Za-z0-9]{1,}', seg_name)
+        aliases = list(set(t.lower() for t in tokens + name_tokens))
+        seg_aliases[seg_id] = aliases
+
+    cross_cutting: list[dict] = []
+    for dim in dimensions:
+        dim_name = dim.get('dimension', '')
+        key_qs = dim.get('key_questions', [])
+        all_text = (dim_name + ' ' + ' '.join(key_qs)).lower()
+
+        # 检查这个维度涉及几个 segment
+        related_segs: set[str] = set()
+        for seg_id in seg_keywords:
+            # 方式1: segment name/id 完整匹配
+            if seg.get('name', '').lower() in all_text or seg_id.lower() in all_text:
+                related_segs.add(seg_id)
+                continue
+            # 方式2: 英文别名匹配（如 "gpu" 匹配 "GPU/ASIC/NPU/FPGA"）
+            matched_alias = False
+            for alias in seg_aliases.get(seg_id, []):
+                # 使用 word boundary 匹配避免 "ed" 匹配 "EDA"
+                if re.search(r'\b' + re.escape(alias) + r'\b', all_text):
+                    related_segs.add(seg_id)
+                    matched_alias = True
+                    break
+            if matched_alias:
+                continue
+            # 方式3: 维度文本提到 segment 的 key_companies
+            for company in seg_company_map.get(seg_id, set()):
+                if len(company) >= 2 and company.lower() in all_text:
+                    related_segs.add(seg_id)
+                    break
+
+        # 判定: 涉及 ≥2 个 segment → 跨切面
+        if len(related_segs) >= 2:
+            # 生成 slug id（优先提取英文 token，纯中文则用序号）
+            eng_tokens = re.findall(r'[A-Za-z][A-Za-z0-9]{1,}', dim_name)
+            if eng_tokens:
+                dim_slug = '_'.join(t.lower() for t in eng_tokens[:4])
+            else:
+                # 纯中文维度名：用维度序号 + 前几个 segment id 组合
+                idx = dimensions.index(dim) + 1
+                seg_prefix = '_'.join(sorted(related_segs)[:2])
+                dim_slug = f'dim{idx}_{seg_prefix}'
+            dim_slug = re.sub(r'[^a-zA-Z0-9_]', '_', dim_slug).strip('_')
+            dim_slug = re.sub(r'_+', '_', dim_slug)
+            cross_cutting.append({
+                'dim_id': dim_slug,
+                'name': dim_name,
+                'key_questions': key_qs,
+                'related_segments': sorted(related_segs),
+            })
+
+    return cross_cutting
+
+
 # ═══════════════════════════════════════════════════════
 # 动态 Wave 生成（v2: archetype 驱动）
 # ═══════════════════════════════════════════════════════
@@ -442,6 +575,28 @@ def build_dynamic_wave_plan(task_id: str, step_filter: set[str] | None = None,
 
         waves.append(wave_steps)
 
+    # ── 跨切面维度 wave 注入（v2026-07-10 新增）──
+    # 对 chain_scan: 在 segment_deep wave 和 cross_compare wave 之间插入 cross_cutting wave
+    cross_cutting_dims: list[dict] = []
+    if archetype == "chain_scan" and dynamic_items:
+        cross_cutting_dims = _detect_cross_cutting_dimensions(task_id, dynamic_items)
+        if cross_cutting_dims:
+            # 找到 segment_deep wave 的位置（通常是 Wave 2，index=2）
+            # 在它之后插入一个新 wave
+            seg_deep_wave_idx = None
+            for wi, w in enumerate(waves):
+                if w and w[0].startswith("step_segment_deep_"):
+                    seg_deep_wave_idx = wi
+                    break
+
+            if seg_deep_wave_idx is not None:
+                cc_steps = [f"step_cross_cutting_{d['dim_id']}" for d in cross_cutting_dims]
+                # 插入在 segment_deep wave 之后
+                insert_at = seg_deep_wave_idx + 1
+                waves.insert(insert_at, cc_steps)
+                # 更新 deps_template 中的引用（cross_compare 等依赖 __all_cross_cutting__）
+                print(f"  🔄 注入 {len(cc_steps)} 个跨切面 step: {cc_steps}")
+
     # 构建 step_deps
     deps_template = template.get("step_deps_template", template.get("step_deps", {}))
 
@@ -449,14 +604,20 @@ def build_dynamic_wave_plan(task_id: str, step_filter: set[str] | None = None,
         if step_name_flat in deps_template:
             # 静态 step
             raw_deps = deps_template[step_name_flat]
-            resolved = _resolve_deps(raw_deps, dynamic_items, archetype, template)
+            resolved = _resolve_deps(raw_deps, dynamic_items, archetype, template, cross_cutting_dims)
             step_deps[step_name_flat] = resolved
+        elif step_name_flat.startswith("step_cross_cutting_"):
+            # 跨切面 step: 依赖 value_chain + 所有 segment_deep
+            cc_deps = ["step_value_chain"]
+            for item in dynamic_items:
+                cc_deps.append(f"step_segment_deep_{item['id']}")
+            step_deps[step_name_flat] = cc_deps
         else:
             # 动态 step: 从 deps_template 的模板 key 推断
             dep_key = _find_deps_template_key(step_name_flat, deps_template)
             if dep_key:
                 raw_deps = deps_template[dep_key]
-                resolved = _resolve_deps(raw_deps, dynamic_items, archetype, template)
+                resolved = _resolve_deps(raw_deps, dynamic_items, archetype, template, cross_cutting_dims)
                 step_deps[step_name_flat] = resolved
             else:
                 step_deps[step_name_flat] = []
@@ -468,6 +629,7 @@ def build_dynamic_wave_plan(task_id: str, step_filter: set[str] | None = None,
         "current_wave_index": 2 if is_dynamic else 1,
         "segments": dynamic_items if dynamic_source == "value_chain_segments" else [],
         "routes": dynamic_items if dynamic_source == "tech_routes" else [],
+        "cross_cutting_dims": cross_cutting_dims,
         "waves": waves,
         "step_deps": step_deps,
         "completed_steps": _get_initial_completed(waves, is_dynamic),
@@ -495,8 +657,9 @@ def _get_initial_completed(waves: list[list[str]], is_dynamic: bool) -> list[str
     return completed
 
 
-def _resolve_deps(raw_deps: list, dynamic_items: list[dict], archetype: str, template: dict) -> list[str]:
-    """解析依赖中的特殊标记（如 __all_segment_deep__）。"""
+def _resolve_deps(raw_deps: list, dynamic_items: list[dict], archetype: str, template: dict,
+                  cross_cutting_dims: list[dict] | None = None) -> list[str]:
+    """解析依赖中的特殊标记（如 __all_segment_deep__、__all_cross_cutting__）。"""
     resolved = []
     dynamic_source = template.get("dynamic_source", "")
 
@@ -507,19 +670,32 @@ def _resolve_deps(raw_deps: list, dynamic_items: list[dict], archetype: str, tem
         elif dep == "__all_route_deep__" and dynamic_source == "tech_routes":
             for item in dynamic_items:
                 resolved.append(f"step_route_deep_{item['id']}")
+        elif dep == "__all_cross_cutting__":
+            if cross_cutting_dims:
+                for d in cross_cutting_dims:
+                    resolved.append(f"step_cross_cutting_{d['dim_id']}")
         elif "{seg}" in dep or "{route}" in dep:
             for item in dynamic_items:
                 resolved.append(dep.replace("{seg}", item["id"]).replace("{route}", item["id"]))
+        elif "{dim}" in dep:
+            if cross_cutting_dims:
+                for d in cross_cutting_dims:
+                    resolved.append(dep.replace("{dim}", d['dim_id']))
+            # 如果没有 cross_cutting_dims，跳过该依赖（该 step 不会被实际生成）
         else:
             resolved.append(dep)
     return resolved
 
 
 def _find_deps_template_key(step_name: str, deps_template: dict) -> str | None:
-    """为动态 step 找到对应的 deps 模板 key。"""
+    """为动态 step 找到对应的 deps 模板 key。支持 {seg}/{route}/{dim} 模板。"""
     for key in deps_template:
         if "{seg}" in key or "{route}" in key:
             base = key.replace("_{seg}", "").replace("_{route}", "")
+            if step_name.startswith(f"{base}_"):
+                return key
+        if "{dim}" in key:
+            base = key.replace("_{dim}", "")
             if step_name.startswith(f"{base}_"):
                 return key
     return None
@@ -583,6 +759,19 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
     if "{dimension}" in instruction:
         instruction = instruction.replace("{dimension}", _DIMENSION_CN.get(dimension, dimension or ""))
 
+    # 跨切面维度占位符替换（v2026-07-10 新增）
+    if step.startswith("step_cross_cutting_"):
+        dim_id = step.replace("step_cross_cutting_", "")
+        cc_dim_info = _get_cross_cutting_dim_info(task_id, dim_id)
+        if cc_dim_info:
+            instruction = instruction.replace("{dimension_name}", cc_dim_info.get("name", ""))
+            instruction = instruction.replace("{dimension_description}", cc_dim_info.get("name", ""))
+            kq = cc_dim_info.get("key_questions", [])
+            kq_text = "\n".join(f"  - {q}" for q in kq) if kq else "(无)"
+            instruction = instruction.replace("{key_questions}", kq_text)
+            instruction = instruction.replace("{related_segments}",
+                                              ", ".join(cc_dim_info.get("related_segments", [])))
+
     brief_lines = [
         f'# Step Brief: {role_key} ({step})',
         f'',
@@ -642,6 +831,20 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
             brief_lines.append(f'')
             brief_lines.append(f'完整输出文件路径：`{dep_path}`')
             brief_lines.append(f'请使用 Read 工具读取该文件的完整内容（不要依赖摘要，必须读原文）。')
+
+    # ── 注入课题研究方向 checklist（v2026-07-10 新增）──
+    # 让所有 step 的子代理"看得见"课题定义的 research_content，
+    # 避免维度丢失（如"品类定位与用途"在 chain_scan 环节展开中被遗忘）。
+    research_content = _load_research_content(task_id)
+    if research_content:
+        brief_lines.append('')
+        brief_lines.append('## 课题研究方向（研究内容 Checklist）')
+        brief_lines.append('')
+        brief_lines.append('本课题定义了以下研究方向，你的分析必须覆盖与当前环节/任务相关的项。')
+        brief_lines.append('未覆盖的项必须明确标注"本环节不涉及"而非省略。')
+        brief_lines.append('')
+        for i, rc in enumerate(research_content, 1):
+            brief_lines.append(f'{i}. {rc}')
 
     return '\n'.join(brief_lines)
 

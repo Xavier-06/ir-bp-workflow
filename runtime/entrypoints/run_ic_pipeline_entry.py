@@ -26,6 +26,7 @@ def run_ic_job(
     dispatch_poll_interval: int = 30,
     start_phase: str | None = None,
     research_tier: str = "deep",
+    topic_file: str = "",
 ) -> dict:
     """行业研究管线入口（旧版，行业全景模式）。
 
@@ -33,6 +34,7 @@ def run_ic_job(
     query: 研究查询（可包含重点公司名单）
     market: 市场区域（cn/hk/us）
     research_tier: 研究深度 (deep/standard/quick)
+    topic_file: 课题池 DOCX/MD/JSON 文件路径（供 phase01 topic_intake 解析 research_content）
     """
     profile = ICProfile(runtime_root=RUNTIME_ROOT, research_tier=research_tier)
     job_ctx = JobContext(
@@ -49,6 +51,7 @@ def run_ic_job(
             "session_id": session_id,
             "dispatch_max_wait": dispatch_max_wait,
             "dispatch_poll_interval": dispatch_poll_interval,
+            "topic_file": topic_file,
         },
     )
     return run_pipeline(profile=profile, job_ctx=job_ctx, runtime_root=RUNTIME_ROOT,

@@ -296,6 +296,10 @@ class PipelineOrchestrator:
             if key in record.result:
                 metadata[key] = record.result[key]
 
+        # 把 input_file 传给 topic_file，让 phase01 能从 DOCX 解析 research_content
+        if record.input_file:
+            metadata["topic_file"] = record.input_file
+
         return run_ic_job(
             job_id=record.job_id,
             entity=record.entity,
