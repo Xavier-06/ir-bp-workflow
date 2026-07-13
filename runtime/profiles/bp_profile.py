@@ -508,13 +508,102 @@ def _extract_company_verify_facts(task_dir: Path) -> list[dict[str, Any]]:
     return facts
 
 
+def _extract_research_plan_facts(task_dir: Path) -> list[dict[str, Any]]:
+    """Extract seed facts from bp_research_plan.json (replaces presearch facts).
+
+    v5.3 后 presearch 被砍，搜索全部交给 phase04 子代理。
+    research_plan.json 中包含行业/竞品/技术等结构化研究结果，
+    提取为 seed facts 让子代理启动时 fact store 不为空。
+    """
+    rp_path = task_dir / "bp_research_plan.json"
+    if not rp_path.exists():
+        return []
+
+    try:
+        rp = json.loads(rp_path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    facts: list[dict[str, Any]] = []
+    fact_counter = 0
+
+    # Extract from industry_analysis
+    for section_key in ["industry_analysis", "competitive_landscape", "tech_analysis",
+                        "market_sizing", "key_findings", "research_notes"]:
+        section = rp.get(section_key)
+        if not section:
+            continue
+        if isinstance(section, str) and len(section) >= 30:
+            fact_counter += 1
+            facts.append({
+                "fact_id": f"BP-RESEARCH-{section_key.upper()}-F{fact_counter:03d}",
+                "claim": section[:80],
+                "value": section[:300],
+                "unit": "",
+                "period": "待验证",
+                "source_url": "",
+                "source_tier": "research_plan",
+                "source_quote": section[:150],
+                "question_id": f"research_plan_{section_key}",
+                "fact_type": f"research_plan_{section_key}",
+                "confidence": "medium",
+            })
+        elif isinstance(section, list):
+            for item in section:
+                if isinstance(item, dict):
+                    text = item.get("summary") or item.get("content") or item.get("text") or json.dumps(item, ensure_ascii=False)[:200]
+                    if len(text) >= 30:
+                        fact_counter += 1
+                        source = item.get("source_url") or item.get("url") or ""
+                        facts.append({
+                            "fact_id": f"BP-RESEARCH-{section_key.upper()}-F{fact_counter:03d}",
+                            "claim": (item.get("title") or item.get("name") or text)[:80],
+                            "value": text[:300],
+                            "unit": "",
+                            "period": "待验证",
+                            "source_url": source,
+                            "source_tier": "research_plan" if not source else _classify_source_tier(source),
+                            "source_quote": text[:150],
+                            "question_id": f"research_plan_{section_key}",
+                            "fact_type": f"research_plan_{section_key}",
+                            "confidence": "medium",
+                        })
+
+    # Also extract from flat keys (some research plans use flat structure)
+    for key in ["industry", "competition", "technology", "market", "valuation", "risks"]:
+        val = rp.get(key)
+        if isinstance(val, str) and len(val) >= 30:
+            fact_counter += 1
+            facts.append({
+                "fact_id": f"BP-RESEARCH-{key.upper()}-F{fact_counter:03d}",
+                "claim": val[:80],
+                "value": val[:300],
+                "unit": "",
+                "period": "待验证",
+                "source_url": "",
+                "source_tier": "research_plan",
+                "source_quote": val[:150],
+                "question_id": f"research_plan_{key}",
+                "fact_type": f"research_plan_{key}",
+                "confidence": "medium",
+            })
+
+    return facts[:80]  # Cap at 80 facts
+
+
 def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 07: 初始化 BP 事实库 — 注入 presearch + company_verify 事实，
-    子代理启动时 fact store 不再为空。"""
+    """Phase 07: 初始化 BP 事实库 — 注入 research_plan + company_verify 事实，
+    子代理启动时 fact store 不再为空。
+
+    v5.3: presearch 被砍后，改从 bp_research_plan.json 提取 seed facts。
+    兼容旧 job：如果 presearch 文件存在仍会提取（向后兼容）。
+    """
     task_dir = _task_dir(runtime_root, job_ctx)
 
-    # Collect seed facts from presearch and company verification
+    # Collect seed facts from research_plan (v5.3) and company verification
     seed_facts: list[dict[str, Any]] = []
+    seed_facts.extend(_extract_research_plan_facts(task_dir))
+    # Backward compat: if old presearch files exist, still extract them
     seed_facts.extend(_extract_presearch_facts(task_dir))
     seed_facts.extend(_extract_company_verify_facts(task_dir))
 
@@ -528,12 +617,13 @@ def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dic
             unique_facts.append(fact)
 
     payload = _bp_fact_store_payload(job_ctx, facts=unique_facts)
-    payload["source_files"] = ["presearch_steps", "company_verify_report"]
+    payload["source_files"] = ["research_plan", "presearch_steps_compat", "company_verify_report"]
     store_path, index_path = _write_bp_fact_store(task_dir, payload)
 
+    research_count = sum(1 for f in unique_facts if "RESEARCH" in str(f.get("fact_id", "")))
     presearch_count = sum(1 for f in unique_facts if "PRESEARCH" in str(f.get("fact_id", "")))
     company_count = sum(1 for f in unique_facts if "COMPANY" in str(f.get("fact_id", "")))
-    print(f"    📦 Fact Store bootstrap: {len(unique_facts)} seed facts (presearch={presearch_count}, company_verify={company_count})", flush=True)
+    print(f"    📦 Fact Store bootstrap: {len(unique_facts)} seed facts (research_plan={research_count}, presearch_compat={presearch_count}, company_verify={company_count})", flush=True)
 
     return {
         "ok": True,
@@ -544,6 +634,7 @@ def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dic
             "store_path": str(store_path),
             "index_path": str(index_path),
             "total_facts": len(unique_facts),
+            "research_plan_facts": research_count,
             "presearch_facts": presearch_count,
             "company_verify_facts": company_count,
         },
@@ -1645,14 +1736,20 @@ def _extract_list_field(
 
 def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
     """构建所有 role spec 列表。首次调用后写缓存，后续 wave 直接读缓存避免重复 OCR 扫描。"""
+    _CACHE_VERSION = 2  # v2: presearch_steps → research_plan + presearch_steps_compat
     cache_path = task_dir / "_dispatch_role_specs_cache.json"
     if cache_path.exists():
         try:
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
-            if isinstance(cached, list) and len(cached) > 0:
-                return cached
+            if isinstance(cached, dict) and cached.get("_cache_version") == _CACHE_VERSION:
+                specs = cached.get("specs", [])
+                if isinstance(specs, list) and len(specs) > 0:
+                    return specs
         except Exception:
             pass
+    # v5.3: presearch 被砍后，子代理应从 research_plan 获取上下文
+    # 向后兼容：如果旧 presearch 文件存在也列出来
+    research_plan_file = str(task_dir / "bp_research_plan.json") if (task_dir / "bp_research_plan.json").exists() else ""
     presearch_files = sorted(str(p) for p in task_dir.glob("bp_presearch_step*.md"))
 
     # Generic extraction — works for any industry
@@ -1678,7 +1775,8 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "founders": profile.get("founders", []),
-                "presearch_steps": presearch_files,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1690,7 +1788,8 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "company_name": profile.get("company_name", ""),
                 "products": products,
                 "customers": customers,
-                "presearch_steps": presearch_files,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1702,7 +1801,8 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "company_name": profile.get("company_name", ""),
                 "products": products,
                 "tech_keywords": tech_keywords,
-                "presearch_steps": presearch_files,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1714,7 +1814,8 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "company_name": profile.get("company_name", ""),
                 "products": products,
                 "competitors": competitors,
-                "presearch_steps": presearch_files,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1726,20 +1827,22 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "company_name": profile.get("company_name", ""),
                 "products": products,
                 "competitors": competitors,
-                "presearch_steps": presearch_files,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
             },
         },
         {
             "role_name": "bp_valuation_return",
             "brief_key": "bp_valuation_return",
-            "description": "Wave 3 Cross-Dimension: 融资估值、可比公司/交易、MOIC/IRR、退出路径与估值模型",
+            "description": "Wave 3 Cross-Dimension: 融资历史估值变化、可比公司估值对标（主营业务重合筛选）、估值事实呈现",
             "output_file": str(task_dir / "bp_phase2_valuation_return.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "products": products,
                 "competitors": competitors,
                 "financing_rounds": profile.get("financing_rounds", []),
-                "presearch_steps": presearch_files,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1752,7 +1855,8 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "products": products,
                 "customers": customers,
                 "financing_rounds": profile.get("financing_rounds", []),
-                "presearch_steps": presearch_files,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1765,13 +1869,15 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "products": products,
                 "competitors": competitors,
                 "customers": customers,
-                "presearch_steps": presearch_files,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
             },
         },
     ]
-    # 写缓存：后续 wave 直接读缓存，避免重复 OCR 扫描 presearch 文件
+    # 写缓存：后续 wave 直接读缓存，避免重复 OCR 扫描
     try:
-        cache_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        cache_payload = {"_cache_version": _CACHE_VERSION, "specs": result}
+        cache_path.write_text(json.dumps(cache_payload, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
         pass
     return result
