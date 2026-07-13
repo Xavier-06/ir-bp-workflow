@@ -169,33 +169,54 @@ def _attach_valuation(entity: str, profile: dict[str, Any]) -> dict[str, Any]:
 def _extract_comparables(task_dir: Path, profile: dict[str, Any], entity: str = "") -> list[dict[str, str]]:
     """PR4: 提取可比上市公司，返回 [{name, ticker}] 列表。
 
-    策略：
-    1. profile.competitors（BP 自述，无 ticker）
-    2. research_plan fact_requirements（结构化搜索任务，无 ticker）
-    3. NeoData 板块表格（同时拿 ticker + name，最可靠）
+    策略（2026-07-13 v2 修复）：
+    1. profile.competitors（BP 自述，兼容 list/str/dict 格式）
+    2. research_plan.competitors（Phase04 子代理写回，新格式 [{name, ticker, main_business}]）
+    3. research_plan.fact_requirements 正则提取（旧格式兼容）
+    4. NeoData 搜索可比公司（同时拿 ticker + name，搜索词优化为简洁行业名+竞品名）
     """
     items: list[dict[str, str]] = []
     seen_names: set[str] = set()
 
     def _add(name: str, ticker: str = "") -> None:
         n = name.strip()
-        if not n or len(n) < 3 or len(n) > 10 or n in seen_names:
+        # 放宽长度：中文公司名常见 3-15 字，去掉"有限公司"等后缀后再判断
+        if not n or len(n) < 2 or len(n) > 20 or n in seen_names:
             return
         seen_names.add(n)
         items.append({"name": n, "ticker": ticker})
 
     # 1. profile.competitors（最高优先级，BP 自述的直接竞品）
+    #    兼容 list[str] / str / dict{direct:[], alternatives:[], chain_risks:[]}
     raw_comps = profile.get("competitors") or profile.get("key_competitors") or []
     if isinstance(raw_comps, str):
         raw_comps = [s.strip() for s in re.split(r'[,，、;/]', raw_comps) if s.strip()]
+    elif isinstance(raw_comps, dict):
+        # preflight_check 输出的是 {direct:[], alternatives:[], chain_risks:[]}
+        direct = raw_comps.get("direct") or []
+        alts = raw_comps.get("alternatives") or []
+        chain = raw_comps.get("chain_risks") or []
+        raw_comps = list(direct) + list(alts) + list(chain)
     for c in raw_comps:
         _add(str(c))
 
-    # 2. research_plan fact_requirements 中显式搜索的竞品名
+    # 2. research_plan.competitors（Phase04 子代理写回的新字段，格式 [{name, ticker, main_business}]）
     rp_path = task_dir / "bp_research_plan.json"
     if rp_path.exists():
         try:
             rp = json.loads(rp_path.read_text(encoding="utf-8"))
+            # 优先读新格式 competitors 字段（Layer 1 修复后会有值）
+            rp_competitors = rp.get("competitors") or []
+            if isinstance(rp_competitors, list):
+                for c in rp_competitors:
+                    if isinstance(c, dict):
+                        name = c.get("name", "")
+                        ticker = c.get("ticker", "")
+                        if name:
+                            _add(name, ticker=ticker)
+                    elif isinstance(c, str) and c:
+                        _add(c)
+            # 兼容旧格式：fact_requirements 中的正则提取
             for fr in rp.get("fact_requirements", []):
                 q = str(fr.get("question", ""))
                 for match in re.finditer(
@@ -213,18 +234,24 @@ def _extract_comparables(task_dir: Path, profile: dict[str, Any], entity: str = 
             industry = profile.get("sub_industry") or profile.get("industry") or ""
             products = profile.get("product_service") or []
             product_tag = products[0] if products else ""
+            # BUG-2 fix: 搜索词从长描述改为简洁行业名+产品名
             queries = []
             if industry:
                 queries.append(f"{industry} 龙头上市公司 市值")
+                queries.append(f"{industry} 上市公司 市盈率")
             if product_tag:
                 queries.append(f"{product_tag} 行业上市公司 PS估值")
-            for query in queries[:2]:
+            # 用竞品名直接搜
+            for c in raw_comps[:3] if isinstance(raw_comps, list) else []:
+                queries.append(f"{c} 市值 市盈率")
+            for query in queries[:4]:
                 rows = neodata_search(query, data_type="api")
                 for row in rows:
                     content = str(row.get("content", ""))
                     # 解析 NeoData 板块表格: | 股票代码 | 股票名称 | 价格 | ...
+                    # BUG-3 fix: 正则白名单增加"创新""智能""光学""机器人"等常见后缀
                     for table_match in re.finditer(
-                        r'\|\s*(\d{6}\.(?:SZ|SH|BJ))\s*\|\s*([\u4e00-\u9fff]{2,8}(?:股份|电子|科技|半导体|微电子|集团|材料|光电|芯片)?)\s*\|',
+                        r'\|\s*(\d{6}\.(?:SZ|SH|BJ))\s*\|\s*([\u4e00-\u9fff]{2,12}(?:股份|电子|科技|半导体|微电子|集团|材料|光电|芯片|创新|智能|光学|机器人|装备|仪器|自动化|通信|信息|数据|软件|系统|网络|生物|医药|化学|能源|环境|控股)?)\s*\|',
                         content
                     ):
                         ticker = table_match.group(1)

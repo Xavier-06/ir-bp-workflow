@@ -145,7 +145,7 @@ def bp_build_research_plan_instruction(
         f'cd {task_dir.parent.parent} && python3 -c "\n'
         "import json, sys; sys.path.insert(0, \'.\')\n"
         "from scripts.search_gateway import tencent_news_search\n"
-        f\'result = tencent_news_search(\'"{entity}" 融资 产品 合作 最新\', max_results=5)\n'
+        f'result = tencent_news_search(\'"{entity}" 融资 产品 合作 最新\', max_results=5)\n'
         "print(json.dumps(result, ensure_ascii=False, indent=2))\n"
         '"\n'
         "```\n"
@@ -153,10 +153,23 @@ def bp_build_research_plan_instruction(
         f'cd {task_dir.parent.parent} && python3 -c "\n'
         "import json, sys; sys.path.insert(0, \'.\')\n"
         "from scripts.search_gateway import tencent_news_search\n"
-        f\'result = tencent_news_search(\'"[industry from brief]" 行业 政策 动态\', max_results=5)\n'
+        f'result = tencent_news_search(\'"[industry from brief]" 行业 政策 动态\', max_results=5)\n'
         "print(json.dumps(result, ensure_ascii=False, indent=2))\n"
         '"\n'
         "```\n"
+        "\n"
+        "## Competitor Extraction (MANDATORY — do NOT skip)\n"
+        "\n"
+        "After your searches, you MUST populate a `competitors` field in the output JSON.\n"
+        "This field is consumed downstream by the valuation sub-agent (Wave3) to pick comparable companies.\n"
+        "If you skip it, the valuation step will have NO competitor list and will guess blindly.\n"
+        "\n"
+        "How to populate `competitors`:\n"
+        "1. Read the BP OCR text (bp_ocr_text.txt) — look for company names mentioned as competitors/benchmarks\n"
+        "2. Check the brief's `competitors` field if it already has names\n"
+        "3. From your tyc/westock/web_search results — extract any named companies that compete with {entity}\n"
+        "4. Include BOTH listed and unlisted companies (e.g., DJI, Insta360, GoPro, Proscenic, Roborock)\n"
+        "5. For each competitor, record: name, ticker (if listed), and main business\n"
         "\n"
         "## Analysis & Output\n"
         "\n"
@@ -184,6 +197,7 @@ def bp_build_research_plan_instruction(
         f'  "market": "{market}",\n'
         f'  "stage_tier": "{stage_tier}",\n'
         f'  "data_sources_used": ["tyc-mcp:company", "westock-mcp:industry/reports", "web_search:public"],\n'
+        f'  "competitors": [{{"name": "Insta360影石", "ticker": "", "main_business": "运动相机/全景相机"}}, {{"name": "大疆DJI", "ticker": "", "main_business": "无人机/影像系统"}}, {{"name": "GoPro", "ticker": "GPRO", "main_business": "运动相机"}}],\n'
         f'  "core_questions": [{{\n'
         f'    "question_id": "CQ1",\n'
         f'    "question": "Does the company legally exist and operate compliantly?",\n'
@@ -210,6 +224,7 @@ def bp_build_research_plan_instruction(
         f'- All owner_section: bp_company_team_compliance, bp_product_commercial, bp_tech_ip_moat, bp_market_supply_chain, bp_competition_positioning, bp_valuation_return, bp_customer_revenue_validation, bp_dealbreaker_risk\n'
         f'- Minimum: 10 claims, 30 fact_keys, covering all 8 sections\n'
         f'- If tyc cannot find company (T1/T2): note in search_summary and still generate full plan\n'
+        f'- **MANDATORY**: `competitors` field MUST contain at least 3 named companies (list of {{name, ticker, main_business}}). DO NOT leave it empty unless the BP has ZERO competitor mentions.\n'
         f'- Write bp_research_plan.json directly; no need to notify main AI\n'
     )
 

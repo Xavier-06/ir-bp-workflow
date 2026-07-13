@@ -173,13 +173,31 @@ web_fetch: {搜索结果中的URL}
 
 ## 搜索策略（分步流程）
 
+**Step 0: 竞品名单自主提取（MANDATORY — 不要依赖 brief 中的空 competitors[]）**
+
+brief 中的 `competitors` 字段可能为空或遗漏（上游数据断裂的已知 BUG）。你**必须**自己从以下源提取竞品名：
+
+1. **读取 BP OCR 原文**（`{task_dir}/bp_ocr_text.txt`）— 搜索"竞品""对标""竞争对手""类似""vs"等关键词，提取公司名
+2. **读取竞争维度报告**（如 `bp_competition_positioning.md` 或 `bp_competition_positioning_facts.json`）— 提取其中列出的所有竞品名
+3. **读取 `bp_research_plan.json` 的 `competitors` 字段**（如已填写）— 直接提取
+4. **读取 `company_verify_report.json` 的 `comparable_valuations`**（如已预注入）— 直接提取
+
+如果以上源均为空，**自行搜索**：
+```
+web_search: "{公司名}" 竞品 对标 竞争对手
+web_search: "{公司名}" competitors vs market share
+web_search: "{行业}" 龙头 上市公司 排名
+```
+
+将提取到的竞品名记录到 `comparable_companies` 列表中，后续 Step 2 做过滤。
+
 **Step 1: 历史融资估值时间线**
 - TYC `call_tool` (融资记录) 获取全部历史融资轮次
 - WebSearch 补搜每轮融资的金额/估值/投资方
 - 构建完整时间线表格：轮次 | 时间 | 融资金额 | 投前估值 | 投后估值 | 出让比例 | 投资方 | 来源
 
 **Step 2: 可比公司筛选 + 主营业务重合度验证**
-- 从竞争维度输出中获取初始可比公司列表
+- 从 Step 0 的竞品名单 + 竞争维度输出中获取初始可比公司列表
 - **四重过滤**：阶段匹配、规模匹配、模式匹配、**主营业务重合度 ≥60%**
 - 每家可比公司必须说明：标的主营什么、可比主营什么、重合度判断依据
 - 不匹配必须标注原因并剔除
