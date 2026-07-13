@@ -283,7 +283,7 @@ web_fetch: {搜索结果中的URL}
     "tam_gap_note": "口径差异说明"
   },
   "industry_landscape": {
-    "mainstream_routes": [{"route": "路线", "market_share": "份额", "key_players": ["厂商"]}],
+    "mainstream_routes": [{"route": "路线", "plain_explanation": "通俗解释（大白话，一句话说明这条路线本质上在做什么）", "market_share": "份额", "key_players": ["厂商"]}],
     "growth_drivers": ["驱动因素"],
     "substitution_risks": ["替代风险"]
   },
@@ -317,7 +317,7 @@ web_fetch: {搜索结果中的URL}
 
 ### quality_gate
 - `market_sizing`: TAM/SAM/SOM 三项都必须有独立推算（不能只有 BP 值）
-- `industry_landscape.mainstream_routes`: 至少 3 条路线
+- `industry_landscape.mainstream_routes`: 至少 3 条路线，**每条必须有 `plain_explanation`（通俗解释）**
 - `supply_chain`: 每个关键供应商必须有 `tyc_verified` 字段
 - `competitor_financials`: 每个上市竞对必须有 `source` 字段
 - `data_gaps`: 搜不到的字段必须列出
@@ -325,7 +325,8 @@ web_fetch: {搜索结果中的URL}
 ## 输出结构
 1. 市场定义与 TAM/SAM/SOM 口径
 2. 市场规模独立推算和口径对比
-3. 目标场景性能门槛参数表（新增）
-4. 行业格局、政策环境和需求节奏
-5. 供应链、产能和产业链议价
-6. 本维度结论、counter_evidence、data_gaps
+3. 目标场景性能门槛参数表（门槛参数用大白话解释含义）
+4. **行业格局与路线对比**（每条主流路线附通俗解释）
+5. 政策环境和需求节奏
+6. 供应链、产能和产业链议价
+7. 本维度结论、counter_evidence、data_gaps

@@ -3286,6 +3286,23 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
     except Exception as exc:
         print(f"  ⚠️ 维度 DOCX 批量生成异常: {exc}", flush=True)
 
+    # ── 来源与参考独立 Word 文档（2026-07-13 新增） ──
+    refs_docx_path = ""
+    if use_synthesis and synthesis_path:
+        try:
+            from scripts.build_bp_references_docx import build_bp_references_docx
+            refs_out = delivery_dir / f"{entity or job_ctx.job_id}_来源参考.docx"
+            refs_docx_path = str(build_bp_references_docx(
+                synthesis_md_path=synthesis_path,
+                output_path=refs_out,
+                entity=entity or job_ctx.entity or "",
+            ))
+            print(f"  📄 来源参考: {refs_docx_path}", flush=True)
+        except ImportError:
+            pass  # python-docx 不可用时静默跳过
+        except Exception as refs_exc:
+            print(f"  ⚠️ 来源参考 DOCX 生成失败: {refs_exc}", flush=True)
+
     audit_path = delivery_dir / "bp_delivery_audit.json"
     audit_data = {
         "job_id": job_ctx.job_id,
@@ -3294,6 +3311,7 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         "dimensions_completed": list(dimension_outputs.keys()),
         "gate_verdict": "PASS" if docx_path else "PARTIAL",
         "dim_docx_count": len(dim_docx_paths),
+        "refs_docx_path": refs_docx_path or None,
         "audit_timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
     audit_path.write_text(json.dumps(audit_data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -3341,6 +3359,9 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         # 注册 xlsx 附件
         for i, att_path in enumerate(attachment_paths):
             ss.record_artifact(job_ctx.job_id, f"bp_attachment_{i}", Path(att_path))
+        # 注册来源参考 DOCX（2026-07-13 新增）
+        if refs_docx_path:
+            ss.record_artifact(job_ctx.job_id, "bp_references_docx", Path(refs_docx_path))
     except Exception:
         pass
 
@@ -3359,6 +3380,7 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
             "attachment_paths": attachment_paths,
             "dim_docx_paths": dim_docx_paths,
             "dim_docx_count": len(dim_docx_paths),
+            "refs_docx_path": refs_docx_path,
             "delivery_errors": delivery_errors,
             "gate_verdict": "PASS" if docx_path else "PARTIAL",
         },
