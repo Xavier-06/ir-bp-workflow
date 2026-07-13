@@ -271,8 +271,8 @@ Agent tool 参数：
 - `"{{entity}}" 商业模式 护城河`
 - `"{{entity}}" 管理层 大股东 股权结构`
 - `"{{entity}}" 催化剂 即将发生 事件`
-- `"{{entity}}" competitive landscape market share {year}`
-- `"{{entity}}" risk bear case downside {year}`
+- `"{{entity}}" competitive landscape market share {{year}}`
+- `"{{entity}}" risk bear case downside {{year}}`
 - `"{{entity}}" business model moat competitive advantage`
 
 ### Step 5: 腾讯新闻（实时中文新闻，Bash 调用）
@@ -728,7 +728,7 @@ def _run_shared_state_refresh(runtime_root: Path, job_ctx: JobContext,
 
     # 自动检测：找最后一个有 step 输出的 wave index
     if after_wave is None:
-        from scripts.ir_subagent_launcher_wb import step_output_path
+        from scripts.ir_subagent_launcher_wb import step_output_path, LAUNCH_WAVES
         after_wave = 0
         for wi, wave_steps in enumerate(LAUNCH_WAVES):
             if any(
@@ -777,6 +777,150 @@ def _run_shared_state_refresh(runtime_root: Path, job_ctx: JobContext,
     }
 
 
+def _auto_generate_sidecars_from_md(
+    task_id: str,
+    step_name: str,
+    md_path: Path,
+    facts_out: Path | None,
+    section_out: Path | None,
+) -> None:
+    """从 .md 内容自动提取生成缺失的 facts + section sidecar。
+
+    兜底逻辑（2026-07-13 新增）：当子代理因基础设施问题（如 499 canceled）
+    只输出了 .md 但缺失 sidecar 时，从 md 文本中提取结构化 facts 和 section package，
+    避免整条管线因 sidecar 缺失而卡死。
+    """
+    md_text = md_path.read_text(encoding="utf-8")
+    step_upper = step_name.replace("_", " ").upper()
+
+    # ── 提取 facts ──
+    if facts_out is not None:
+        facts: list[dict[str, Any]] = []
+        fact_counter = 0
+
+        # 从 markdown 中提取带 URL 的定量数据点
+        # 匹配模式: 含数字的句子 + 后面的 URL 或脚注
+        lines = md_text.split("\n")
+        current_section = ""
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                current_section = stripped.lstrip("#").strip()[:60]
+                continue
+            if not stripped or stripped.startswith("|") or stripped.startswith("---"):
+                continue
+
+            # 提取含数字+单位的关键数据点
+            num_match = re.search(
+                r'(\d[\d,]*\.?\d*\s*(?:亿|万|千|百|%|倍|元|台|件|个|条|家|项|项|次|次))',
+                stripped
+            )
+            if num_match and len(stripped) >= 20:
+                fact_counter += 1
+                # 尝试从当前行或附近行提取 URL
+                url = ""
+                url_match = re.search(r'(https?://[^\s\)\]">]+)', stripped)
+                if url_match:
+                    url = url_match.group(1)
+                # 从脚注标记提取
+                fn_match = re.search(r'\[\^(\d+)\]', stripped)
+                source_quote = stripped[:200]
+
+                facts.append({
+                    "fact_id": f"{step_upper}-F{fact_counter:03d}",
+                    "claim": stripped[:80],
+                    "value": num_match.group(0),
+                    "unit": "",
+                    "period": "",
+                    "source_url": url,
+                    "source_tier": "web" if url else "md_extraction",
+                    "source_quote": source_quote,
+                    "entity": "",
+                    "question_id": "",
+                    "fact_type": "step_sidecar",
+                    "confidence": "medium",
+                })
+
+            # 限制最多 50 个 facts
+            if fact_counter >= 50:
+                break
+
+        # 如果没提取到任何定量数据，提取前 5 个非空段落作为 facts
+        if not facts:
+            for line in lines:
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#") and not stripped.startswith("|") and len(stripped) >= 30:
+                    fact_counter += 1
+                    url_match = re.search(r'(https?://[^\s\)\]">]+)', stripped)
+                    facts.append({
+                        "fact_id": f"{step_upper}-F{fact_counter:03d}",
+                        "claim": stripped[:80],
+                        "value": stripped[:100],
+                        "unit": "",
+                        "period": "",
+                        "source_url": url_match.group(1) if url_match else "",
+                        "source_tier": "md_extraction",
+                        "source_quote": stripped[:200],
+                        "entity": "",
+                        "question_id": "",
+                        "fact_type": "step_sidecar",
+                        "confidence": "low",
+                    })
+                    if fact_counter >= 5:
+                        break
+
+        facts_payload = {
+            "schema_version": "ir_step_facts.v1",
+            "step": step_name,
+            "facts": facts,
+            "auto_generated": True,
+            "source": "md_extraction_fallback",
+        }
+        from scripts.bp_file_lock import atomic_write
+        atomic_write(facts_out, json.dumps(facts_payload, ensure_ascii=False, indent=2) + "\n")
+        print(f"    📦 [{step_name}] 自动提取 {len(facts)} 条 facts", flush=True)
+
+    # ── 提取 section package ──
+    if section_out is not None:
+        # 从 md 的 heading 结构提取 key_messages
+        key_messages: list[str] = []
+        for line in md_text.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                title = stripped.lstrip("#").strip()
+                if title and len(key_messages) < 10:
+                    key_messages.append(title)
+
+        # 从 facts 中提取 claims
+        claims: list[dict[str, Any]] = []
+        if facts_out and facts_out.exists():
+            try:
+                facts_data = json.loads(facts_out.read_text(encoding="utf-8"))
+                for f in facts_data.get("facts", [])[:30]:
+                    claims.append({
+                        "claim": f["claim"],
+                        "fact_ids": [f["fact_id"]],
+                        "reasoning": f"基于{step_name}自动提取",
+                        "confidence": f.get("confidence", "medium"),
+                        "source_quality": f.get("source_tier", "unknown"),
+                    })
+            except Exception:
+                pass
+
+        section_payload = {
+            "schema_version": "ir_section_package.v1",
+            "section_id": step_name,
+            "section_title": key_messages[0] if key_messages else f"{step_name} 分析报告",
+            "key_messages": key_messages,
+            "claims": claims,
+            "auto_generated": True,
+            "source": "md_extraction_fallback",
+        }
+        from scripts.bp_file_lock import atomic_write
+        atomic_write(section_out, json.dumps(section_payload, ensure_ascii=False, indent=2) + "\n")
+        print(f"    📦 [{step_name}] 自动提取 {len(claims)} 条 claims, {len(key_messages)} 条 key_messages", flush=True)
+
+
 def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     """Phase 4b: 检查子代理输出是否完成，做质量门禁。
 
@@ -815,12 +959,41 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
         
         # L2 硬约束: 三文件检查
         missing_files = []
-        if not md_path.exists() or md_path.stat().st_size < 100:
+        md_ok = md_path.exists() and md_path.stat().st_size >= 100
+        facts_ok = facts_path.exists() and facts_path.stat().st_size >= 10
+        section_ok = section_path.exists() and section_path.stat().st_size >= 10
+        if not md_ok:
             missing_files.append(".md (主报告)")
-        if not facts_path.exists() or facts_path.stat().st_size < 10:
+        if not facts_ok:
             missing_files.append("-facts.json")
-        if not section_path.exists() or section_path.stat().st_size < 10:
+        if not section_ok:
             missing_files.append("-section.json")
+        
+        # ── L2.5 sidecar 自动补生成兜底 ──
+        # 当 .md 存在但 sidecar 缺失时，从 md 内容自动提取 facts + section
+        # 解决子代理基础设施 499 canceled 导致只出 .md 的问题
+        if md_ok and (not facts_ok or not section_ok):
+            try:
+                _auto_generate_sidecars_from_md(
+                    job_ctx.job_id, step_name, md_path,
+                    facts_path if not facts_ok else None,
+                    section_path if not section_ok else None,
+                )
+                facts_ok = facts_path.exists() and facts_path.stat().st_size >= 10
+                section_ok = section_path.exists() and section_path.stat().st_size >= 10
+                if facts_ok and section_ok:
+                    print(f"  🔄 [{step_name}] sidecar 自动补生成成功", flush=True)
+                    missing_files = []
+                else:
+                    still_missing = []
+                    if not facts_ok:
+                        still_missing.append("-facts.json")
+                    if not section_ok:
+                        still_missing.append("-section.json")
+                    print(f"  ⚠️ [{step_name}] sidecar 补生成不完整: {still_missing}", flush=True)
+                    missing_files = still_missing
+            except Exception as sidecar_exc:
+                print(f"  ⚠️ [{step_name}] sidecar 补生成失败: {sidecar_exc}", flush=True)
         
         if missing_files:
             incomplete_steps.append({
