@@ -20,6 +20,9 @@ from typing import Optional
 
 import requests
 
+# 直连绕过代理：沙箱 HTTP(S)_PROXY 端口动态变化且常 refuse，学术源统一走直连更稳
+NO_PROXY = {"http": None, "https": None}
+
 CROSSREF_BASE = "https://api.crossref.org"
 POLITE_EMAIL = os.getenv("CROSSREF_EMAIL", "xavier@example.com")
 REQUEST_TIMEOUT = 15
@@ -97,7 +100,7 @@ def get_work_by_doi(doi: str) -> Optional[dict]:
         resp = requests.get(
             f"{CROSSREF_BASE}/works/{doi}",
             headers=_headers(),
-            timeout=REQUEST_TIMEOUT,
+            timeout=REQUEST_TIMEOUT, proxies=NO_PROXY,
         )
         resp.raise_for_status()
         return _parse_work(resp.json().get("message", {}))
@@ -120,7 +123,7 @@ def search_crossref(query: str, max_results: int = 10) -> list[dict]:
             f"{CROSSREF_BASE}/works",
             params=params,
             headers=_headers(),
-            timeout=REQUEST_TIMEOUT,
+            timeout=REQUEST_TIMEOUT, proxies=NO_PROXY,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -145,7 +148,7 @@ def get_bibtex(doi: str) -> str:
         resp = requests.get(
             f"{CROSSREF_BASE}/works/{doi}",
             headers={"Accept": "application/x-bibtex", **_headers()},
-            timeout=REQUEST_TIMEOUT,
+            timeout=REQUEST_TIMEOUT, proxies=NO_PROXY,
         )
         resp.raise_for_status()
         return resp.text

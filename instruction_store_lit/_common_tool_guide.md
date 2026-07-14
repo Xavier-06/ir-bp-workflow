@@ -14,9 +14,10 @@
 ### A. 学术元数据 & 引用网络
 
 > ⚠️ 以下数据源已确认不可用，**禁止调用**：
-> - ~~OpenAlex~~ — 503 Service Unavailable（匿名限流，需 API Key）
 > - ~~Semantic Scholar~~ — 429 Rate Limit（无限挂起，需 API Key）
 > - ~~CORE~~ — 无 API Key，脚本直接跳过
+>
+> ✅ **OpenAlex 已启用**（免费, 无需 Key, https 直连稳定），纳入默认学术源池，与 arXiv/PMC/Crossref/DBLP 并列。
 
 > ⚠️⚠️ **领域判定**：搜索前必须先读 `research_plan.json` 的 `domain` 字段或关键词信号判定领域。
 > - **生物医学** (biomedical/clinical/pharma/oncology/genomics/drug/cell therapy/CRISPR/protein/antibody/neuro/cardio/vaccine/mRNA/lipid nanoparticle) → PMC 为 **PRIMARY** 搜索源，排第一
@@ -30,14 +31,15 @@
 | Crossref | `python3 scripts/api_clients/crossref_client.py "doi" --json` | DOI+参考文献+基金 | DOI 权威元数据 + 引用链 |
 | DBLP | `python3 scripts/api_clients/dblp_client.py "query" --json` | CS 论文补充 | CS 会议覆盖 |
 | arXiv | `python3 scripts/api_clients/arxiv_client.py "query" --json` | 预印本 | 预印本首发 + PDF 直下 |
+| OpenAlex | `python3 scripts/api_clients/openalex_client.py "query" --json` | 综合学术元数据 | 四级领域分类 + OA URL + 引用数，覆盖广 |
 
 **统一搜索（多源并行 + 去重 + 排序）：**
 ```bash
 # CS/AI/Tech 领域
-cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources arxiv,dblp,pmc --max-results 30 --json
+cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources arxiv,dblp,pmc,openalex --max-results 30 --json
 
 # 生物医学领域 — PMC 放第一位
-cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources pmc,arxiv,crossref --max-results 30 --json
+cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources pmc,arxiv,crossref,openalex --max-results 30 --json
 ```
 
 ### B. 论文全文获取 (按文档类型路由)

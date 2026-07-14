@@ -20,7 +20,7 @@
 
 ### 学术 API 调用方式
 
-> ⚠️ OpenAlex / Semantic Scholar / CORE 已确认为不可用(503/429/无Key),**不要调用**。
+> ⚠️ Semantic Scholar / CORE 已确认为不可用(429/无Key),**不要调用**。OpenAlex 已启用(免费无需Key, https直连稳定), 正常使用。
 
 **可用的 4 个学术数据源**(全部必须用上):
 
@@ -30,6 +30,7 @@
 | **PMC** | `pmc_client.py` | 生物医学 OA 全文 | 生物医学 PRIMARY |
 | **Crossref** | `crossref_client.py` | DOI 元数据 + **关键词搜索** + 引用链 | **搜索源 + 引用验证** |
 | **DBLP** | `dblp_client.py` | CS 会议论文 | CS 领域补充 |
+| **OpenAlex** | `openalex_client.py` | 综合学术元数据 | 四级领域分类 + OA URL + 引用数，覆盖广 |
 
 ```bash
 # 1. arXiv — CS/AI/Tech 预印本 (注意: 必须 --noproxy)
@@ -51,11 +52,11 @@ cd {RUNTIME_ROOT} && python3 scripts/api_clients/crossref_client.py --query "sol
 # 4. DBLP — CS 领域补充
 cd {RUNTIME_ROOT} && python3 scripts/api_clients/dblp_client.py "solid state battery" --max-results 10 --json
 
-# 统一搜索(多源并行 + 去重 + 排序,4 个源全用上)
-cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources arxiv,dblp,pmc,crossref --max-results 30 --json
+# 统一搜索(多源并行 + 去重 + 排序,5 个源全用上)
+cd {RUNTIME_ROOT} && python3 scripts/search/unified_search.py "关键词" --sources arxiv,dblp,pmc,crossref,openalex --max-results 30 --json
 ```
 
-> ⚠️ **unified_search 只用于学术搜索**,不要传 neodata/s2/openalex(已确认不可用或走其他路径)。
+> ⚠️ **unified_search 只用于学术搜索**,不要传 neodata/s2/core(已确认不可用或走其他路径)。
 
 ## ⚠️⚠️ 领域判定 & 数据源优先级
 

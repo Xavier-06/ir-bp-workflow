@@ -22,13 +22,21 @@ import requests
 
 EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 PMC_API_KEY = os.getenv("PMC_API_KEY", "")
+# NCBI E-utilities 政策要求 tool + email（或 api_key）；缺失会被限流/标记
+NCBI_TOOL = os.getenv("NCBI_TOOL", "LitReviewPipeline")
+NCBI_EMAIL = os.getenv("NCBI_EMAIL", "")
 REQUEST_TIMEOUT = 15
 RATE_LIMIT_SLEEP = 0.4  # ~2.5 req/s (低于 3/s 限制)
 
+# 直连绕过代理：沙箱 HTTP(S)_PROXY 端口动态变化且常 refuse，学术源统一走直连更稳
+NO_PROXY = {"http": None, "https": None}
+
 
 def _build_params(**kwargs) -> dict:
-    """构建通用参数，加入 API key (如有)。"""
-    params = {"retmode": "xml", **kwargs}
+    """构建通用参数，加入 API key (如有) + NCBI 要求的 tool/email。"""
+    params = {"retmode": "xml", "tool": NCBI_TOOL, **kwargs}
+    if NCBI_EMAIL:
+        params["email"] = NCBI_EMAIL
     if PMC_API_KEY:
         params["api_key"] = PMC_API_KEY
     return params
@@ -44,7 +52,7 @@ def search_pmc(query: str, max_results: int = 10) -> list[dict]:
         sort="relevance",
     )
     try:
-        resp = requests.get(f"{EUTILS_BASE}/esearch.fcgi", params=params, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(f"{EUTILS_BASE}/esearch.fcgi", params=params, timeout=REQUEST_TIMEOUT, proxies=NO_PROXY)
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
     except Exception as e:
@@ -59,7 +67,7 @@ def search_pmc(query: str, max_results: int = 10) -> list[dict]:
     time.sleep(RATE_LIMIT_SLEEP)
     params = _build_params(db="pmc", id=",".join(id_list[:max_results + 5]))
     try:
-        resp = requests.get(f"{EUTILS_BASE}/esummary.fcgi", params=params, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(f"{EUTILS_BASE}/esummary.fcgi", params=params, timeout=REQUEST_TIMEOUT, proxies=NO_PROXY)
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
     except Exception as e:
@@ -119,7 +127,7 @@ def fetch_fulltext_xml(pmc_id: str) -> Optional[str]:
     """获取 PMC 全文 XML (OA 论文)。"""
     params = _build_params(db="pmc", id=pmc_id, rettype="xml")
     try:
-        resp = requests.get(f"{EUTILS_BASE}/efetch.fcgi", params=params, timeout=30)
+        resp = requests.get(f"{EUTILS_BASE}/efetch.fcgi", params=params, timeout=30, proxies=NO_PROXY)
         resp.raise_for_status()
         return resp.text
     except Exception as e:

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """arXiv API client — CS/AI/Tech 预印本搜索 + PDF 直下。
 
-端点: http://export.arxiv.org/api/query
+端点: https://export.arxiv.org/api/query
 限流: 建议 3s 间隔
 特色: PDF 直下 (arxiv.org/pdf/{id}.pdf), 无需认证
-重要: 必须 --noproxy，arXiv 会封锁代理连接
+注意: 已配置 https 直连 (proxies={"http": None, "https": None}) 绕过代理。
+      沙箱 HTTP(S)_PROXY 端口动态变化且常拒绝连接，故学术源统一走直连更稳。
+      请勿加 --noproxy（脚本无此参数，且直连已隐含绕过代理）。
 
 用法:
     python arxiv_client.py '"solid state battery"' --categories cs,cond-mat --max-results 20 --json
@@ -22,9 +24,14 @@ from urllib.parse import quote
 
 import requests
 
-ARXIV_API = "http://export.arxiv.org/api/query"
+# 直连绕过代理：沙箱 HTTP(S)_PROXY 端口动态变化且常 refuse，学术源统一走直连更稳
+NO_PROXY = {"http": None, "https": None}
+
+ARXIV_API = "https://export.arxiv.org/api/query"
 ARXIV_PDF_BASE = "https://arxiv.org/pdf"
-REQUEST_TIMEOUT = 20
+# arXiv export API 响应抖动极大（实测 2s~31s 不等），客户端超时须留足余量；
+# 必须 < unified_search 里 _SOURCE_TIMEOUT["arxiv"]（signal 硬超时），否则 signal 会提前杀请求。
+REQUEST_TIMEOUT = 45
 RATE_LIMIT_SLEEP = 3.0
 
 NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
@@ -97,7 +104,7 @@ def search_arxiv(
     }
 
     try:
-        resp = requests.get(ARXIV_API, params=params, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(ARXIV_API, params=params, timeout=REQUEST_TIMEOUT, proxies=NO_PROXY)
         resp.raise_for_status()
     except Exception as e:
         print(f"[arXiv] 请求失败: {e}", file=sys.stderr)
@@ -124,7 +131,7 @@ def get_paper_by_id(arxiv_id: str) -> Optional[dict]:
     """通过 arXiv ID 获取单篇论文。"""
     params = {"id_list": arxiv_id}
     try:
-        resp = requests.get(ARXIV_API, params=params, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(ARXIV_API, params=params, timeout=REQUEST_TIMEOUT, proxies=NO_PROXY)
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
         entries = root.findall("atom:entry", NS)

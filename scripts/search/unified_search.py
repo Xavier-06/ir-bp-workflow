@@ -16,13 +16,15 @@ from typing import Any
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent.parent))
 
 
+# 各源 signal 硬超时（秒）。必须 >= 对应客户端 REQUEST_TIMEOUT，否则 signal 会在
+# 客户端超时前杀掉请求。arXiv 实测延迟可达 ~31s，故给 50s 余量。
 _SOURCE_TIMEOUT = {
-    "openalex": 10,
-    "arxiv": 10,
-    "s2": 10,
-    "dblp": 10,
-    "pmc": 10,
-    "crossref": 10,
+    "openalex": 20,
+    "arxiv": 50,  # arXiv 抖动大（2~31s），客户端 REQUEST_TIMEOUT=45，signal 兜底到 50
+    "s2": 20,
+    "dblp": 20,
+    "pmc": 20,
+    "crossref": 20,
 }
 
 

@@ -51,7 +51,7 @@ LIT_ALL_SLUGS: list[str] = list(LIT_ALL_ROLE_SLUGS.values())
 # ── Connector IDs 按角色分配 ────────────────────────────────
 LIT_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
     "tech_decomposition": ['westock-mcp'],       # 板块/产业链/机构评级/资金流（技术背景补充）
-    "academic_scout": ['westock-mcp'],           # 板块/产业链/机构评级（行业背景补充）
+    "academic_scout": [],                    # 纯学术搜索(arXiv/PMC/Crossref/DBLP/OpenAlex 脚本)，无需 MCP
     "industry_scout": ['westock-mcp'],           # 板块/产业链/机构评级/券商研报（westock-mcp），补充 NeoData 行业研报
     "enterprise_scout": LIT_TYC_CONNECTOR_IDS + ['westock-mcp'],  # 天眼查 MCP + westock-mcp（板块/产业链/机构评级/资金流）
     "deep_reader": ['westock-mcp'],              # 板块/产业链（按需查标的背景）

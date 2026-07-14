@@ -18,6 +18,9 @@ from typing import Optional
 
 import requests
 
+# 直连绕过代理：沙箱 HTTP(S)_PROXY 端口动态变化且常 refuse，学术源统一走直连更稳
+NO_PROXY = {"http": None, "https": None}
+
 DBLP_API = "https://dblp.org/search/publ/api"
 REQUEST_TIMEOUT = 15
 
@@ -79,7 +82,7 @@ def search_dblp(query: str, max_results: int = 10) -> list[dict]:
         "h": max_results + 5,
     }
     try:
-        resp = requests.get(DBLP_API, params=params, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(DBLP_API, params=params, timeout=REQUEST_TIMEOUT, proxies=NO_PROXY)
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:

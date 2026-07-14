@@ -22,6 +22,9 @@ from urllib.parse import quote
 
 import requests
 
+# 直连绕过代理：沙箱 HTTP(S)_PROXY 端口动态变化且常 refuse，学术源统一走直连更稳
+NO_PROXY = {"http": None, "https": None}
+
 # ── 常量 ──────────────────────────────────────────────────
 OPENALEX_BASE = "https://api.openalex.org"
 POLITE_EMAIL = os.getenv("OPENALEX_EMAIL", "xavier@example.com")
@@ -128,6 +131,7 @@ def search_openalex(
                 params=params,
                 timeout=REQUEST_TIMEOUT,
                 headers={"User-Agent": "LitReviewPipeline/1.0"},
+                proxies=NO_PROXY,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -162,8 +166,8 @@ def get_work_by_doi(doi: str) -> Optional[dict]:
         resp = requests.get(
             f"{OPENALEX_BASE}/works/https://doi.org/{doi}",
             params={"mailto": POLITE_EMAIL},
-            timeout=REQUEST_TIMEOUT,
-        )
+timeout=REQUEST_TIMEOUT, proxies=NO_PROXY,
+            )
         resp.raise_for_status()
         return _parse_work(resp.json())
     except Exception as e:
@@ -183,8 +187,8 @@ def get_work_citations(openalex_id: str, max_results: int = 20) -> list[dict]:
                 "mailto": POLITE_EMAIL,
                 "sort": "cited_by_count:desc",
             },
-            timeout=REQUEST_TIMEOUT,
-        )
+timeout=REQUEST_TIMEOUT, proxies=NO_PROXY,
+            )
         resp.raise_for_status()
         for work in resp.json().get("results", []):
             parsed = _parse_work(work)
