@@ -1180,7 +1180,7 @@ def _run_single_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext,
             gate_result=gate_result,
             tasks_dir=tasks_dir,
         )
-        attempt = read_attempt_count(job_ctx.job_id, gate_key, tasks_dir=tasks_dir)
+        attempt = read_attempt_count(tasks_dir / f"{job_ctx.job_id}-{gate_key}.json")
         if attempt > 1:
             print(f"  ⚠️ [{gate_key}] repair 次数已用尽 (attempt={attempt}), 降级放行", flush=True)
             return {
@@ -1278,7 +1278,7 @@ def _run_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str
         }
 
     if has_repair:
-        attempt = read_attempt_count(job_ctx.job_id, "wave_evidence_gate", tasks_dir=tasks_dir)
+        attempt = read_attempt_count(tasks_dir / f"{job_ctx.job_id}-wave_evidence_gate.json")
         if attempt > 1:
             return {
                 "ok": True, "mode": "wave_evidence_gate",
@@ -1532,7 +1532,7 @@ def _run_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         # ── Repair 机制：脚注密度不达标 → 派发修复子代理 ──
         if not footnote_ok:
             prior_attempt = read_attempt_count(
-                job_ctx.job_id, "synthesis_repair", tasks_dir=tasks_dir
+                tasks_dir / f"{job_ctx.job_id}-synthesis_repair.json"
             )
 
             if prior_attempt < 1:

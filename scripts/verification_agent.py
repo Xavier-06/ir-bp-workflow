@@ -988,6 +988,8 @@ class AdversarialVerifier:
                     detail=f'{biz_name}业务应仅在一处估值。如已做防重复扣减，必须展示精确计算过程。'
                 ))
 
+        double_count_deduction = re.search(r'防重复.*?扣减.*?(\d{1,4})\s*亿', text)
+        synergy_adjustment = re.search(r'协同.*?效应.*?(\d{1,4})\s*亿', text)
         if double_count_deduction and synergy_adjustment:
             ded = double_count_deduction.group(1)
             syn = synergy_adjustment.group(1)
