@@ -1208,16 +1208,42 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     sub_qs = topic_metadata.get("sub_questions", [])
     research_content = topic_metadata.get("research_content", [])
     companies = topic_metadata.get("key_companies", [])
+    category = topic_metadata.get("category", "")
     year = time.strftime("%Y")
+
+    # Bug fix (2026-07-15): metadata 全空时（无 topic_file + 纯文本 query），
+    # 用 entity 生成最小合理的研究方向，避免 brief 全空导致子代理无方向搜索。
+    if not core_q or core_q == entity:
+        core_q = entity or job_ctx.query or "行业研究"
+    if not research_content:
+        research_content = [
+            f"{entity} 行业市场规模与增长趋势",
+            f"{entity} 竞争格局与市场份额",
+            f"{entity} 产业链上下游分析",
+            f"{entity} 技术趋势与创新方向",
+            f"{entity} 政策监管与行业风险",
+            f"{entity} 关键公司画像与对标",
+        ]
+        print(f"  ⚠️ [ic phase04] metadata.research_content 为空，已用 entity 生成默认研究方向", flush=True)
+    if not sub_qs:
+        sub_qs = [
+            f"{entity} 的市场规模有多大？增长驱动力是什么？",
+            f"行业竞争格局如何？头部企业是谁？",
+            f"{entity} 产业链有哪些关键环节？",
+            f"未来3-5年的技术趋势和催化剂是什么？",
+        ]
+        print(f"  ⚠️ [ic phase04] metadata.sub_questions 为空，已用 entity 生成默认子问题", flush=True)
 
     # 写 brief 文件（v1.4: 不再含 presearch 引用，子代理全权搜索）
     brief_path = tasks_dir / f"{job_ctx.job_id}-ic_phase04_brief.json"
     brief = {
         "entity": entity, "core_question": core_q,
+        "category": category,
         "sub_questions": sub_qs if isinstance(sub_qs, list) else [],
         "research_content": research_content if isinstance(research_content, list) else [],
         "key_companies": companies if isinstance(companies, list) else [],
         "metadata_path": str(topic_path),
+        "metadata_source": "topic_file" if (research_content and sub_qs and companies) else "auto_generated",
     }
     brief_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

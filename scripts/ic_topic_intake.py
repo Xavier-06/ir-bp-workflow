@@ -320,24 +320,67 @@ def _parse_topic_from_entity(result: dict[str, Any]) -> None:
 
 
 def _infer_category(entity: str) -> str:
-    """从课题名称推断分类。"""
-    keywords_map = {
-        "AI芯片": "AI芯片", "GPU": "AI芯片", "ASIC": "AI芯片", "HBM": "AI芯片",
-        "CoWoS": "AI芯片", "芯片": "AI芯片",
+    """从课题名称推断分类。
+
+    三层匹配策略，避免子串误匹配：
+    1. 精确匹配：多字符专有名词（AI芯片/HBM/CoWoS/核聚变等）直接子串匹配
+    2. 单字符边界匹配：氢/氨/芯/电解等单字需检查前后字符，排除化合物（氢氧化锂/氨基酸/电解液）
+    3. 双字符排除：视频/开源等易误匹配词需排除特定语境（视频会议/开源硬件）
+    """
+    # ── 精确匹配：多字符专有名词，足够独特，直接子串匹配 ──
+    _EXACT = {
+        "AI芯片": "AI芯片", "GPU": "AI芯片", "ASIC": "AI芯片",
+        "HBM": "AI芯片", "CoWoS": "AI芯片",
         "服务器": "AI基础设施", "液冷": "AI基础设施", "光模块": "AI基础设施",
-        "算力": "AI基础设施", "数据中心": "AI基础设施", "电力": "AI基础设施",
-        "大模型": "大模型", "开源": "大模型", "Agent": "大模型",
-        "AI Coding": "AI应用", "视频": "AI应用", "AI编程": "AI应用",
-        "聚变": "可控核聚变", "核聚变": "可控核聚变", "超导": "可控核聚变",
-        "氢": "绿色氢氨醇", "电解": "绿色氢氨醇", "氨": "绿色氢氨醇", "甲醇": "绿色氢氨醇",
+        "算力": "AI基础设施", "数据中心": "AI基础设施",
+        "大模型": "大模型", "Agent": "大模型",
+        "AI Coding": "AI应用", "AI编程": "AI应用",
+        "核聚变": "可控核聚变", "聚变": "可控核聚变", "超导": "可控核聚变",
+        "甲醇": "绿色氢氨醇",
         "机器人": "机器人", "Optimus": "机器人", "灵巧手": "机器人",
         "具身": "机器人", "减速器": "机器人", "丝杠": "机器人",
         "Robotaxi": "Robotaxi", "自动驾驶": "Robotaxi", "FSD": "Robotaxi",
         "思摩尔": "跟踪标的", "传思": "跟踪标的",
     }
-    for keyword, category in keywords_map.items():
+    for keyword, category in _EXACT.items():
         if keyword in entity:
             return category
+
+    # ── 单字符边界匹配：检查前后字符排除化合物 ──
+    _SINGLE = {
+        "氢": ("绿色氢氨醇", set("氧碳氮氟氯硫钠钾锂硅硼"), set("氧化合物燃料电离")),
+        "氨": ("绿色氢氨醇", set("基酸纶"), set("")),
+        "芯": ("AI芯片", set(""), set("")),
+        "电解": ("绿色氢氨醇", set(""), set("铝液铜质")),
+    }
+    for keyword, (category, prev_excl, next_excl) in _SINGLE.items():
+        idx = entity.find(keyword)
+        if idx >= 0:
+            ok_prev = (idx == 0 or entity[idx - 1] not in prev_excl)
+            end = idx + len(keyword)
+            ok_next = (end >= len(entity) or entity[end] not in next_excl)
+            if ok_prev and ok_next:
+                return category
+
+    # ── 双字符排除：特定语境下不匹配 ──
+    _MULTI_EXCL = {
+        "视频": ("AI应用", set("会监通")),
+        "开源": ("大模型", set("硬数")),
+        "电力": ("AI基础设施", set("机车牵")),
+    }
+    for keyword, (category, next_excl) in _MULTI_EXCL.items():
+        idx = entity.find(keyword)
+        if idx >= 0:
+            end = idx + len(keyword)
+            if end >= len(entity) or entity[end] not in next_excl:
+                return category
+
+    # ── 兜底：宽泛匹配（长度 ≥ 2 的关键词） ──
+    _BROAD = {"芯片": "AI芯片"}
+    for keyword, category in _BROAD.items():
+        if keyword in entity:
+            return category
+
     return ""
 
 

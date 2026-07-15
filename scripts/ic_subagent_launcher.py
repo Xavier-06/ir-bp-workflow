@@ -980,21 +980,24 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
     }
 
 
-def _build_inline_data_source_guide(role: str, step: str) -> str:
+def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> str:
     """为 inline prompt 生成角色专属的数据源路由指引。
 
     核心目的：子代理的 inline prompt 直接告诉它"搜什么→用什么工具"，
     不要让它自己去翻 brief 或 system_prompt 里的 _common_tool_guide.md。
+
+    entity: 课题名称，用于动态引用行业板块和公司名称，避免硬编码。
     """
+    sector_hint = entity if entity else "课题对应行业"
     # 按角色分发数据源路由
     if role == 'ic_executive_hypothesis':
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
-            '- 行业板块走势/估值 → westock-mcp: data_sector（查 AI芯片/半导体 板块）\n'
-            '- 最新行业动态 → 腾讯新闻 CLI（Bash 调用，见 System Prompt 工具指南）\n'
-            '- 龙头公司实时估值锚 → westock-mcp: data_quote（查英伟达/寒武纪/海光等）\n'
-            '- 行业研报/市场规模 → westock-mcp: data_report\n'
-            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+            f'⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            f'- 行业板块走势/估值 → westock-mcp: data_sector（查 {sector_hint} 板块）\n'
+            f'- 最新行业动态 → 腾讯新闻 CLI（Bash 调用，见 System Prompt 工具指南）\n'
+            f'- 龙头公司实时估值锚 → westock-mcp: data_quote（查 {sector_hint} 龙头公司）\n'
+            f'- 行业研报/市场规模 → westock-mcp: data_report\n'
+            f'- web_search 仅作兜底，结构化源搜不到才用\n\n'
         )
     elif role == 'ic_market_overview':
         return (
@@ -1485,7 +1488,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             )
 
         # ── 角色专属数据源路由（v2.1: 嵌入 inline prompt，子代理直接看到）──
-        data_source_guide = _build_inline_data_source_guide(role, step)
+        data_source_guide = _build_inline_data_source_guide(role, step, entity=entity)
 
         prompt_body += (
             f'【执行步骤】\n'
