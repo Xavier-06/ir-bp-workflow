@@ -28,6 +28,11 @@ ROLE_TO_KEY = {
     'bp_valuation_return': 'valuation_return',
     'bp_customer_revenue_validation': 'customer_revenue_validation',
     'bp_dealbreaker_risk': 'dealbreaker_risk',
+    # v4.5 新增：投资叙事层 4 角色
+    'bp_investment_hypothesis': 'investment_hypothesis',
+    'bp_consensus_challenge': 'consensus_challenge',
+    'bp_catalyst': 'catalyst',
+    'bp_industry_research': 'industry_research',
     # Legacy slugs kept for old task recovery.
     'bp_团队与合规': 'team',
     'bp_技术与产品': 'tech',
@@ -51,6 +56,11 @@ CURRENT_BP_ROLES = {
     'bp_valuation_return',
     'bp_customer_revenue_validation',
     'bp_dealbreaker_risk',
+    # v4.5 新增：投资叙事层
+    'bp_investment_hypothesis',
+    'bp_consensus_challenge',
+    'bp_catalyst',
+    'bp_industry_research',
 }
 
 
@@ -963,6 +973,27 @@ _BP_SEARCH_TEMPLATES = {
         '"{entity}" risk litigation debt default qualification',
         '"{entity}" controversy negative news supply chain risk',
         '"{entity}" 风险 诉讼 债务 资质 负面 供应链',
+    ],
+    # v4.5 新增：投资叙事层
+    'bp_investment_hypothesis': [
+        '"{entity}" investment thesis core hypothesis growth driver',
+        '"{entity}" market consensus bull bear case',
+        '"{entity}" 投资逻辑 增长驱动 市场预期 分歧',
+    ],
+    'bp_consensus_challenge': [
+        '"{entity}" analyst consensus market expectation sell side',
+        '"{entity}" expectation gap contrarian view consensus vs reality',
+        '"{entity}" 卖方共识 预期差 市场定价 非共识',
+    ],
+    'bp_catalyst': [
+        '"{entity}" catalyst event timeline milestone trigger',
+        '"{entity}" upcoming event policy product launch earnings',
+        '"{entity}" 催化剂 事件 时间窗口 里程碑 触发器',
+    ],
+    'bp_industry_research': [
+        '"{entity}" industry report market size TAM SAM deep research',
+        '"{entity}" supply chain cost structure technology roadmap benchmark',
+        '"{entity}" 行业研报 市场规模 技术路线 成本结构 产业链',
     ],
     'bp_团队与合规': [
         '"{entity}" founder background legal compliance litigation',

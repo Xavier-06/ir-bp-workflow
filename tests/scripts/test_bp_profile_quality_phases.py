@@ -257,7 +257,7 @@ def test_bp_dispatch_prepare_uses_four_evidence_collection_roles_without_valuati
     dispatch_payload = json.loads((tmp_path / "tasks" / "BP-WAVE1" / "phase2_dispatch.json").read_text(encoding="utf-8"))
     assert dispatch_payload["wave_design"] == "wave1_evidence_collection_4_roles"
     assert dispatch_payload["current_subagent"] == "bp_company_team_compliance"
-    assert dispatch_payload["total_subagents"] == 8
+    assert dispatch_payload["total_subagents"] == 12  # v4.5: 8 维度 + 4 叙事角色
 
 
 def test_bp_wave3_prepare_dispatches_two_roles_with_shared_inputs(tmp_path):

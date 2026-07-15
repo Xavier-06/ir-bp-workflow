@@ -13,15 +13,10 @@ from pathlib import Path
 from typing import Any
 
 from scripts.bp_utils import load_json
+from runtime.profiles.bp_constants import BP_ALL_ROLE_SLUGS
 
-# 8 维度 slug — 用于检查维度输出文件完整性
-_BP_ALL_SLUGS = [
-    "company_team_compliance", "product_commercial",
-    "tech_ip_moat", "market_supply_chain",
-    "customer_revenue_validation",
-    "competition_positioning", "valuation_return",
-    "dealbreaker_risk",
-]
+# 维度 slug — 用于检查维度输出文件完整性（从 bp_constants 动态导入，加角色只需改一处）
+_BP_ALL_SLUGS = list(BP_ALL_ROLE_SLUGS.values())
 
 
 def _investment_conclusion_section(markdown: str) -> str:

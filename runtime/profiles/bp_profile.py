@@ -15,6 +15,7 @@ from runtime.profiles.bp_constants import (
     BP_ALL_ROLE_SLUGS,
     BP_LEGACY_ROLE_SLUGS,
     BP_TYC_CONNECTOR_IDS,
+    BP_WAVE0_ROLE_SLUGS,
     BP_WAVE1_ROLE_SLUGS,
     BP_WAVE2_ROLE_SLUGS,
     BP_WAVE3_ROLE_SLUGS,
@@ -280,7 +281,7 @@ def _run_bp_shared_page_init(runtime_root: Path, job_ctx: JobContext) -> dict[st
     }
 
 
-_WAVE_TO_PHASE_NUM = {1: "12", 3: "19", 4: "23"}
+_WAVE_TO_PHASE_NUM = {0: "07d", 1: "12", 3: "19", 4: "23"}
 
 def _run_bp_shared_page_refresh(runtime_root: Path, job_ctx: JobContext, after_wave: int = 0) -> dict[str, Any]:
     """Refresh BP shared diligence page after a wave completes."""
@@ -1736,7 +1737,7 @@ def _extract_list_field(
 
 def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
     """构建所有 role spec 列表。首次调用后写缓存，后续 wave 直接读缓存避免重复 OCR 扫描。"""
-    _CACHE_VERSION = 2  # v2: presearch_steps → research_plan + presearch_steps_compat
+    _CACHE_VERSION = 3  # v3: +4 investment narrative roles (hypothesis/consensus/catalyst/industry_research)
     cache_path = task_dir / "_dispatch_role_specs_cache.json"
     if cache_path.exists():
         try:
@@ -1869,6 +1870,52 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "products": products,
                 "competitors": competitors,
                 "customers": customers,
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
+            },
+        },
+        # ── v4.5 新增：投资叙事层 4 角色 ──
+        {
+            "role_name": "bp_investment_hypothesis",
+            "brief_key": "bp_investment_hypothesis",
+            "description": "Wave 0 先行者: 投资假说框架 + 可验证问题 + 市场共识初判",
+            "output_file": str(task_dir / "bp_phase2_investment_hypothesis.md"),
+            "key_inputs": {
+                "company_name": profile.get("company_name", ""),
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
+            },
+        },
+        {
+            "role_name": "bp_consensus_challenge",
+            "brief_key": "bp_consensus_challenge",
+            "description": "Wave 4: 共识挑战与预期差分析",
+            "output_file": str(task_dir / "bp_phase2_consensus_challenge.md"),
+            "key_inputs": {
+                "company_name": profile.get("company_name", ""),
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
+            },
+        },
+        {
+            "role_name": "bp_catalyst",
+            "brief_key": "bp_catalyst",
+            "description": "Wave 4: 催化剂与事件分析（时间窗口+概率+传导链）",
+            "output_file": str(task_dir / "bp_phase2_catalyst.md"),
+            "key_inputs": {
+                "company_name": profile.get("company_name", ""),
+                "research_plan": research_plan_file,
+                "presearch_steps_compat": presearch_files,
+            },
+        },
+        {
+            "role_name": "bp_industry_research",
+            "brief_key": "bp_industry_research",
+            "description": "Wave 4: 行业深度研报整合（技术路线横评/成本结构/头部财务/法规标准/第三方TAM）",
+            "output_file": str(task_dir / "bp_phase2_industry_research.md"),
+            "key_inputs": {
+                "company_name": profile.get("company_name", ""),
+                "competitors": competitors,
                 "research_plan": research_plan_file,
                 "presearch_steps_compat": presearch_files,
             },
@@ -2146,8 +2193,77 @@ def _file_stable(path: Path, interval: float = 5) -> bool:
     return size2 == size1
 
 
+# Wave 0: 投资假说先行者，在所有维度子代理之前跑
+_WAVE0_ROLES = list(BP_WAVE0_ROLE_SLUGS.keys())
 # Wave 1 只做证据采集：估值延后到 Wave 3，避免在商业化/市场/竞争证据不足时拍脑袋。
 _CORE_ROLES = list(BP_WAVE1_ROLE_SLUGS.keys())
+
+
+# ── Wave 0: 投资假说框架（先行者）────────────────────────────────────
+# Wave 0 在 phase07（fact store bootstrap）之后、phase08（Wave 1 dispatch）之前跑。
+# 只有 1 个角色（bp_investment_hypothesis），不做 evidence gate（假说不做 claim-fact 校验）。
+
+
+def _run_bp_wave0_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Wave 0: 投资假说框架 — sequential 模式（只有 1 个角色）。"""
+    from scripts.bp_subagent_launcher_wb import _spawn_one
+
+    task_dir = _task_dir(runtime_root, job_ctx)
+    outputs_dir = _outputs_dir(runtime_root, job_ctx)
+    profile = _load_bp_profile(task_dir)
+
+    all_subs = _dispatch_role_specs(task_dir, profile)
+    wave0_subs = [s for s in all_subs if s["role_name"] in _WAVE0_ROLES]
+    if len(wave0_subs) != len(_WAVE0_ROLES):
+        found = {s["role_name"] for s in wave0_subs}
+        missing = [role for role in _WAVE0_ROLES if role not in found]
+        return {"ok": False, "error": f"wave0 role spec missing: {missing}"}
+
+    # sequential：找 pending
+    pending = []
+    for sub in wave0_subs:
+        slug = BP_WAVE0_ROLE_SLUGS[sub["role_name"]]
+        is_complete, _ = _role_outputs_complete(sub["role_name"], slug, outputs_dir, task_dir)
+        if not is_complete:
+            pending.append(sub)
+
+    if not pending:
+        return {"ok": True, "needs_dispatch": False, "has_more": False,
+                "mode": "bp_wave0_prepare", "phase": "phase07b_wave0_prepare", "job_id": job_ctx.job_id}
+
+    sub = pending[0]
+    shared = _shared_inputs(task_dir)
+    sub["output_file"] = str(outputs_dir / Path(sub["output_file"]).name)
+    sub["key_inputs"]["shared_inputs"] = shared
+    sub["wave_inputs"] = shared
+
+    spawn_result = _spawn_one(job_ctx.job_id, sub, task_dir=task_dir)
+    manifest_path = spawn_result.get("manifest_path", "") if isinstance(spawn_result, dict) else str(spawn_result)
+
+    has_more = len(pending) > 1
+    remaining = [s["role_name"] for s in pending[1:]]
+
+    return {
+        "ok": True, "needs_dispatch": True, "has_more": has_more,
+        "mode": "bp_wave0_prepare", "phase": "phase07b_wave0_prepare", "job_id": job_ctx.job_id,
+        "dispatch_info": {"manifests": [manifest_path], "current_role": sub["role_name"],
+                          "remaining_roles": remaining, "task_dir": str(task_dir), "outputs_dir": str(outputs_dir)},
+        "instruction": _dispatch_completion_instruction_sequential(
+            sub["role_name"], BP_WAVE0_ROLE_SLUGS, "phase07c_wave0_collect",
+            has_more=has_more, remaining=remaining),
+    }
+
+
+def _run_bp_wave0_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """检查 Wave 0 投资假说输出。"""
+    task_dir = _task_dir(runtime_root, job_ctx)
+    outputs_dir = _outputs_dir(runtime_root, job_ctx)
+    return _collect_with_retry(
+        "wave0_collect",
+        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE0_ROLE_SLUGS, _WAVE0_ROLES, "phase07c_wave0_collect"),
+        job_id=job_ctx.job_id,
+        outputs_dir=outputs_dir,
+    )
 _WAVE2_ROLES = list(BP_WAVE2_ROLE_SLUGS.keys())
 _WAVE3_ROLES = list(BP_WAVE3_ROLE_SLUGS.keys())
 _WAVE4_ROLES = list(BP_WAVE4_ROLE_SLUGS.keys())
@@ -2519,8 +2635,9 @@ def _run_bp_wave4_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                 "mode": "bp_wave4_prepare", "phase": "phase20_wave4_prepare", "job_id": job_ctx.job_id}
 
     sub = pending[0]
-    # 汇总 Wave 1 + Wave 2 + Wave 3 输出
-    prior_outputs = _prior_wave_files(BP_WAVE1_ROLE_SLUGS.items(), task_dir, outputs_dir)
+    # 汇总 Wave 0 + Wave 1 + Wave 2 + Wave 3 输出
+    prior_outputs = _prior_wave_files(BP_WAVE0_ROLE_SLUGS.items(), task_dir, outputs_dir)
+    prior_outputs.update(_prior_wave_files(BP_WAVE1_ROLE_SLUGS.items(), task_dir, outputs_dir))
     prior_outputs.update(_prior_wave_files(BP_WAVE2_ROLE_SLUGS.items(), task_dir, outputs_dir))
     prior_outputs.update(_prior_wave_files(BP_WAVE3_ROLE_SLUGS.items(), task_dir, outputs_dir))
     shared = _shared_inputs(task_dir)
@@ -2775,7 +2892,11 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
             "missing": missing_local,
         }
 
-    expected_slugs = list(BP_ALL_ROLE_SLUGS.values())
+    # v4.5: 统稿只检查传统维度角色的三件套输出（md/facts/section）
+    # 投资叙事层角色（hypothesis/consensus/catalyst/industry_research）产出纯叙述，无 claim-fact 结构，
+    # 不要求 sidecar 文件——它们的内容通过 prior_wave_files 传给 synthesis prompt。
+    _NARRATIVE_SLUGS = {"investment_hypothesis", "consensus_challenge", "catalyst", "industry_research"}
+    expected_slugs = [s for s in BP_ALL_ROLE_SLUGS.values() if s not in _NARRATIVE_SLUGS]
     check_result = _collect_with_retry(
         "synthesis_prepare_check", _do_synthesis_check,
         job_id=job_ctx.job_id,
@@ -2784,6 +2905,16 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
     if not check_result.get("ok"):
         return {"ok": False, "error": f"统稿缺少维度输出（含 sidecar）: {check_result.get('missing', [])}"}
     dim_files = check_result["dim_files"]
+
+    # v4.5: 叙事角色的 md 也传给统稿（不做三件套检查，但文件存在就纳入）
+    for slug in _NARRATIVE_SLUGS:
+        if slug in dim_files:
+            continue
+        for d in (outputs_dir, task_dir):
+            p = d / f"bp_phase2_{slug}.md"
+            if p.exists() and p.stat().st_size > 100:
+                dim_files[slug] = str(p)
+                break
 
     synthesis_output = outputs_dir / "bp_synthesis.md"
     # 也写一份到 task_dir
@@ -3509,6 +3640,10 @@ class BPProfile(PipelineProfile):
             "phase05_bp_shared_page_init": lambda job_ctx: _run_bp_shared_page_init(runtime_root, job_ctx),     # 05
             "phase06_search_plan_compile": lambda job_ctx: _run_bp_search_plan_compile(runtime_root, job_ctx),  # 06
             "phase07_bp_fact_store_bootstrap": lambda job_ctx: _run_bp_fact_store_bootstrap(runtime_root, job_ctx),  # 07
+            # ── Wave 0: 投资假说先行者（在所有维度子代理之前）──
+            "phase07b_wave0_prepare": lambda job_ctx: _run_bp_wave0_prepare(runtime_root, job_ctx),             # 07b → needs_dispatch
+            "phase07c_wave0_collect": lambda job_ctx: _run_bp_wave0_collect(runtime_root, job_ctx),             # 07c
+            "phase07d_wave0_shared_page_refresh": lambda job_ctx: _run_bp_shared_page_refresh(runtime_root, job_ctx, after_wave=0),  # 07d
             # ── Wave 1: 基础四维并行 ──
             "phase08_dispatch_prepare": lambda job_ctx: _run_bp_dispatch_prepare(runtime_root, job_ctx),        # 08 → needs_dispatch
             "phase09_dispatch_collect": lambda job_ctx: _run_bp_dispatch_collect(runtime_root, job_ctx),        # 09
@@ -3554,6 +3689,7 @@ class BPProfile(PipelineProfile):
         return {
             "phase06_search_plan_compile": ["bp_research_plan.json"],
             "phase07_bp_fact_store_bootstrap": ["bp_research_plan.json", "bp_search_plan.json"],
+            "phase07b_wave0_prepare": ["bp_research_plan.json"],
             "phase08_dispatch_prepare": ["bp_research_plan.json"],
             "phase11_bp_fact_store_merge": ["bp_research_plan.json"],
             "phase26_bp_section_package_validation": ["bp_research_plan.json"],
@@ -3575,6 +3711,9 @@ class BPProfile(PipelineProfile):
             "phase05_bp_shared_page_init": ["bp_shared_diligence_page.md"],
             "phase06_search_plan_compile": ["bp_search_plan.json"],
             "phase07_bp_fact_store_bootstrap": ["bp_fact_store.json", "bp_fact_store_index.json"],
+            "phase07b_wave0_prepare": [],
+            "phase07c_wave0_collect": [],
+            "phase07d_wave0_shared_page_refresh": [],
             "phase08_dispatch_prepare": ["phase2_dispatch.json"],
             "phase09_dispatch_collect": [],
             "phase10_wave1_evidence_gate": ["bp_wave1_evidence_gate.json"],

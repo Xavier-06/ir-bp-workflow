@@ -5,14 +5,14 @@
 
 **三条管线，统一架构：**
 - **IR 管线**：股票/标的深度研报（9 步 + 5 波）
-- **BP 管线**：商业计划书尽调（33 Phase + 4 波 + 统稿）
+- **BP 管线**：商业计划书尽调（37 Phase + 5 波 + 统稿）
 - **LIT 管线**：技术评估文献综述（20 Phase + 3 波 + per-sub_topic 并行深读）
 
 ---
 
 ## 一句话看懂管线
 
-**BP 文件进来 → 提取结构化数据 → 8 个维度子代理并行调研 → 每个维度产出的事实存入全局 Fact Store → 门禁校验证据完整性 → 不合格的自动修复 → 合格的进入统稿 → 生成 DOCX 交付。**
+**BP 文件进来 → 提取结构化数据 → Wave 0 投资假说先行者 → 8 个维度子代理分 4 波调研 → 共识挑战/催化剂/行业研报 → 每个维度产出的事实存入全局 Fact Store → 门禁校验证据完整性 → 不合格的自动修复 → 合格的进入统稿 → 生成 DOCX 交付。**
 
 整个管线是一个**数据流闭环**：每个分析结论都必须有可追溯的证据（claim → fact → source），没有证据的结论会被门禁拦截并要求修复。
 
@@ -350,39 +350,46 @@ Layer 5: yfinance（美股估值）
 
 ---
 
-## 8 个维度子代理速查
+## 12 个子代理速查（v4.5: 5 波 12 角色）
 
 | 角色 | Wave | 职责 | 核心工具 |
 |------|------|------|---------|
-| `bp_company_team_compliance` | W1 | 团队/合规/治理 | 天眼查 + NeoData |
-| `bp_product_commercial` | W1 | 产品/商业化/客户 | 天眼查 + search_gateway |
-| `bp_tech_ip_moat` | W1 | 技术/IP/护城河 | 天眼查 IPR + yfinance |
-| `bp_market_supply_chain` | W1 | 市场/行业/供应链 | 天眼查 + NeoData + search_gateway |
-| `bp_customer_revenue_validation` | W2 | 客户收入交叉验证 | 天眼查 + web_search |
-| `bp_competition_positioning` | W3 | 竞品清单/差异化/可复制性 | 天眼查 + NeoData + yfinance |
-| `bp_valuation_return` | W3 | 估值/回报/可比公司 | NeoData + yfinance + enrich_valuation |
-| `bp_dealbreaker_risk` | W4 | 红队风险/deal breaker | 天眼查 risk 全面扫描 + search_gateway |
+| `bp_investment_hypothesis` | W0 | 投资假说先行者（提假说+可验证问题） | 天眼查 + westock-mcp + web_search |
+| `bp_company_team_compliance` | W1 | 团队/合规/治理 | 天眼查 + westock-mcp |
+| `bp_product_commercial` | W1 | 产品/商业化/客户 | 天眼查 + westock-mcp |
+| `bp_tech_ip_moat` | W1 | 技术/IP/护城河 | 天眼查 + westock-mcp |
+| `bp_market_supply_chain` | W1 | 市场/行业/供应链 | 天眼查 + westock-mcp |
+| `bp_customer_revenue_validation` | W2 | 客户收入交叉验证 | 天眼查 + westock-mcp |
+| `bp_competition_positioning` | W3 | 竞品清单/差异化/可复制性 | 天眼查 + westock-mcp |
+| `bp_valuation_return` | W3 | 估值情况/可比公司 | 天眼查 + westock-mcp |
+| `bp_dealbreaker_risk` | W4 | 红队风险/deal breaker | 天眼查 + westock-mcp |
+| `bp_consensus_challenge` | W4 | 共识挑战/预期差分析 | 天眼查 + westock-mcp + web_search |
+| `bp_catalyst` | W4 | 催化剂事件/时间窗口/传导链 | 天眼查 + westock-mcp + web_search |
+| `bp_industry_research` | W4 | 行业研报整合（6 大类基准数据） | westock-mcp + web_search |
 
 每个角色的指令文件在 `instruction_store_bp/` 目录，含角色专属工具映射表。通用工具使用指南在 `_common_tool_guide.md`。
 
 ---
 
-## 33 Phase 完整清单
+## 37 Phase 完整清单（v4.5: +Wave 0 先行者 + Wave 4 扩展）
 
 | # | Phase | 类型 | 说明 |
 |---|-------|------|------|
 | 01 | document_intake | 脚本 | VL OCR 识别 + 结构化抽取 |
 | 02 | company_verify | 脚本 | 天眼查工商/风险验证 |
-| 03 | research_plan | dispatch | 研究计划骨架 + LLM enrichment |
-| 03c | research_plan_collect | 收集 | 合并 enrichment delta |
-| 04 | presearch | 脚本 | 4 维度预搜索 |
+| 03 | presearch | 脚本 | web+新闻预搜索 |
+| 04 | research_plan | dispatch | 研究计划子代理派发 |
+| 04c | research_plan_collect | 收集 | 读子代理输出 |
 | 05 | bp_shared_page_init | 脚本 | 共享尽调页初始化 |
 | 06 | search_plan_compile | 脚本 | 搜索工单编译 |
-| 07 | bp_fact_store_bootstrap | 脚本 | Fact Store 初始化（注入预搜索事实） |
-| 08 | dispatch_prepare | dispatch | Wave 1 派发（sequential） |
+| 07 | bp_fact_store_bootstrap | 脚本 | Fact Store 初始化 |
+| 07b | wave0_prepare | dispatch | **Wave 0 投资假说先行者（1 角色）** ★v4.5 |
+| 07c | wave0_collect | 收集 | Wave 0 收集 |
+| 07d | wave0_shared_page_refresh | 脚本 | 共享页刷新（含假说） |
+| 08 | dispatch_prepare | dispatch | Wave 1 派发（sequential, 4 角色） |
 | 09 | dispatch_collect | 收集 | Wave 1 收集（retry + 三文件检查） |
 | 10 | wave1_evidence_gate | 门禁 | Wave 1 证据校验（repair） |
-| 11 | bp_fact_store_merge | 脚本 | Fact Store 合并（8 维度 sidecar → 中央库） |
+| 11 | bp_fact_store_merge | 脚本 | Fact Store 合并 |
 | 12 | wave1_shared_page_refresh | 脚本 | 共享页刷新 |
 | 13 | wave2_prepare | dispatch | Wave 2 派发（T1 跳过） |
 | 14 | wave2_collect | 收集 | Wave 2 收集 |
@@ -391,20 +398,20 @@ Layer 5: yfinance（美股估值）
 | 17 | wave3_collect | 收集 | Wave 3 收集 |
 | 18 | wave3_evidence_gate | 门禁 | Wave 3 证据校验（repair） |
 | 19 | wave3_shared_page_refresh | 脚本 | 共享页刷新 |
-| 20 | wave4_prepare | dispatch | Wave 4 派发 |
+| 20 | wave4_prepare | dispatch | Wave 4 派发（4 角色: dealbreaker+共识+催化剂+行业研报）★v4.5 |
 | 21 | wave4_collect | 收集 | Wave 4 收集 |
-| 22 | wave4_evidence_gate | 门禁 | Wave 4 证据校验（repair） |
+| 22 | wave4_evidence_gate | 门禁 | Wave 4 证据校验（repair, _NON_CLAIM_ROLES 跳过假说类）★v4.5 |
 | 23 | wave4_shared_page_refresh | 脚本 | 共享页刷新 |
 | 24 | bp_claim_coverage_validation | 门禁 | Claim 覆盖校验（repair） |
-| 25 | bp_cross_dimension_gate | 门禁 | 跨维度一致性（HIGH→WARN 放行） |
+| 25 | bp_cross_dimension_gate | 门禁 | 跨维度一致性 |
 | 26 | bp_section_package_validation | 校验 | Section Package 校验 |
-| 27 | synthesis_prepare | dispatch | 统稿派发 |
+| 27 | synthesis_prepare | dispatch | 统稿派发（8 维度三件套 + 4 叙事仅 md）★v4.5 |
 | 28 | synthesis_collect | 收集 | 统稿收集（脚注密度 repair） |
 | 29 | bp_debate_review | 校验 | 对抗评审 |
 | 30 | bp_final_assembly | 脚本 | 最终组装 |
 | 31 | bp_readability_review | 校验 | 可读性审查 |
 | 32 | bp_investment_judgment | 脚本 | 投资判断汇总 |
-| 33 | delivery | 交付 | DOCX 生成 + 桌面复制 + 通知 |
+| 33 | delivery | 交付 | DOCX 生成 + 交付门禁（动态 12 slug）★v4.5 |
 
 ---
 
@@ -416,9 +423,9 @@ Layer 5: yfinance（美股估值）
 │            接收自然语言指令 → 自动识别管线类型 → 全自动执行           │
 ├───────────────────────────────┬─────────────────────────────────┤
 │     IR 管线（券商研报）         │       BP 管线（尽调报告）          │
-│     9 步 · 5 波子代理           │       33 Phase · 4 波 + 统稿      │
+│     9 步 · 5 波子代理           │       37 Phase · 5 波 + 统稿      │
 │                               │                                  │
-│  预搜索 → 5波派发 → 对抗验证    │  OCR → 4波+门禁 → 统稿 → DOCX     │
+│  预搜索 → 5波派发 → 对抗验证    │  OCR → W0假说 → 4波+门禁 → 统稿  │
 │  → DOCX 生成 + 桌面复制        │  → 对抗评审 → 桌面复制             │
 ├───────────────────────────────┴─────────────────────────────────┤
 │                         共享基础设施                               │
@@ -474,7 +481,7 @@ ir-bp-workflow/
 │       ├── neodata_search.py        # NeoData 研报搜索
 │       ├── dedup.py                 # DOI + title 去重
 │       └── rate_limiter.py          # API 限速
-├── instruction_store_bp/            # BP 角色指令库（8 个维度）
+├── instruction_store_bp/            # BP 角色指令库（12 角色: 8 维度 + W0假说 + W4共识/催化剂/行业研报）
 │   ├── _common_tool_guide.md        # 通用工具使用指南
 │   ├── bp_company_team_compliance.md
 │   ├── bp_competition_positioning.md

@@ -1,10 +1,10 @@
 {
   "meta": {
-    "version": 10,
+    "version": 11,
     "created_at": "2026-03-31T16:37:00",
-    "updated_at": "2026-07-13T10:15:00",
+    "updated_at": "2026-07-15T20:45:00",
     "task_type": "bp_尽调类",
-    "description": "BP 尽调管线指令库 v10 — 工商信息表/股权表/招投标硬性输出，产品全覆盖(BP+官网)，技术/痛点通俗化三段式，竞品对比表术语通俗解释，估值情况改名(删投资回报/估值建议/估值区间，加历史融资时间线+主营业务重合≥60%)，来源参考独立Word文档",
+    "description": "BP 尽调管线指令库 v11 — 新增投资叙事层(Wave 0 假说先行者 + Wave 4 共识挑战/催化剂/行业研报) + 维度指令增强(供应链门槛/头部出清/法规定性/第三方TAM)",
     "changelog": [
       "v1 (2026-03-31): 初始版本，6 角色编组",
       "v2 (2026-04-02): 全部子代理新增 SearXNG 调用示例 + DDG fallback + 证据质量评分(🅰🅱🅲)",
@@ -15,7 +15,8 @@
       "v7 (2026-06-12): 修正所有角色工具映射中的 QCC 工具名为精确 API 函数名。v6 只写了 connector 名（如 mcp__tyc-mcp），LLM 不知道该调哪个 API。修正为实际函数名（如 get_shareholder_info / get_actual_controller / get_company_registration_info / get_company_risk_scan / get_patent_info 等）。同时 tyc-mcp connector 之前 SSE 握手失败导致工具列表为空，已在 UI 重新连接恢复。",
       "v8 (2026-06-13): bp_company_team_compliance prompt 新增'OCR 提取人物专项调查'硬性要求。问题：子代理 prompt 虽然写了'逐人验证'但过于泛泛，brief 中 key_inputs 只 dump 了 founders JSON 没有强调必须逐一独立搜索。新增指令明确要求：读取 step0_profile 的 team_highlights + founders 合并去重，每人至少 2 次独立 web_search + 天眼查 executive 验证 + web_fetch 深读，搜不到必须标注而非忽略。同时修复 bp_presearch.py 只搜 first_founder 的 bug，改为对所有提取出的创始人（最多5人）都发起搜索。",
       "v9 (2026-07-06): 企业数据 MCP 从天眼查（6 connector）全面替换为天眼查（tyc-mcp 单 connector 聚合网关）。1) bp_constants.py: BP_QCC_CONNECTOR_IDS → BP_TYC_CONNECTOR_IDS=['tyc-mcp']，保留旧名别名向后兼容。2) bp_profile.py: synthesis/repair manifest 的 connectorIds 改引用常量。3) bp_subagent_launcher_wb.py: wave 子代理 connectorIds 改引用常量。4) _common_tool_guide.md: QCC 工具段全面重写为 TYC 两阶段调用模式（search_companies → get_company_capabilities → call_tool），更新工具优先级表和脚注来源。5) 7 个维度 prompt 中所有 mcp__qcc-* 工具映射替换为 TYC 等效工具。6) bp_统稿.md 脚注示例和来源标注替换。天眼查聚合网关模式只需 1 个 connector 覆盖天眼查原来 6 个 connector 的全部能力。",
-      "v10 (2026-07-13): BP管线9项优化。1) bp_company_team_compliance.md: 工商信息摘要表+完整股权结构表(含持股平台穿透)+招投标汇总表三项硬性输出(缺失=不合格)。2) bp_product_commercial.md: 产品矩阵全覆盖(BP提及+官网展示全部产品)，每条标注产品状态和预计未来营收占比。3) bp_tech_ip_moat.md: 技术原理通俗化三段式(大白话→类比→专业细节)硬性格式，技术路线对比表加通俗解释列，场景性能门槛参数表用大白话解释含义。4) bp_competition_positioning.md: 竞品参数对比表专业参数列名加括号注释+📖术语通俗解释小节+通俗解读段落。5) bp_market_supply_chain.md: 行业路线加通俗解释(plain_explanation)。6) bp_valuation_return.md: 重写为估值情况分析师(删MOIC/IRR投资回报模型、删估值区间建议、删投资建议，加融资历史时间线表、可比公司主营业务重合≥60%四重过滤)。7) bp_统稿.md: 整合全部9项需求到统稿模板(工商信息表/股权表/持股平台/产品全覆盖/技术通俗化三段式/痛点四步格式/竞品对比表术语解释/招投标/估值情况删建议/来源参考独立Word)。8) index.json: bp_valuation_return改名为估值情况分析师。9) 新建scripts/build_bp_references_docx.py(来源参考Word生成器，按天眼查/NeoData/WebSearch/WebFetch分组+可点击超链接)。10) bp_profile.py: phase33 delivery集成来源参考DOCX生成+StateStore注册。"
+      "v10 (2026-07-13): BP管线9项优化。1) bp_company_team_compliance.md: 工商信息摘要表+完整股权结构表(含持股平台穿透)+招投标汇总表三项硬性输出(缺失=不合格)。2) bp_product_commercial.md: 产品矩阵全覆盖(BP提及+官网展示全部产品)，每条标注产品状态和预计未来营收占比。3) bp_tech_ip_moat.md: 技术原理通俗化三段式(大白话→类比→专业细节)硬性格式，技术路线对比表加通俗解释列，场景性能门槛参数表用大白话解释含义。4) bp_competition_positioning.md: 竞品参数对比表专业参数列名加括号注释+📖术语通俗解释小节+通俗解读段落。5) bp_market_supply_chain.md: 行业路线加通俗解释(plain_explanation)。6) bp_valuation_return.md: 重写为估值情况分析师(删MOIC/IRR投资回报模型、删估值区间建议、删投资建议，加融资历史时间线表、可比公司主营业务重合≥60%四重过滤)。7) bp_统稿.md: 整合全部9项需求到统稿模板(工商信息表/股权表/持股平台/产品全覆盖/技术通俗化三段式/痛点四步格式/竞品对比表术语解释/招投标/估值情况删建议/来源参考独立Word)。8) index.json: bp_valuation_return改名为估值情况分析师。9) 新建scripts/build_bp_references_docx.py(来源参考Word生成器，按天眼查/NeoData/WebSearch/WebFetch分组+可点击超链接)。10) bp_profile.py: phase33 delivery集成来源参考DOCX生成+StateStore注册。",
+      "v11 (2026-07-15): 投资叙事层+维度指令增强。1) P0完成: bp_统稿.md +§14投资判断框架+§15创始人Q&A+5条叙事风格规则, bp_tech_ip_moat.md +法规定性+认知纠偏+路线天花板, bp_product_commercial.md +供应链准入门槛, bp_competition_positioning.md +头部财务出清, bp_market_supply_chain.md +第三方TAM交叉验证。2) P1新增4角色: bp_investment_hypothesis(Wave 0先行者,提假说+可验证问题), bp_consensus_challenge(Wave 4,共识挑战+预期差), bp_catalyst(Wave 4,催化剂事件+时间窗口+传导链), bp_industry_research(Wave 4,行业研报整合+6大类基准数据)。3) 管线编排: bp_constants.py加Wave0/Wave4扩展+connector+ALL_ROLE_SLUGS, bp_profile.py加_dispatch_role_specs 4角色spec+wave0 prepare phase+phase编号重排+wave4 prior含wave0, bp_subagent_launcher_wb.py加CURRENT_BP_ROLES+slug映射, bp_delivery_gate.py改动态导入_BP_ALL_SLUGS, bp_wave_evidence_gate.py加_NON_CLAIM_ROLES跳过假说类claim检查。"
     ]
   },
   "roles": [
@@ -107,7 +108,31 @@
       "key": "bp_统稿",
       "name": "统稿分析师",
       "file": "bp_统稿.md",
-      "description": "Synthesis: 读取 Wave 1-4 维度输出，按投研逻辑重组为完整报告"
+      "description": "Synthesis: 读取 Wave 0-4 维度输出，按投研逻辑重组为完整报告"
+    },
+    {
+      "key": "bp_investment_hypothesis",
+      "name": "投资假说框架分析师",
+      "file": "bp_investment_hypothesis.md",
+      "description": "Wave 0 先行者：提出可验证投资假说 + 可验证问题 + 市场共识初判"
+    },
+    {
+      "key": "bp_consensus_challenge",
+      "name": "共识挑战与预期差分析师",
+      "file": "bp_consensus_challenge.md",
+      "description": "Wave 4：归纳市场共识 → 逐条挑战 → 预期差分析"
+    },
+    {
+      "key": "bp_catalyst",
+      "name": "催化剂与事件分析师",
+      "file": "bp_catalyst.md",
+      "description": "Wave 4：识别前瞻性催化剂 + 时间窗口 + 概率/影响 + 传导链"
+    },
+    {
+      "key": "bp_industry_research",
+      "name": "行业深度研报整合分析师",
+      "file": "bp_industry_research.md",
+      "description": "Wave 4：行业研报整合：技术路线横评/成本结构/头部财务/法规标准/第三方TAM/产业化时间线"
     }
   ],
   "deprecated": [
@@ -127,6 +152,10 @@
       "valuation_return": "bp_valuation_return",
       "customer_revenue_validation": "bp_customer_revenue_validation",
       "dealbreaker_risk": "bp_dealbreaker_risk",
+      "investment_hypothesis": "bp_investment_hypothesis",
+      "consensus_challenge": "bp_consensus_challenge",
+      "catalyst": "bp_catalyst",
+      "industry_research": "bp_industry_research",
       "team": "bp_company_team_compliance",
       "tech": "bp_tech_ip_moat",
       "industry": "bp_market_supply_chain",
