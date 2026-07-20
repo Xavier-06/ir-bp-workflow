@@ -71,9 +71,9 @@ Phase 01b 产出 profile 标记 `extraction_source: "public_search"` + `data_com
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
   --entity "公司名称" --market cn --input-file /path/to/bp.pdf
 
-# 公司名模式（无 PDF，仅公司名）
+# 公司名模式（无 PDF，仅公司名）— 必须加 --pipeline bp 强制路由
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
-  --entity "公司名称" --market cn
+  --entity "公司名称" --market cn --pipeline bp
 
 # 执行管线
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX

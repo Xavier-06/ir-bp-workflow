@@ -231,6 +231,133 @@ def bp_build_research_plan_instruction(
     return instruction
 
 
+def _normalize_research_plan_schema(plan: dict[str, Any]) -> dict[str, Any]:
+    """归一化子代理产出的 research plan schema，对齐管线期望字段名。
+
+    子代理（LLM）经常自由发挥字段名，这里做兜底映射：
+    - claim_matrix: id→claim_id, section→owner_section, risk_level→priority, current_status→status
+    - fact_requirements: key→fact_key, description→label, source_hint→domain
+    - core_questions/strategic_questions: section→owner_section, fact_keys→required_fact_keys
+    """
+    section_keys = {
+        "bp_company_team_compliance", "bp_product_commercial", "bp_tech_ip_moat",
+        "bp_market_supply_chain", "bp_competition_positioning", "bp_valuation_return",
+        "bp_customer_revenue_validation", "bp_dealbreaker_risk",
+        # 投资叙事层
+        "bp_investment_hypothesis", "bp_consensus_challenge", "bp_catalyst", "bp_industry_research",
+    }
+
+    # ── claim_matrix 归一化 ──
+    for i, claim in enumerate(plan.get("claim_matrix", [])):
+        # id → claim_id
+        if "claim_id" not in claim and "id" in claim:
+            claim["claim_id"] = claim.pop("id")
+        # 确保 claim_id 有 BC 前缀
+        cid = claim.get("claim_id", "")
+        if cid and not cid.startswith("BC"):
+            claim["claim_id"] = f"BC{cid}" if cid.isdigit() else f"BC_{cid}"
+
+        # section → owner_section
+        if "owner_section" not in claim and "section" in claim:
+            claim["owner_section"] = claim.pop("section")
+
+        # risk_level → priority
+        if "priority" not in claim and "risk_level" in claim:
+            claim["priority"] = claim.pop("risk_level")
+
+        # current_status → status
+        if "status" not in claim and "current_status" in claim:
+            claim["status"] = claim.pop("current_status")
+
+        # 补齐缺失字段
+        if "source" not in claim:
+            claim["source"] = "bp_claim|external"
+        if "required_fact_keys" not in claim:
+            claim["required_fact_keys"] = []
+
+    # ── fact_requirements 归一化 ──
+    for fact in plan.get("fact_requirements", []):
+        # key → fact_key
+        if "fact_key" not in fact and "key" in fact:
+            fact["fact_key"] = fact.pop("key")
+
+        # description → label
+        if "label" not in fact and "description" in fact:
+            fact["label"] = fact.pop("description")
+
+        # source_hint → domain
+        if "domain" not in fact and "source_hint" in fact:
+            fact["domain"] = fact.pop("source_hint")
+
+        # required (bool) → required_for_stage
+        if "required_for_stage" not in fact:
+            req = fact.pop("required", None)
+            if req is True:
+                fact["required_for_stage"] = "T1-T4"
+            elif req is False:
+                fact["required_for_stage"] = ""
+            else:
+                fact["required_for_stage"] = ""
+
+    # ── core_questions / strategic_questions 归一化 ──
+    cq_count = len(plan.get("core_questions", []))
+    all_questions = list(plan.get("core_questions", [])) + list(plan.get("strategic_questions", []))
+    for qi, q in enumerate(all_questions):
+        # section → owner_section
+        if "owner_section" not in q and "section" in q:
+            q["owner_section"] = q.pop("section")
+
+        # fact_keys → required_fact_keys
+        if "required_fact_keys" not in q and "fact_keys" in q:
+            q["required_fact_keys"] = q.pop("fact_keys")
+        if "required_fact_keys" not in q:
+            q["required_fact_keys"] = []
+
+        # required_fact_keys 为空时从已有 fact_requirements 按 section 匹配
+        if not q.get("required_fact_keys") and q.get("owner_section"):
+            sec = q["owner_section"]
+            matched = [
+                f.get("fact_key") for f in plan.get("fact_requirements", [])
+                if f.get("owner_section") == sec and f.get("fact_key")
+            ]
+            q["required_fact_keys"] = matched[:5] if matched else [f"{sec}_overview"]
+            # 如果生成了新 key，加进 fact_requirements
+            if not matched:
+                plan.setdefault("fact_requirements", []).append({
+                    "fact_key": f"{sec}_overview",
+                    "label": f"{sec} 综合评估",
+                    "domain": "general",
+                    "owner_section": sec,
+                    "required_for_stage": "T1-T4",
+                })
+
+        # priority 缺失时补 "high"
+        if "priority" not in q:
+            q["priority"] = "high"
+
+        # 确保 question_id 存在
+        if "question_id" not in q:
+            prefix = "CQ" if qi < cq_count else "ESQ"
+            q["question_id"] = f"{prefix}{qi + 1:02d}"
+
+    # ── coverage_matrix 自动构建（从 questions 派生）──
+    if not plan.get("coverage_matrix"):
+        coverage = {}
+        for q in all_questions:
+            qid = q.get("question_id")
+            owner = q.get("owner_section", "")
+            if qid and owner:
+                coverage[qid] = {
+                    "owner": owner,
+                    "supporting_sections": [],
+                    "required_fact_keys": q.get("required_fact_keys", []),
+                    "priority": q.get("priority", "high"),
+                }
+        plan["coverage_matrix"] = coverage
+
+    return plan
+
+
 def bp_collect_research_plan(
     runtime_root: Path,
     job_ctx: JobContext,
@@ -248,6 +375,8 @@ def bp_collect_research_plan(
     if plan_path.exists() and plan_path.stat().st_size > 200:
         try:
             plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            # 归一化子代理产出的 schema（字段名对齐管线期望格式）
+            plan = _normalize_research_plan_schema(plan)
             validation = validate_bp_research_plan_ready(plan)
             if validation["ready"]:
                 plan["plan_status"] = "ready"
