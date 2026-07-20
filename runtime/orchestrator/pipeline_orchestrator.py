@@ -124,7 +124,7 @@ class PipelineOrchestrator:
         """
         # 强制指定管线（公司名模式 BP 的核心入口）
         if force_pipeline:
-            fp = force_pipeline.strip().upper()
+            fp = force_pipeline.strip().lower()
             try:
                 return JobType(fp)
             except ValueError:
