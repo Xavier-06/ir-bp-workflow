@@ -312,10 +312,17 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 ```python
 # ⚠️ 所有命令必须 cd ~/.workbuddy/ir_runtime && 前缀
 
-# ── IR / IC 管线调度 ──
+# ── IR / IC / BP 管线调度 ──
 # 1. 提交任务
+#    BP PDF 模式：
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
-  --entity "标的名称" --market cn [--input-file /path/to/bp.pdf]
+  --entity "标的名称" --market cn --input-file /path/to/bp.pdf
+#    BP 公司名模式（无 PDF，必须加 --pipeline bp）：
+cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
+  --entity "标的名称" --market cn --pipeline bp
+#    IR / IC 管线（无 --pipeline）：
+cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
+  --entity "标的名称" --market cn --query "分析股票"
 
 # 2. 执行到 needs_dispatch 暂停（heavy phase 自动等完，无需轮询）
 # ⚠️ Bash 必须设 timeout=600000（10分钟），否则 Bash 120s 超时切断 agent session
