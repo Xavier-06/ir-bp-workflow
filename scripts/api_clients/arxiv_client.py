@@ -23,9 +23,28 @@ from typing import Optional
 from urllib.parse import quote
 
 import requests
+import urllib3
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # 直连绕过代理：沙箱 HTTP(S)_PROXY 端口动态变化且常 refuse，学术源统一走直连更稳
 NO_PROXY = {"http": None, "https": None}
+
+# [P0 修复 2026-07-14] arXiv 429 限流根因：requests.get 缺 User-Agent 且无重试。
+# 构造带 backoff 重试 + 合规 UA 的 session，search/get 两处共用。
+_UA = "ir-coordinator-lit/1.0 (automated literature review; mailto:research-pipeline@example.com)"
+_RETRY = Retry(
+    total=4,
+    backoff_factor=2.0,           # 退避 2/4/8/16s，覆盖 arXiv 429 抖动
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=frozenset(["GET"]),
+    raise_on_status=False,
+)
+_SESSION = requests.Session()
+_SESSION.proxies = NO_PROXY
+_SESSION.headers.update({"User-Agent": _UA})
+_SESSION.mount("https://", HTTPAdapter(max_retries=_RETRY))
+_SESSION.mount("http://", HTTPAdapter(max_retries=_RETRY))
 
 ARXIV_API = "https://export.arxiv.org/api/query"
 ARXIV_PDF_BASE = "https://arxiv.org/pdf"
@@ -104,7 +123,9 @@ def search_arxiv(
     }
 
     try:
-        resp = requests.get(ARXIV_API, params=params, timeout=REQUEST_TIMEOUT, proxies=NO_PROXY)
+        # 遵守 arXiv 3s 间隔限流，连续调用前主动让出，避免触发 429
+        time.sleep(RATE_LIMIT_SLEEP)
+        resp = _SESSION.get(ARXIV_API, params=params, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
     except Exception as e:
         print(f"[arXiv] 请求失败: {e}", file=sys.stderr)
@@ -131,7 +152,8 @@ def get_paper_by_id(arxiv_id: str) -> Optional[dict]:
     """通过 arXiv ID 获取单篇论文。"""
     params = {"id_list": arxiv_id}
     try:
-        resp = requests.get(ARXIV_API, params=params, timeout=REQUEST_TIMEOUT, proxies=NO_PROXY)
+        time.sleep(RATE_LIMIT_SLEEP)
+        resp = _SESSION.get(ARXIV_API, params=params, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
         entries = root.findall("atom:entry", NS)
