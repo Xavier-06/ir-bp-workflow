@@ -115,8 +115,21 @@ class PipelineOrchestrator:
                       "tech assessment", "literature review", "tech due diligence",
                       "technology landscape", "tech readiness"}
 
-    def classify_job(self, input_file: str = "", query: str = "") -> JobType:
-        """判断是 IR / BP / IC / LIT 任务"""
+    def classify_job(self, input_file: str = "", query: str = "",
+                     force_pipeline: str = "") -> JobType:
+        """判断是 IR / BP / IC / LIT 任务。
+
+        force_pipeline: 强制指定管线类型（bp/ir/ic/lit），跳过自动分类。
+        用于公司名模式 BP：无 input_file 但用户明确要走 BP 管线。
+        """
+        # 强制指定管线（公司名模式 BP 的核心入口）
+        if force_pipeline:
+            fp = force_pipeline.strip().upper()
+            try:
+                return JobType(fp)
+            except ValueError:
+                pass  # 无效值，回退到自动分类
+
         if input_file:
             ext = Path(input_file).suffix.lower()
             if ext in (".pdf", ".pptx", ".ppt", ".docx", ".doc", ".png", ".jpg", ".jpeg"):
@@ -176,10 +189,15 @@ class PipelineOrchestrator:
         query: str = "",
         input_file: str = "",
         job_id: str | None = None,
+        force_pipeline: str = "",
         **kwargs,
     ) -> JobRecord:
-        """提交一个新任务"""
-        job_type = self.classify_job(input_file, query)
+        """提交一个新任务。
+
+        force_pipeline: 强制指定管线（bp/ir/ic/lit），跳过自动分类。
+        用于公司名模式 BP：无 input_file 但用户明确要走 BP 管线。
+        """
+        job_type = self.classify_job(input_file, query, force_pipeline=force_pipeline)
         job_id = job_id or self._next_job_id()
 
         record = JobRecord(
@@ -404,6 +422,8 @@ def main():
     s.add_argument("--market", default="cn", choices=["cn", "us", "hk"])
     s.add_argument("--query", default="")
     s.add_argument("--input-file", default="", help="BP 文件路径（有则走 BP 管线）")
+    s.add_argument("--pipeline", default="", choices=["bp", "ir", "ic", "lit"],
+                    help="强制指定管线类型（公司名模式 BP 用 --pipeline bp）")
     s.add_argument("--job-id", default=None)
     s.set_defaults(func=cmd_submit)
 
@@ -461,6 +481,7 @@ def cmd_submit(args):
         query=args.query,
         input_file=args.input_file,
         job_id=args.job_id,
+        force_pipeline=getattr(args, "pipeline", ""),
     )
     print(json.dumps(record.to_dict(), ensure_ascii=False, indent=2))
 
