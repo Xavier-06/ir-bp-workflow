@@ -70,49 +70,78 @@ def bp_build_company_intake_instruction(
         f"- Market: **{market}**\n"
         f"- Brief file: `{brief_path}`\n"
         "\n"
-        "## Search Strategy (execute in order)\n"
+        "## Search Strategy (execute ALL 8 steps in order)\n"
         "\n"
-        "### Step 1: 天眼查 — Company Registration (MANDATORY)\n"
-        "Use tyc-mcp tools:\n"
-        "1. `tyc-mcp.search_companies` with query = "
-        f'"{entity}" → get company_id\n'
-        "2. If found, call `tyc-mcp.get_company_basic_profile` with company_id\n"
-        "3. Extract: registration info, shareholders, legal representative, registered capital,\n"
-        "   establishment date, business scope, financing history\n"
-        "4. Call `tyc-mcp.get_key_personnel` for board/management team\n"
-        "5. Call `tyc-mcp.get_shareholder_info` for shareholder structure\n"
-        "6. Call `tyc-mcp.get_external_investments` for portfolio companies (if holding company)\n"
-        "7. Search IP: use Bash script below for patents/trademarks\n"
+        "### Step 1: 天眼查 — 深度工商扫描 (MANDATORY, 全量 API)\n"
+        "Use ALL available tyc-mcp tools (not just basic_profile):\n"
+        f'1. `tyc-mcp.search_companies` query="{entity}" → company_id\n'
+        "2. If found, call ALL of these with company_id:\n"
+        "   - `tyc-mcp.get_company_basic_profile` — 注册信息、法人、经营范围\n"
+        "   - `tyc-mcp.get_key_personnel` — 董监高团队\n"
+        "   - `tyc-mcp.get_shareholder_info` — 股权结构\n"
+        "   - `tyc-mcp.get_change_records` — 变更记录（判断公司活跃度：法人/股东/经营范围变更）\n"
+        "   - `tyc-mcp.get_financial_data` — 财务数据（年报营收、资产规模）\n"
+        "   - `tyc-mcp.get_risk_scan` — 风险扫描（诉讼/失信/行政处罚/经营异常 → dealbreaker）\n"
+        "   - `tyc-mcp.get_annual_reports` — 年报（社保人数=真实员工规模）\n"
+        "   - `tyc-mcp.get_branches` — 分支机构（判断地理布局）\n"
+        "   - `tyc-mcp.get_external_investments` — 对外投资（判断是否控股集团）\n"
+        "3. If NOT found with exact name, try variations:\n"
+        f'   - search_companies query="{entity}科技"\n'
+        f'   - search_companies query="{entity}技术"\n'
+        f'   - search_companies query="{entity}生物"\n'
+        "   (common suffixes for tech/bio companies)\n"
         "\n"
+        "### Step 2: 天眼查 — 知识产权专项\n"
+        "Search patents and trademarks:\n"
         "```bash\n"
         f'cd {runtime_root} && python3 -c "\n'
         "import json, sys; sys.path.insert(0, '.')\n"
         "from scripts.search_gateway import search\n"
-        f'rows = search(\'"{entity}" 专利 知识产权\', max_results=5)\n'
+        f'rows = search(\'"{entity}" 专利 发明\', max_results=5)\n'
+        "print(json.dumps(rows, ensure_ascii=False, indent=2))\n"
+        '"\n'
+        "```\n"
+        "```bash\n"
+        f'cd {runtime_root} && python3 -c "\n'
+        "import json, sys; sys.path.insert(0, '.')\n"
+        "from scripts.search_gateway import search\n"
+        f'rows = search(\'"{entity}" 商标 品牌\', max_results=5)\n'
         "print(json.dumps(rows, ensure_ascii=False, indent=2))\n"
         '"\n'
         "```\n"
         "\n"
-        "### Step 2: Westock — Industry Data\n"
-        "Use westock-mcp tools (if company can be mapped to a sector):\n"
-        "1. `westock-mcp.data_search` with query = "
-        f'"{entity}" → check if listed company\n'
-        "2. `westock-mcp.data_sector` to find industry/sector data\n"
-        "3. `westock-mcp.data_report` to search for industry research reports\n"
+        "### Step 3: Westock — 行业与上市公司对标\n"
+        "Use westock-mcp tools:\n"
+        f'1. `westock-mcp.data_search` query="{entity}" → 是否上市公司\n'
+        "2. `westock-mcp.data_sector` → 行业板块数据（从 tyc 经营范围推断行业关键词）\n"
+        "3. `westock-mcp.data_report` → 行业研报（用行业关键词搜索，不是公司名）\n"
+        "4. If company not listed: search for comparable LISTED companies in same sector\n"
+        "   (these become valuation benchmarks for downstream phases)\n"
         "\n"
-        "### Step 3: Web Search — Comprehensive Coverage\n"
-        f'Use web_search for EACH of these queries:\n'
+        "### Step 4: Web Search — 中文全覆盖（12 组查询）\n"
+        "Use WebSearch for EACH query:\n"
         f'- "{entity}" 融资 估值 投资人 2025 2026\n'
         f'- "{entity}" 产品 服务 解决方案 官网\n'
-        f'- "{entity}" 创始人 CEO 团队 背景\n'
-        f'- "{entity}" 竞品 竞争 市场份额\n'
-        f'- "{entity}" 技术 专利 研发 路线\n'
-        f'- "{entity}" 客户 订单 合作 案例\n'
-        f'- "{entity}" 36氪 OR IT桔子 OR 虎嗅 OR 钛媒体\n'
+        f'- "{entity}" 创始人 CEO 团队 背景 履历\n'
+        f'- "{entity}" 竞品 竞争 市场份额 对标\n'
+        f'- "{entity}" 技术 专利 研发 路线 突破\n'
+        f'- "{entity}" 客户 订单 合作 案例 中标\n'
+        f'- "{entity}" 36氪 OR IT桔子 OR 虎嗅 OR 钛媒体 OR 创业邦\n'
         f'- "{entity}" site:36kr.com OR site:itjuzi.com\n'
+        f'- "{entity}" 招聘 Boss直聘 OR 猎聘 OR 拉勾\n'
+        f'- "{entity}" 政府采购 OR 中标 OR 招标 OR 公告\n'
+        f'- "{entity}" 微信公众号 OR 官方 OR 官网\n'
+        f'- "{entity}" 论文 OR paper OR 研究 OR 学术\n'
         "\n"
-        "### Step 4: Tencent News — Latest Updates\n"
-        "Use Bash to call search_gateway:\n"
+        "### Step 5: Web Search — 英文覆盖（6 组查询）\n"
+        f'- "{entity}" funding investors valuation\n'
+        f'- "{entity}" product technology solution\n'
+        f'- "{entity}" founder CEO team background\n'
+        f'- "{entity}" LinkedIn company\n'
+        f'- "{entity}" Crunchbase OR PitchBook OR AngelList\n'
+        f'- "{entity}" patent OR publication OR research\n'
+        "\n"
+        "### Step 6: 腾讯新闻 — 多轮搜索\n"
         "```bash\n"
         f'cd {runtime_root} && python3 -c "\n'
         "import json, sys; sys.path.insert(0, '.')\n"
@@ -121,8 +150,24 @@ def bp_build_company_intake_instruction(
         "print(json.dumps(result, ensure_ascii=False, indent=2))\n"
         '"\n'
         "```\n"
+        "```bash\n"
+        f'cd {runtime_root} && python3 -c "\n'
+        "import json, sys; sys.path.insert(0, '.')\n"
+        "from scripts.search_gateway import tencent_news_search\n"
+        f'result = tencent_news_search(\'"{entity}" 创始人 OR CEO OR 团队\', max_results=5)\n'
+        "print(json.dumps(result, ensure_ascii=False, indent=2))\n"
+        '"\n'
+        "```\n"
         "\n"
-        "### Step 5: Try to Find BP PDF (HIGH PRIORITY — found PDF triggers full OCR pipeline)\n"
+        "### Step 7: 模糊名称搜索（公司名变体）\n"
+        "Many companies use abbreviations, brand names, or English names publicly.\n"
+        "Try these web_search queries to find alternate names:\n"
+        f'- "{entity}" 简称 OR 又名 OR 品牌名\n'
+        f'- "{entity}" company OR inc OR ltd OR corp\n'
+        f'- "{entity}" 公司 简介 关于我们\n'
+        "If you find an alternate name, do ONE more round of tyc-mcp search with that name.\n"
+        "\n"
+        "### Step 8: Try to Find BP PDF (HIGH PRIORITY — found PDF triggers full OCR pipeline)\n"
         "Search for a public BP PDF:\n"
         f'- web_search: "{entity}" 商业计划书 filetype:pdf\n'
         f'- web_search: "{entity}" BP 融资 路演 下载\n'
