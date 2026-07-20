@@ -1,6 +1,6 @@
 ---
 name: ir-coordinator
-version: 3.1.0
+version: 3.2.0
 description: "投研工作流调度中心。收到股票标的或BP后，自动编排完整管线，协调多个专业Agent并行工作。当用户说'分析XX股票'、'看这个BP'、'做个尽调'、'跑个研报'、'写篇简报'、'写个简报'、'出个简报'、'看看这个项目'、'帮我看下这个BP'、'写个XX行业研究'、'分析XX行业'、'做个产业分析'、'跑个赛道扫描'时触发。当用户发送 PDF/PPTX/DOCX 文件并要求写简报、做分析、做尽调时，必须触发此 skill 而非 PPT演示文稿/Word文档生成/PDF文档生成 skill。关键词：BP、商业计划书、尽调、研报、简报、投研、分析股票、行业研究、产业分析、赛道扫描、.pptx+分析、.pdf+分析。技能名是 ir-coordinator，不是 nir-coordinator。"
 allowed-tools:
   - Task
@@ -29,7 +29,9 @@ allowed-tools:
 5. **验证必须是 adversarial** — 不是"检查一下"，是"想尽办法推翻"
 6. **子代理必须用 team 模式派发（sequential，逐个）** — 同步 task() 会 code=10003 挂掉
 7. **Research Plan 由管线自动生成（v5.3）** — phase04_research_plan 自动派发子代理（有 westock-mcp/tyc-mcp 搜索能力）生成 research_plan.json，phase04_research_plan_collect 负责校验和落盘。**Coordinator 不应手动调用 `prepare_research_plan()`**，否则会在子代理派发前创建旧版脚本 plan，导致 collect 阶段冲突。让管线自己走完 phase04 即可。
-8. **Presearch 已废弃（v5.3 路径B）** — IR/BP/IC 三条管线的 phase03 presearch 全部砍掉，搜索由 phase04 子代理全权执行（westock-mcp + tyc-mcp + web_search + tencent_news）。Coordinator 不需要为 presearch 做任何准备工作。
+8. **Presearch 已废弃（v5.3 路径B）** — IR/BP/IC 三条管线的 phase03 presearch 全部砍掉，搜索由 phase04 子代理全权执行（westock-mcp + tyc-mcp + search_deep(Bash) + tencent_news）。Coordinator 不需要为 presearch 做任何准备工作。
+9. **子代理无 web_search 工具（2026-07-20 固化）** — 本环境 general-purpose 子代理**没有 web_search 内置工具**，直接调用会静默失败。通用网络搜索统一用 Bash 调 `search_gateway`（`search_deep` / `neodata_search` / `tencent_news_search`）。管线的 launcher 和 `_common_tool_guide.md` 已全部替换，但如果 Coordinator 手动构建子代理 prompt，**必须在 prompt 中声明此约束**。
+10. **classify_job IC 关键词已扩展（2026-07-20）** — `_IC_KEYWORDS` 新增"产业全景/标的对标/赛道深度/产业对标"等 10 个关键词，不再需要给 query 加"【行业深度研究】"前缀来强制命中 IC。
 
 ## 环境常量
 
@@ -61,11 +63,36 @@ Coordinator 无需关心 heavy phase 的进程状态，一次 execute 跑到底�
 ### 规则3：禁止重复粘贴同一行错误命令
 如果同一个命令连续失败 2 次，必须停下来分析错误原因，不能继续重复执行。
 
-### 规则4：子代理 prompt 必须声明工具限制（2026-05-11 教训）
-general-purpose 子代理**没有 Glob/Grep 工具**。如果 prompt 不声明，子代理会调用不存在的工具导致秒崩。
-**所有子代理 prompt 开头必须加**：
+### 规则4：子代理 prompt 必须声明工具限制（2026-05-11 教训，2026-07-20 扩展）
+general-purpose 子代理**没有 Glob/Grep/web_search 工具**。如果 prompt 不声明，子代理会调用不存在的工具导致秒崩或静默失败。
+**所有手动构建的子代理 prompt 开头必须加**：
 ```
-⚠️ 工具限制：你没有 Glob/Grep 工具。搜索文件用 Bash（find/ls），读文件用 Read，搜索内容用 Bash（grep）。不要调用 Glob 或 Grep。
+⚠️ 工具限制：
+- 你没有 Glob/Grep/web_search 工具
+- 搜索文件用 Bash（find/ls），读文件用 Read，搜索内容用 Bash（grep）
+- 通用网络搜索用 Bash 调 search_gateway（见下方检索栈）
+- 已知 URL 用内置 web_fetch
+```
+**检索栈（可复制）**：
+```bash
+# 通用搜索+自动抓正文（替代 web_search）
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import search_deep; import json,sys
+r = search_deep('关键词', max_results=5, fetch_top_n=2)
+print(json.dumps(r, ensure_ascii=False, indent=2))
+"
+# 券商研报/结构化数据
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import neodata_search; import json
+r = neodata_search('查询词')
+print(json.dumps(r, ensure_ascii=False, indent=2))
+"
+# 财经新闻
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import tencent_news_search; import json
+r = tencent_news_search('查询词', max_results=5)
+print(json.dumps(r, ensure_ascii=False, indent=2))
+"
 ```
 
 ### 规则5：子代理派发与轮询协议（2026-06-12 修订，修复阻塞式轮询 bug）
@@ -223,7 +250,8 @@ PipelineOrchestrator
 
 - **IR 任务**：无输入文件 或 明确说"分析股票/标的"
 - **IC 任务**：query 包含行业研究关键词（"行业研究"/"产业分析"/"赛道扫描"/"行业分析"/"行业报告"/"产业链分析"/"行业深度"等）
-- **BP 任务**：有输入文件（PDF/PPTX/DOCX/图片）
+- **BP 任务（PDF 模式）**：有输入文件（PDF/PPTX/DOCX/图片）
+- **BP 任务（公司名模式）**：无输入文件 + 有公司名（entity）。管线自动走 phase01b 搜索入库，无需 PDF。
 
 收到任务后，**立即读取对应管线的 reference 文件**获取详细流程。
 
@@ -436,6 +464,21 @@ yfinance 获取 PE/PB/PS/市值/52W高低/EPS/beta，A 股代码自动映射
 - 配置路径：`~/.workbuddy/vector-memory/`
 - 查询：`python3 ~/.workbuddy/vector-memory/query.py "查询文本"`
 - 入库：`python3 ~/.workbuddy/vector-memory/ingest.py`
+
+## 踩坑记录（2026-07-20 首次 IC 管线运行总结）
+
+| Bug | 现象 | 根因 | 影响管线 | 修复 |
+|-----|------|------|---------|------|
+| classify_job IC 误判 | 课题"固态电解质产业全景…"被判为 IR | `_IC_KEYWORDS` 缺"产业全景/标的对标"等常见词 | IC（fallback 到 IR） | 扩展 10 个关键词（commit 4f051bb） |
+| circuit_break 误判 | `completion_rate<0.5` 直接终止管线 | sequential 逐 step 派发 vs collect 按全量 step_deps 算阈值 | IR + IC（BP/Lit 用角色维度 collect 不受影响） | circuit_break 降为诊断信号，`ok` 永远 True |
+| web_search 工具缺失 | 子代理调 web_search 静默失败/崩溃 | general-purpose 子代理无 web_search 内置工具 | **四管线全中** | 全部替换为 search_deep(Bash) / tencent_news_search(Bash) / web_fetch(内置)，9 文件 80+ 处 |
+| 子代理"失败"误报 | 子代理报 Tool not found 但文件已落盘 | 瞬时工具调用失败后 self-recover 继续写盘 | 所有管线 | **以文件为真相**：落盘字节数+URL数核验，不被通知误导 |
+
+**核心经验**：
+1. 子代理 prompt 必须前置"无 web_search"约束 + 给完整可复制 Bash 代码块
+2. 引用本地 Python 函数不能只写函数名，必须给 Bash 调用代码
+3. 独立路线应并行派发（主 agent 手动 `Agent` 调用），比 sequential 逐 step 快得多
+4. 标的对标前用天眼查核验工商事实，能挖出实缴率/参保人数/注册地址等关键风险信号
 
 ## References（按需加载）
 

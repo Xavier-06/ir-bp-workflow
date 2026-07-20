@@ -1,17 +1,29 @@
-# BP 管线详细流程（v4.4 — 2026-06-26 更新）
+# BP 管线详细流程（v4.5+双入口 — 2026-07-20 更新）
 
-## 管线阶段（33 phases，连续编号 phase01-33）
+## 管线阶段（35 phases，含 phase01b 双入口）
 
-⚠️ **v4.4 变更**：
-- Phase 编号已对齐为连续 phase01-33（与 `bp_profile.py` phase_handlers dict 顺序一致）
-- 删除 IC/Red Team 三阶段 + thesis_reconciliation — low ROI
-- Wave evidence gate 新增 repair 机制：gate FAIL → repair manifests → 修复子代理 → 重跑 gate
-- Phase03 research plan 升级为 needs_dispatch + LLM enrichment（v5.0）
-- Phase29 对抗评审宽松化：HIGH→MEDIUM，新增 BLOCKING 级别
-- Phase33 交付新增维度 MD → DOCX 独立报告
+⚠️ **v4.5+双入口变更（2026-07-20）**：
+- 新增 Phase 01b 公司名搜索入库（双入口：PDF 模式 + 公司名模式）
+- Phase 01 无 input_file 时自动跳过（ok: True），交给 Phase 01b
+- Phase 01b 无 input_file 时派子代理搜索（tyc-mcp + westock-mcp + web）
+- 两条路径产出相同格式文件（bp_ocr_text.txt + bp_step0_profile.json），Phase 02-33 零改动
+- v4.5 新增 Wave 0 投资假说先行者 + Wave 4 扩展（详见 codegraph-gate skill 速查）
+
+## 双入口路由
 
 ```
-01 phase01_document_intake                    — VL OCR + Step0 结构化抽取（含 financing_stage）
+run_bp_job(entity, input_file="")         → Phase 01 跳过 → Phase 01b 搜索入库
+run_bp_job(entity, input_file="/path.pdf") → Phase 01 OCR  → Phase 01b 跳过
+```
+
+Phase 01b 产出 profile 标记 `extraction_source: "public_search"` + `data_completeness` 各维度完整度。
+搜不到 BP 是常态——天眼查 + web + westock 拼出的 profile 在多数维度比 BP 自述更可靠。
+唯一缺口是财务预测，Stage Tier 机制已兜住（T1/T2 不要求财务数据）。
+
+```
+01 phase01_document_intake                    — VL OCR + Step0 结构化抽取（无 input_file 时跳过）
+01b phase01b_company_intake                   — 公司名搜索入库（无 PDF 时 → needs_dispatch 子代理）★新增
+01b phase01b_company_intake_collect            — 搜索入库收集（校验 bp_ocr_text.txt + bp_step0_profile.json）★新增
 02 phase02_company_verify                     — 天眼查工商验证（输出 stage_tier）[heavy_bg]
 03 phase03_research_plan                      — 研究计划骨架 → needs_dispatch（LLM enrichment）
 03c phase03_research_plan_collect             — 合并 enrichment delta 到骨架计划
@@ -54,8 +66,14 @@
 
 ```bash
 # ⚠️ 所有 python3 管线命令必须带 cd 前缀（Bash 每次调用是独立 shell）
+
+# PDF 模式（有 BP 文件）
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
   --entity "公司名称" --market cn --input-file /path/to/bp.pdf
+
+# 公司名模式（无 PDF，仅公司名）
+cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
+  --entity "公司名称" --market cn
 
 # 执行管线
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
