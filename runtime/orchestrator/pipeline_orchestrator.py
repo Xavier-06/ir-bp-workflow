@@ -104,7 +104,10 @@ class PipelineOrchestrator:
     # IC（行业研究）关键词
     _IC_KEYWORDS = {"行业研究", "产业分析", "赛道扫描", "行业分析", "产业研究",
                      "行业报告", "产业链分析", "产业链", "行业深度", "行业概览",
-                     "industry research", "sector analysis", "industry overview"}
+                     "产业全景", "标的对标", "行业对比", "赛道深度", "赛道分析",
+                     "产业对标", "行业对标", "全景研究", "赛道研究", "行业扫描",
+                     "industry research", "sector analysis", "industry overview",
+                     "sector deep dive", "industry landscape"}
 
     # LIT（文献综述/技术评估）关键词
     _LIT_KEYWORDS = {"技术评估", "文献综述", "技术尽调", "技术调研", "技术全景",

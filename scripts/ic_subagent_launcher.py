@@ -808,7 +808,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
         f'2. `tyc-mcp` — 工商/股东/专利/风险信息（MCP 直接调用）',
         f'3. NeoData（Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; ..."`）— A/HK股行业深度研报/宏观数据',
         f'4. 腾讯新闻（Bash: `sh ~/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search "关键词" --limit 5`）— 突发新闻/实时动态',
-        f'5. `web_search` — 通用搜索（内置工具，兜底）',
+        f'5. `search_deep`（Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import search_deep; ..."`）— 通用搜索+自动抓正文（兜底，替代 web_search）',
         f'',
         f'⚠️ NeoData/腾讯新闻/yfinance 是 Bash 脚本调用，不是直接工具。完整 Bash 代码块见 System Prompt 中的工具指南。',
         f'',
@@ -990,89 +990,97 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     """
     sector_hint = entity if entity else "课题对应行业"
     # 按角色分发数据源路由
+    # ⚠️ 本环境子代理无 web_search 内置工具！
+    # 通用网络搜索统一用 Bash 调 search_gateway（search_deep / neodata_search / tencent_news_search）
+    _SEARCH_DEEP_HINT = (
+        "search_deep(Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "
+        "\"from scripts.search_gateway import search_deep; import json,sys; "
+        "r=search_deep('关键词',max_results=5,fetch_top_n=2); "
+        "print(json.dumps(r,ensure_ascii=False,indent=2))\"`)\n"
+    )
     if role == 'ic_executive_hypothesis':
         return (
-            f'⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            f'⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
             f'- 行业板块走势/估值 → westock-mcp: data_sector（查 {sector_hint} 板块）\n'
             f'- 最新行业动态 → 腾讯新闻 CLI（Bash 调用，见 System Prompt 工具指南）\n'
             f'- 龙头公司实时估值锚 → westock-mcp: data_quote（查 {sector_hint} 龙头公司）\n'
             f'- 行业研报/市场规模 → westock-mcp: data_report\n'
-            f'- web_search 仅作兜底，结构化源搜不到才用\n\n'
+            f'- 通用搜索兜底 → {_SEARCH_DEEP_HINT}\n\n'
         )
     elif role == 'ic_market_overview':
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
             '- 行业板块走势/估值水平 → westock-mcp: data_sector\n'
-            '- 行业市场规模/TAM/CAGR → NeoData(Bash) → web_search 兜底\n'
+            '- 行业市场规模/TAM/CAGR → NeoData(Bash) → search_deep(Bash) 兜底\n'
             '- 券商行业研报 → westock-mcp: data_report → NeoData(Bash)\n'
             '- 突发行业动态 → 腾讯新闻 CLI(Bash)\n'
             '- 可比公司估值/财务 → westock-mcp: data_finance\n'
-            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+            '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role in ('ic_competitive', 'ic_segment_deep'):
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
             '- 企业工商/股东/融资 → tyc-mcp: search_companies → call_tool\n'
             '- 上市公司财务对比 → westock-mcp: data_finance + data_quote\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 竞品最新动态 → 腾讯新闻 CLI(Bash)\n'
             '- 专利布局/研发能力 → tyc-mcp: call_tool(search_patents)\n'
-            '- 市场份额/CR3/CR5 → westock-mcp + web_search 交叉验证\n'
-            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+            '- 市场份额/CR3/CR5 → westock-mcp + search_deep(Bash) 交叉验证\n'
+            '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role in ('ic_tech_product', 'ic_route_deep'):
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
-            '- 技术论文/arxiv → web_search("arxiv {关键词} {YYYY}") + web_fetch 读全文\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '- 技术论文/arxiv → search_deep(Bash, "arxiv {关键词}") + web_fetch 读全文\n'
             '- 专利检索 → tyc-mcp: search_patents\n'
-            '- 产品参数/性能对比 → web_search + web_fetch\n'
+            '- 产品参数/性能对比 → search_deep(Bash) + web_fetch\n'
             '- 技术突破新闻 → 腾讯新闻 CLI(Bash)\n'
             '- 公司研发投入/研发费用率 → westock-mcp: data_finance\n'
-            '- web_search 用于学术/技术类搜索是合理的，但商业数据仍优先结构化源\n\n'
+            '- search_deep 用于学术/技术类搜索是合理的，但商业数据仍优先结构化源\n\n'
         )
     elif role == 'ic_supply_chain':
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
             '- 产业链图谱/环节梳理 → westock-mcp: data_industry_chain\n'
             '- 企业画像/技术能力 → tyc-mcp: search_companies → get_company_capabilities\n'
             '- 招投标/政府采购 → tyc-mcp: search_bids\n'
             '- 产能/订单动态 → 腾讯新闻 CLI(Bash)\n'
             '- 行业深度数据 → NeoData(Bash)\n'
-            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+            '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role == 'ic_policy_risk':
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
-            '- 国内政策文件/产业规划 → web_search("site:gov.cn {关键词}")\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '- 国内政策文件/产业规划 → search_deep(Bash, "site:gov.cn {关键词}")\n'
             '- 企业司法/风险/行政处罚 → tyc-mcp: call_tool（风险扫描类）\n'
-            '- 出口管制/制裁清单 → web_search("BIS entity list {关键词}")\n'
+            '- 出口管制/制裁清单 → search_deep(Bash, "BIS entity list {关键词}")\n'
             '- 政策最新动态/解读 → 腾讯新闻 CLI(Bash)\n'
-            '- 地缘风险/贸易摩擦 → web_search + 腾讯新闻 CLI\n\n'
+            '- 地缘风险/贸易摩擦 → search_deep(Bash) + 腾讯新闻 CLI\n\n'
         )
     elif role in ('ic_unit_economics', 'ic_business_overview'):
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
             '- 公司财务 → westock-mcp: data_finance\n'
             '- 客户/供应商关系 → tyc-mcp: call_tool\n'
-            '- 定价/收费模式 → web_search + web_fetch（产品官网）\n'
-            '- 用户数据/留存/渗透率 → web_search\n\n'
+            '- 定价/收费模式 → search_deep(Bash) + web_fetch（产品官网）\n'
+            '- 用户数据/留存/渗透率 → search_deep(Bash)\n\n'
         )
     elif role == 'ic_feasibility':
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
-            '- 学术论文/前沿研究 → web_search("arxiv ...") + web_fetch\n'
-            '- 实验进展/里程碑 → web_search + 腾讯新闻 CLI(Bash)\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '- 学术论文/前沿研究 → search_deep(Bash, "arxiv ...") + web_fetch\n'
+            '- 实验进展/里程碑 → search_deep(Bash) + 腾讯新闻 CLI(Bash)\n'
             '- 专利 → tyc-mcp: search_patents\n'
-            '- 项目/公司融资 → tyc-mcp: search_companies → web_search\n\n'
+            '- 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)\n\n'
         )
     elif role in ('ic_catalyst', 'ic_consensus'):
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
             '- 重大事件/业绩会/并购 → westock-mcp: data_events\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 资金流向/北向持仓 → westock-mcp: data_fund_flow + data_north_holding\n'
             '- 最新动态 → 腾讯新闻 CLI(Bash)\n'
-            '- web_search 仅作兜底\n\n'
+            '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role == 'ic_report_synthesizer':
         return (
@@ -1082,15 +1090,15 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     else:
         # 通用 fallback
         return (
-            '⚠️ 数据源路由（按优先级执行，不要只用 web_search）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
             '- 公司财务/行情/估值 → westock-mcp: data_finance / data_quote\n'
             '- 企业工商/股东/专利 → tyc-mcp: search_companies → call_tool\n'
             '- 行业研报/板块数据 → westock-mcp: data_report / data_sector\n'
-            '- **券商研报/行业深度报告/财经新闻** → NeoData Bash(`data_type="doc"`) — 质量远优于 web_search\n'
+            '- **券商研报/行业深度报告/财经新闻** → NeoData Bash(`data_type="doc"`) — 质量远优于通用搜索\n'
             '- 中文实时新闻 → 腾讯新闻 CLI(Bash)\n'
             '- **美股新闻/earnings/分析师** → Yahoo Finance Bash(`_yahoo_search`) — 英文金融新闻首选\n'
             '- 美股估值 → yfinance(Bash)\n'
-            '- web_search 仅作兜底，结构化源搜不到才用\n\n'
+            '- 通用搜索兜底 → search_deep(Bash)，结构化源搜不到才用\n\n'
         )
 
 
@@ -1123,7 +1131,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'cn',
         f"If you cannot find specific data, SUPPLEMENTARY SEARCH FIRST before writing '未找到独立外部证据'. "
         f"Use thinking=high — reason carefully before writing each section.\n\n"
         f"CRITICAL: You must autonomously close the loop. When you discover data gaps during analysis:\n"
-        f"1. Search for the missing data yourself (westock-mcp → tyc-mcp → NeoData(Bash) → 腾讯新闻(Bash) → web_search)\n"
+        f"1. Search for the missing data yourself (westock-mcp → tyc-mcp → NeoData(Bash) → 腾讯新闻(Bash) → search_deep(Bash))\n"
         f"2. Integrate the found data into your analysis\n"
         f"3. Only mark as '待核实' after 3 rounds of supplementary search still yield nothing\n"
         f"Do NOT return to the coordinator for search instructions — you ARE the search agent.\n\n"

@@ -19,6 +19,7 @@ Phase Runner — 后台独立执行单个管线阶段
 
 支持的 phase：
     phase01_document_intake   — 文档 OCR + 结构化
+    phase01b_company_intake   — 公司名搜索入库（无 PDF 模式，needs_dispatch）
     phase02_company_verify   — 主体核验
     phase04_presearch         — 预搜索
     phase08_dispatch_prepare  — 子代理派发准备（Wave 1）

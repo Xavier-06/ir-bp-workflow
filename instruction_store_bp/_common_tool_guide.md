@@ -23,7 +23,7 @@
 ```
 
 ### 脚注来源优先级
-1. **外部 URL**（web_search / search_gateway 返回的 URL）→ 写完整 URL
+1. **外部 URL**（search_gateway / search_deep 返回的 URL）→ 写完整 URL
 2. **天眼查结构化数据** → 写 `天眼查结构化数据（天眼查 MCP）`
 3. **BP 自述数据**（无外部来源）→ 写 `BP自述 — 无外部来源URL`
 4. **NeoData 金融数据** → 写 `NeoData 金融数据 — neodata_search`
@@ -91,7 +91,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | `doc` | **券商研报 + 行业深度报告 + 财经新闻 + 政策分析** | 行业分析、竞争格局、政策解读、新闻舆情、供应链、估值逻辑 |
 | `all` | api + doc 两者同时返回 | 最全面，但结果较多 |
 
-**⚠️ `data_type=doc` 是新闻和研报的主力数据源——所有维度都应该用它搜行业报告和新闻，不要只用 web_search。**
+**⚠️ `data_type=doc` 是新闻和研报的主力数据源——所有维度都应该用它搜行业报告和新闻，不要只用通用搜索。**
 
 **NeoData `data_type=doc` 常用场景（所有维度通用）：**
 
@@ -210,7 +210,7 @@ print(v)
 - 查历史变更（股权变更、法人变更）
 - 查对外投资、关联企业（估值/竞争维度）
 
-**注意：TYC 查的是中国大陆注册企业。如果标的是境外注册，TYC 可能无数据，用 web_search 兜底。**
+**注意：TYC 查的是中国大陆注册企业。如果标的是境外注册，TYC 可能无数据，用 search_deep(Bash) 兜底。**
 
 **⚠️ 关键纪律：call_tool 的 tool_name 必须逐字复制 get_company_capabilities 返回表格中的真实名称，不能按中文含义猜测或翻译。**
 
@@ -287,7 +287,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 ### 6. 通用网络搜索（新闻、行业报告、通用信息）
 
-**web_search（WorkBuddy 内置工具）**
+**search_deep（Bash 调用 search_gateway，替代 web_search）**
 - 直接用，不需要 Bash
 - 适合：搜新闻、行业趋势、媒体报道、通用信息
 - 不适合：结构化金融数据（用 search_gateway）、结构化企业数据（用 TYC 天眼查）
@@ -359,7 +359,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 来源域名: [列出所有引用的域名]
 ```
 
-如果全部来源都是 web_search，说明为什么没用结构化数据源（没有合理理由将被视为质量不合格）。
+如果全部来源都是通用搜索(search_deep)，说明为什么没用结构化数据源（没有合理理由将被视为质量不合格）。
 
 ## 角色边界（写在每个角色指令开头）
 

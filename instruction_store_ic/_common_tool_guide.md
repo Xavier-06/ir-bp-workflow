@@ -12,42 +12,42 @@
 
 | 我要搜什么 | 首选 | 备用 | 兜底 |
 |---|---|---|---|
-| 公司营收/利润/毛利率/ROE 等财务指标 | westock-mcp: `data_finance` | NeoData | web_search |
+| 公司营收/利润/毛利率/ROE 等财务指标 | westock-mcp: `data_finance` | NeoData | search_deep(Bash) |
 | 公司股价/市值/PE/PB/PS 实时估值 | westock-mcp: `data_quote` | valuation_enricher (Bash) | yfinance (美股) |
-| 公司融资历程/股东/实控人/股权结构 | tyc-mcp: `search_companies` → `call_tool(get_shareholder_info)` | web_search | — |
-| 公司注册时间/注册资本/经营范围 | tyc-mcp: `search_companies` → `call_tool(get_company_basic_profile)` | web_search | — |
-| 公司董监高/核心管理层/团队背景 | tyc-mcp: `call_tool(get_key_personnel)` | web_search | — |
-| 公司专利数量/技术布局/研发能力 | tyc-mcp: `call_tool(search_patents)` | web_search("arxiv/patent {公司名}") | — |
-| 公司招投标/政府采购/中标信息 | tyc-mcp: `call_tool(search_bids)` | web_search | — |
-| 公司司法风险/诉讼/被执行/失信 | tyc-mcp: `call_tool` (风险扫描类) | web_search | — |
-| 公司最新融资/IPO/并购动态 | 腾讯新闻 CLI | web_search | — |
-| 公司集团关系/股权穿透/子公司 | tyc-mcp: `call_tool(get_company_group_profile)` | web_search | — |
-| 未上市公司的基本信息 | tyc-mcp: `search_companies` | web_search | — |
+| 公司融资历程/股东/实控人/股权结构 | tyc-mcp: `search_companies` → `call_tool(get_shareholder_info)` | search_deep(Bash) | — |
+| 公司注册时间/注册资本/经营范围 | tyc-mcp: `search_companies` → `call_tool(get_company_basic_profile)` | search_deep(Bash) | — |
+| 公司董监高/核心管理层/团队背景 | tyc-mcp: `call_tool(get_key_personnel)` | search_deep(Bash) | — |
+| 公司专利数量/技术布局/研发能力 | tyc-mcp: `call_tool(search_patents)` | search_deep(Bash, "arxiv/patent {公司名}") | — |
+| 公司招投标/政府采购/中标信息 | tyc-mcp: `call_tool(search_bids)` | search_deep(Bash) | — |
+| 公司司法风险/诉讼/被执行/失信 | tyc-mcp: `call_tool` (风险扫描类) | search_deep(Bash) | — |
+| 公司最新融资/IPO/并购动态 | 腾讯新闻 CLI | search_deep(Bash) | — |
+| 公司集团关系/股权穿透/子公司 | tyc-mcp: `call_tool(get_company_group_profile)` | search_deep(Bash) | — |
+| 未上市公司的基本信息 | tyc-mcp: `search_companies` | search_deep(Bash) | — |
 
 ### 行业/市场类
 
 | 我要搜什么 | 首选 | 备用 | 兜底 |
 |---|---|---|---|
-| 行业板块走势/指数/估值水平 | westock-mcp: `data_sector` | NeoData | web_search |
-| 产业链上下游图谱/环节梳理 | westock-mcp: `data_industry_chain` | web_search | — |
-| 行业市场规模/TAM/SAM/CAGR | NeoData | web_search("{行业} 市场规模 CAGR 2025") | — |
-| 券商行业研报/深度报告 | westock-mcp: `data_report` | **NeoData `data_type='doc'`** | web_search |
-| 行业竞争格局/市占率/CR3/CR5 | **NeoData `data_type='doc'`** + westock-mcp 交叉验证 | web_search | — |
-| 行业政策/法规/准入标准 | web_search("site:gov.cn {关键词}") | **NeoData `data_type='doc'`** | 腾讯新闻 CLI |
-| 行业突发新闻/最新动态 | 腾讯新闻 CLI | **NeoData `data_type='doc'`** | web_search |
-| 财经深度分析/政策解读 | **NeoData `data_type='doc'`**（200-500字深度摘要） | 腾讯新闻 CLI | web_search |
-| 宏观数据(GDP/CPI/PMI/利率) | NeoData `data_type='api'` | web_search | — |
+| 行业板块走势/指数/估值水平 | westock-mcp: `data_sector` | NeoData | search_deep(Bash) |
+| 产业链上下游图谱/环节梳理 | westock-mcp: `data_industry_chain` | search_deep(Bash) | — |
+| 行业市场规模/TAM/SAM/CAGR | NeoData | search_deep(Bash, "{行业} 市场规模 CAGR 2025") | — |
+| 券商行业研报/深度报告 | westock-mcp: `data_report` | **NeoData `data_type='doc'`** | search_deep(Bash) |
+| 行业竞争格局/市占率/CR3/CR5 | **NeoData `data_type='doc'`** + westock-mcp 交叉验证 | search_deep(Bash) | — |
+| 行业政策/法规/准入标准 | search_deep(Bash, "site:gov.cn {关键词}") | **NeoData `data_type='doc'`** | 腾讯新闻 CLI |
+| 行业突发新闻/最新动态 | 腾讯新闻 CLI | **NeoData `data_type='doc'`** | search_deep(Bash) |
+| 财经深度分析/政策解读 | **NeoData `data_type='doc'`**（200-500字深度摘要） | 腾讯新闻 CLI | search_deep(Bash) |
+| 宏观数据(GDP/CPI/PMI/利率) | NeoData `data_type='api'` | search_deep(Bash) | — |
 
 ### 投资/资本市场类
 
 | 我要搜什么 | 首选 | 备用 | 兜底 |
 |---|---|---|---|
-| 机构评级/一致预期/目标价 | westock-mcp: `data_rating` | web_search | — |
-| 资金流向/主力/散户/北向资金 | westock-mcp: `data_fund_flow` | — | web_search |
-| 北向持仓/外资动向 | westock-mcp: `data_north_holding` | — | web_search |
-| 重大事件(业绩会/产品发布/并购) | westock-mcp: `data_events` | 腾讯新闻 CLI | web_search |
-| 美股公司估值/财务 | yfinance (Python) | westock-mcp: `data_quote` | web_search |
-| **美股公司新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** (Bash) | 腾讯新闻 CLI(中文) | web_search |
+| 机构评级/一致预期/目标价 | westock-mcp: `data_rating` | search_deep(Bash) | — |
+| 资金流向/主力/散户/北向资金 | westock-mcp: `data_fund_flow` | — | search_deep(Bash) |
+| 北向持仓/外资动向 | westock-mcp: `data_north_holding` | — | search_deep(Bash) |
+| 重大事件(业绩会/产品发布/并购) | westock-mcp: `data_events` | 腾讯新闻 CLI | search_deep(Bash) |
+| 美股公司估值/财务 | yfinance (Python) | westock-mcp: `data_quote` | search_deep(Bash) |
+| **美股公司新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** (Bash) | 腾讯新闻 CLI(中文) | search_deep(Bash) |
 | A/HK 股估值快照(PE/PB/PS/换手率) | valuation_enricher (Bash) | westock-mcp: `data_quote` | — |
 | 可比公司财务对比(多公司横比) | westock-mcp: `data_finance` | NeoData | — |
 
@@ -55,22 +55,22 @@
 
 | 我要搜什么 | 首选 | 备用 | 兜底 |
 |---|---|---|---|
-| 技术论文/学术前沿/arxiv | web_search("arxiv {关键词} {YYYY}") | web_fetch 读论文正文 | — |
-| 技术参数/产品规格/性能对比 | web_search + web_fetch | — | — |
-| 技术突破/产品发布新闻 | 腾讯新闻 CLI | web_search | — |
-| 技术路线成熟度/TRL评估 | web_search("{技术} technology readiness level") | web_fetch | — |
-| 专利检索(技术方向) | tyc-mcp: `search_patents` | web_search("patent {关键词}") | — |
-| 公司研发投入/研发费用率 | westock-mcp: `data_finance` | tyc-mcp: `get_company_capabilities` | web_search |
+| 技术论文/学术前沿/arxiv | search_deep(Bash, "arxiv {关键词} {YYYY}") | web_fetch 读论文正文 | — |
+| 技术参数/产品规格/性能对比 | search_deep(Bash) + web_fetch | — | — |
+| 技术突破/产品发布新闻 | 腾讯新闻 CLI | search_deep(Bash) | — |
+| 技术路线成熟度/TRL评估 | search_deep(Bash, "{技术} technology readiness level") | web_fetch | — |
+| 专利检索(技术方向) | tyc-mcp: `search_patents` | search_deep(Bash, "patent {关键词}") | — |
+| 公司研发投入/研发费用率 | westock-mcp: `data_finance` | tyc-mcp: `get_company_capabilities` | search_deep(Bash) |
 
 ### 政策/风险类
 
 | 我要搜什么 | 首选 | 备用 | 兜底 |
 |---|---|---|---|
-| 国内政策文件/产业规划 | web_search("site:gov.cn {关键词}") | 腾讯新闻 CLI | — |
-| 出口管制/制裁清单(BIS/OFAC) | web_search("BIS entity list {关键词}") | — | — |
-| 政策最新动态/解读 | 腾讯新闻 CLI | web_search | — |
-| 企业合规/行政处罚/环保问题 | tyc-mcp: `call_tool` (风险类) | web_search | — |
-| 地缘风险/贸易摩擦 | web_search | 腾讯新闻 CLI | — |
+| 国内政策文件/产业规划 | search_deep(Bash, "site:gov.cn {关键词}") | 腾讯新闻 CLI | — |
+| 出口管制/制裁清单(BIS/OFAC) | search_deep(Bash, "BIS entity list {关键词}") | — | — |
+| 政策最新动态/解读 | 腾讯新闻 CLI | search_deep(Bash) | — |
+| 企业合规/行政处罚/环保问题 | tyc-mcp: `call_tool` (风险类) | search_deep(Bash) | — |
+| 地缘风险/贸易摩擦 | search_deep(Bash) | 腾讯新闻 CLI | — |
 
 ---
 
@@ -155,7 +155,7 @@ sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh 
 
 ### 2.4 NeoData (Bash) — 深度行业数据 + 券商研报 + 财经新闻
 
-**一句话**：A/HK 股行业的"深度研报数据库"——不只有结构化行情数据，**`data_type='doc'` 还能搜券商研报、行业深度报告、财经新闻、政策解读**，质量远优于 web_search。
+**一句话**：A/HK 股行业的"深度研报数据库"——不只有结构化行情数据，**`data_type='doc'` 还能搜券商研报、行业深度报告、财经新闻、政策解读**，质量远优于通用搜索。
 
 **三种 data_type 及适用场景**：
 
@@ -165,7 +165,7 @@ sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh 
 | **`doc`** | **券商研报 + 行业深度报告 + 财经新闻 + 政策分析**（200-500字/条，质量高） | **行业分析、竞争格局、政策解读、新闻舆情、供应链、估值逻辑** |
 | `all` | api + doc 两者 | 最全面，但结果较多 |
 
-**⚠️ `data_type='doc'` 是研报和新闻的主力数据源——不要只用 web_search 搜行业报告和新闻。**
+**⚠️ `data_type='doc'` 是研报和新闻的主力数据源——不要只用通用搜索搜行业报告和新闻。**
 
 **调用方式**：
 
@@ -265,7 +265,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - 部分数据有 15 分钟延迟
 - 没有中文搜索能力
 
-### 2.6 web_search (内置) — 万能兜底
+### 2.6 search_deep (Bash) — 万能兜底（替代 web_search）
 
 **一句话**：什么都搜得到，但质量参差不齐。当结构化数据源搜不到时用，**永远不是首选**。
 
@@ -278,11 +278,12 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 **搜索技巧**：
 ```
-web_search("arxiv {技术关键词} {YYYY}")                    # 论文
-web_search("site:gov.cn {政策关键词}")                      # 政策原文
-web_search("{公司名} annual report investor presentation")  # 投资者材料
-web_search("{行业} market size CAGR forecast 2030")         # 英文市场预测
-web_search("{技术} TRL technology readiness level")         # 技术成熟度
+# Bash: cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import search_deep; ..."
+search_deep(Bash, "arxiv {技术关键词} {YYYY}")            # 论文
+search_deep(Bash, "site:gov.cn {政策关键词}")                      # 政策原文
+search_deep(Bash, "{公司名} annual report investor presentation")  # 投资者材料
+search_deep(Bash, "{行业} market size CAGR forecast 2030")         # 英文市场预测
+search_deep(Bash, "{技术} TRL technology readiness level")         # 技术成熟度
 ```
 
 ### 2.7 web_fetch (内置) — 读已知 URL
@@ -290,7 +291,7 @@ web_search("{技术} TRL technology readiness level")         # 技术成熟度
 **一句话**：你已经有一个 URL，需要读它的完整内容。不能搜索，只能读。
 
 **最佳场景**：
-- 读 arxiv 论文正文（从 web_search 找到 URL 后）
+- 读 arxiv 论文正文（从 search_deep 找到 URL 后）
 - 读政策文件原文
 - 读公司公告/新闻稿全文
 - 读研报 PDF（如果 URL 可达）
@@ -311,9 +312,9 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 
 ### 3.1 搜索优先级原则
 
-1. **结构化数据优先**：能用 westock-mcp / tyc-mcp / NeoData 解决的，不搜 web_search
+1. **结构化数据优先**：能用 westock-mcp / tyc-mcp / NeoData 解决的，不用通用搜索
 2. **时效性数据优先**：需要最新动态的，先搜腾讯新闻 CLI
-3. **web_search 是兜底**：只有结构化数据源都搜不到时才用
+3. **search_deep(Bash) 是兜底**：只有结构化数据源都搜不到时才用
 4. **多源交叉验证**：关键数据点至少 2 个独立来源确认
 
 ### 3.2 搜索关键词规则
@@ -333,12 +334,12 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 
 | ❌ 错误 | ✅ 正确 |
 |---|---|
-| 用 web_search 搜公司财务数据 | 用 westock-mcp: data_finance |
-| 用 web_search 搜公司股东信息 | 用 tyc-mcp: search_companies → call_tool |
-| 用 web_search 搜行业板块走势 | 用 westock-mcp: data_sector |
+| 用通用搜索搜公司财务数据 | 用 westock-mcp: data_finance |
+| 用通用搜索搜公司股东信息 | 用 tyc-mcp: search_companies → call_tool |
+| 用通用搜索搜行业板块走势 | 用 westock-mcp: data_sector |
 | 用腾讯新闻搜结构化市场数据 | 用 NeoData 或 westock-mcp |
 | 用 NeoData 搜美股数据 | 用 yfinance 或 westock-mcp |
-| 用 web_search 搜最新新闻动态 | 用腾讯新闻 CLI（分钟级时效） |
+| 用通用搜索搜最新新闻动态 | 用腾讯新闻 CLI（分钟级时效） |
 
 ---
 
@@ -352,7 +353,7 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 
 ### ic_market_overview (市场全景)
 - 行业板块/指数 → westock-mcp: data_sector
-- 市场规模/TAM/CAGR → NeoData → web_search
+- 市场规模/TAM/CAGR → NeoData → search_deep(Bash)
 - 券商行业研报 → westock-mcp: data_report → NeoData
 - 突发行业动态 → 腾讯新闻 CLI
 - 可比公司估值 → westock-mcp: data_finance
@@ -365,9 +366,9 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 - 专利布局 → tyc-mcp: search_patents
 
 ### ic_tech_product / ic_route_deep (技术产品 / 路线深度)
-- 技术论文 → web_search("arxiv ...") + web_fetch
+- 技术论文 → search_deep(Bash, "arxiv ...") + web_fetch
 - 专利检索 → tyc-mcp: search_patents
-- 产品参数 → web_search + web_fetch
+- 产品参数 → search_deep(Bash) + web_fetch
 - 技术突破新闻 → 腾讯新闻 CLI
 - 公司研发投入 → westock-mcp: data_finance
 
@@ -379,22 +380,22 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 - 行业数据 → NeoData
 
 ### ic_policy_risk (政策风险)
-- 政策文件 → web_search("site:gov.cn {关键词}")
+- 政策文件 → search_deep(Bash, "site:gov.cn {关键词}")
 - 企业司法/风险 → tyc-mcp: call_tool（风险扫描）
-- 出口管制 → web_search("BIS entity list {关键词}")
+- 出口管制 → search_deep(Bash, "BIS entity list {关键词}")
 - 政策动态 → 腾讯新闻 CLI
 
 ### ic_unit_economics / ic_business_overview (单元经济 / 业务概览)
 - 公司财务 → westock-mcp: data_finance
 - 客户/供应商 → tyc-mcp: call_tool
-- 定价/收费模式 → web_search + web_fetch（产品官网）
-- 用户数据/留存 → web_search
+- 定价/收费模式 → search_deep(Bash) + web_fetch（产品官网）
+- 用户数据/留存 → search_deep(Bash)
 
 ### ic_feasibility (可行性评估 — early_theme 专用)
-- 学术论文 → web_search("arxiv ...") + web_fetch
-- 实验进展/里程碑 → web_search + 腾讯新闻 CLI
+- 学术论文 → search_deep(Bash, "arxiv ...") + web_fetch
+- 实验进展/里程碑 → search_deep(Bash) + 腾讯新闻 CLI
 - 专利 → tyc-mcp: search_patents
-- 项目/公司融资 → tyc-mcp: search_companies → web_search
+- 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)
 
 ### ic_report_synthesizer (统稿)
 **不搜索新数据**。综合全部前序 wave 输出。如需补充验证，仅通过 westock-mcp / tyc-mcp 定向查询，不超过 2 次。
@@ -413,13 +414,13 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 | 行业市场规模 | westock-mcp: data_sector | "AI芯片 板块" | 15 条 |
 | 龙头财务数据 | NeoData | "英伟达 营收 毛利率" | 3 条 |
 | 最新政策动态 | 腾讯新闻 CLI | "芯片 出口管制 2026" | 5 条 |
-| 技术论文 | web_search | "arxiv HBM4 2026" | 2 条 |
+| 技术论文 | search_deep(Bash) | "arxiv HBM4 2026" | 2 条 |
 | ... | ... | ... | ... |
 
 来源域名: [arxiv.org, finance.sina.com, gov.cn, ...]
 ```
 
 **审计规则**：
-- 如果全部来源都是 web_search → 必须在审计中说明为什么没用结构化数据源
-- 没有合理理由的全 web_search 报告 → evidence gate 扣分
+- 如果全部来源都是通用搜索(search_deep) → 必须在审计中说明为什么没用结构化数据源
+- 没有合理理由的全通用搜索报告 → evidence gate 扣分
 - 统稿角色（ic_report_synthesizer）不需要搜索审计

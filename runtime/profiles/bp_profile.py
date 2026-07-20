@@ -96,13 +96,23 @@ def _not_implemented_phase(phase: str, reason: str, *, result_key: str) -> dict[
 # ── Phase 01: 文档入库（OCR + 结构化抽取）──────────────
 
 def _run_document_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    metadata = job_ctx.metadata or {}
+    input_file = metadata.get("input_file", "")
+
+    # 无 input_file → 跳过 Phase 01，交给 Phase 01b 处理
+    if not input_file:
+        print(f"  ⏭️  [bp] phase01 跳过（无 input_file，由 phase01b 公司名搜索接管）", flush=True)
+        return {
+            "ok": True,
+            "mode": "skipped_no_input_file",
+            "phase": "phase01_document_intake",
+            "job_id": job_ctx.job_id,
+            "result": {"skipped": True, "reason": "no_input_file_use_phase01b"},
+        }
+
     if os.environ.get("IRBP_BG_CHILD") == "1":
         # 当前是后台子进程，直接执行
         from runtime.intake.bp_document_intake import run_document_intake
-        metadata = job_ctx.metadata or {}
-        input_file = metadata.get("input_file", "")
-        if not input_file:
-            return {"ok": False, "error": "metadata.input_file 未提供"}
         return run_document_intake(job_ctx, input_file)
     from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
     cached = check_cached_result(runtime_root, job_ctx.job_id, "phase01_document_intake")
@@ -110,6 +120,84 @@ def _run_document_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, A
         print(f"  📦 [bp] 使用缓存的 document_intake 结果", flush=True)
         return cached
     return launch_heavy_phase(runtime_root, job_ctx, "phase01_document_intake", pipeline="bp")
+
+
+# ── Phase 01b: 公司名搜索入库（无 PDF 模式）──────────────
+
+def _run_company_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 01b: 仅公司名模式 — 通过子代理搜索公开数据重建 BP 等效数据。
+
+    路由逻辑：
+    - 有 input_file → 跳过（Phase 01 已处理）
+    - 无 input_file → needs_dispatch 派发子代理搜索
+    """
+    metadata = job_ctx.metadata or {}
+    input_file = metadata.get("input_file", "")
+
+    # 有 PDF → 跳过，Phase 01 已处理
+    if input_file:
+        print(f"  ⏭️  [bp] phase01b 跳过（已有 input_file，由 phase01 处理）", flush=True)
+        return {
+            "ok": True,
+            "mode": "skipped_has_input_file",
+            "phase": "phase01b_company_intake",
+            "job_id": job_ctx.job_id,
+            "result": {"skipped": True, "reason": "input_file provided, using phase01"},
+        }
+
+    # 无 input_file → 派发子代理搜索
+    from scripts._bp_company_intake_subagent import (
+        bp_build_company_intake_brief,
+        bp_build_company_intake_instruction,
+    )
+
+    task_dir = _task_dir(runtime_root, job_ctx)
+    entity, market = _bp_entity_market(job_ctx)
+
+    brief_path = task_dir / "bp_phase01b_brief.json"
+    brief = bp_build_company_intake_brief(entity=entity, market=market, job_id=job_ctx.job_id)
+    brief_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    instruction = bp_build_company_intake_instruction(
+        entity=entity, market=market, job_id=job_ctx.job_id,
+        task_dir=task_dir, brief_path=brief_path,
+    )
+
+    return {
+        "ok": True,
+        "needs_dispatch": True,
+        "has_more": False,
+        "mode": "bp_company_intake_subagent",
+        "phase": "phase01b_company_intake",
+        "job_id": job_ctx.job_id,
+        "dispatch_info": {
+            "brief_path": str(brief_path),
+            "subagent_connector_ids": ["tyc-mcp", "westock-mcp"],
+            "task_dir": str(task_dir),
+        },
+        "instruction": instruction,
+    }
+
+
+def _run_company_intake_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
+    """Phase 01b collect: 检查子代理产出的 bp_ocr_text.txt + bp_step0_profile.json。"""
+    from scripts._bp_company_intake_subagent import bp_collect_company_intake
+
+    task_dir = _task_dir(runtime_root, job_ctx)
+    metadata = job_ctx.metadata or {}
+    input_file = metadata.get("input_file", "")
+
+    # 有 PDF → 跳过 collect（Phase 01 已产出）
+    if input_file:
+        return {
+            "ok": True,
+            "mode": "skipped_has_input_file",
+            "phase": "phase01b_company_intake_collect",
+            "job_id": job_ctx.job_id,
+            "result": {"skipped": True},
+        }
+
+    return bp_collect_company_intake(task_dir=task_dir, job_id=job_ctx.job_id)
 
 
 # ── Phase 02-04: 主体核验 + 预搜索 ────────────
@@ -3633,6 +3721,8 @@ class BPProfile(PipelineProfile):
             # ── Phase handlers — 执行顺序由 dict 插入顺序决定 ──
             # 序号仅用于注释和日志，不影响执行。
             "phase01_document_intake": lambda job_ctx: _run_document_intake(runtime_root, job_ctx),              # 01
+            "phase01b_company_intake": lambda job_ctx: _run_company_intake(runtime_root, job_ctx),              # 01b → needs_dispatch (公司名搜索入库)
+            "phase01b_company_intake_collect": lambda job_ctx: _run_company_intake_collect(runtime_root, job_ctx),  # 01b collect
             "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),               # 02 [heavy_bg]
             "phase03_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),                         # 03 [heavy_bg] ★前置：research_plan之前
             "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),                 # 04 → needs_dispatch (子代理派发, tyc+westock)
@@ -3704,6 +3794,8 @@ class BPProfile(PipelineProfile):
         """
         return {
             "phase01_document_intake": ["bp_step0_profile.json", "bp_claim_inventory.json"],
+            "phase01b_company_intake": [],
+            "phase01b_company_intake_collect": ["bp_step0_profile.json"],
             "phase02_company_verify": ["company_verify_report.json"],
             # [v5.3] phase03_presearch 已废弃: 子代理全权搜索
             "phase04_research_plan": [],  # v5.2: 子代理直接生成plan, skeleton仅作可选参考

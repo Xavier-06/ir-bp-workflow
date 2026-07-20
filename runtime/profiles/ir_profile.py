@@ -1034,7 +1034,13 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
     total_expected = len(STEP_DEPS)
     completion_rate = len(completed_steps) / max(total_expected, 1)
+
+    # circuit_break 仅作诊断信号，不再阻断管线 (ok 永远 True)
+    # 原因: sequential 派发模式下 collect 可能被调用时仅部分 step 完成，
+    # 用 completion_rate < 0.5 硬卡会误判终止。不完整 step 由 L3 needs_dispatch 兜底。
     circuit_break = completion_rate < 0.5
+    if circuit_break:
+        print(f"  ⚠️ completion_rate={completion_rate:.2f}<0.5 — 仅作诊断, 不阻断管线", flush=True)
 
     # ── L3 半自动: 不完整 step 返回 needs_dispatch ──
     if incomplete_steps:

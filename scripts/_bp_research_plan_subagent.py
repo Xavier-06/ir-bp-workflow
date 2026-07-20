@@ -128,16 +128,16 @@ def bp_build_research_plan_instruction(
         f'- Cross-check: does sector PE/valuation align with what {entity} claims in the BP?\n'
         "\n"
         "### Step 3: Web Supplement (use BOTH Chinese and English queries)\n"
-        f'- web_search: "{entity} 融资 估值 投资人 2025 2026"\n'
-        f'- web_search: "{entity} funding valuation investors 2025 2026"\n'
-        f'- web_search: "{entity} 竞品 对比 市场份额"\n'
-        f'- web_search: "{entity} vs competitors market share"\n'
-        f'- web_search: "{entity} 客户 订单 交付 合同"\n'
-        f'- web_search: "{entity} customers orders contracts revenue"\n'
-        f'- web_search: "{entity} 专利 技术 壁垒 知识产权"\n'
-        f'- web_search: "{entity} technology patents IP moat"\n'
-        f'- web_search: "[industry from brief] 市场规模 增长 趋势"\n'
-        f'- web_search: "[industry from brief] market size growth trend"\n'
+        f'- search_deep(Bash): "{entity} 融资 估值 投资人 2025 2026"\n'
+        f'- search_deep(Bash): "{entity} funding valuation investors 2025 2026"\n'
+        f'- search_deep(Bash): "{entity} 竞品 对比 市场份额"\n'
+        f'- search_deep(Bash): "{entity} vs competitors market share"\n'
+        f'- search_deep(Bash): "{entity} 客户 订单 交付 合同"\n'
+        f'- search_deep(Bash): "{entity} customers orders contracts revenue"\n'
+        f'- search_deep(Bash): "{entity} 专利 技术 壁垒 知识产权"\n'
+        f'- search_deep(Bash): "{entity} technology patents IP moat"\n'
+        f'- search_deep(Bash): "[industry from brief] 市场规模 增长 趋势"\n'
+        f'- search_deep(Bash): "[industry from brief] market size growth trend"\n'
         "\n"
         "### Step 4: Tencent News (real-time Chinese news via Bash)\n"
         "Run these two Bash commands to get latest news:\n"
@@ -167,7 +167,7 @@ def bp_build_research_plan_instruction(
         "How to populate `competitors`:\n"
         "1. Read the BP OCR text (bp_ocr_text.txt) — look for company names mentioned as competitors/benchmarks\n"
         "2. Check the brief's `competitors` field if it already has names\n"
-        "3. From your tyc/westock/web_search results — extract any named companies that compete with {entity}\n"
+        "3. From your tyc/westock/search_deep results — extract any named companies that compete with {entity}\n"
         "4. Include BOTH listed and unlisted companies (e.g., DJI, Insta360, GoPro, Proscenic, Roborock)\n"
         "5. For each competitor, record: name, ticker (if listed), and main business\n"
         "\n"
@@ -196,7 +196,7 @@ def bp_build_research_plan_instruction(
         f'  "entity": "{entity}",\n'
         f'  "market": "{market}",\n'
         f'  "stage_tier": "{stage_tier}",\n'
-        f'  "data_sources_used": ["tyc-mcp:company", "westock-mcp:industry/reports", "web_search:public"],\n'
+        f'  "data_sources_used": ["tyc-mcp:company", "westock-mcp:industry/reports", "search_deep:public"],\n'
         f'  "competitors": [{{"name": "Insta360影石", "ticker": "", "main_business": "运动相机/全景相机"}}, {{"name": "大疆DJI", "ticker": "", "main_business": "无人机/影像系统"}}, {{"name": "GoPro", "ticker": "GPRO", "main_business": "运动相机"}}],\n'
         f'  "core_questions": [{{\n'
         f'    "question_id": "CQ1",\n'

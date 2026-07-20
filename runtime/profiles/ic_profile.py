@@ -466,10 +466,16 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
     total_expected = len(step_deps)
     completion_rate = len(completed_steps) / max(total_expected, 1)
+
+    # circuit_break 仅作诊断信号，不再阻断管线 (ok 永远 True)
+    # 原因: sequential 派发模式下 collect 被调用时可能仅部分 step 完成，
+    # 用 completion_rate < 0.5 硬卡会误判终止。未完成的 step 通过 wave 机制重派发。
     circuit_break = completion_rate < 0.5
+    if circuit_break:
+        print(f"  ⚠️ completion_rate={completion_rate:.2f}<0.5 — 仅作诊断, 不阻断管线", flush=True)
 
     return {
-        "ok": not circuit_break,
+        "ok": True,
         "mode": "wave_orchestration",
         "phase": "phase07_dispatch_collect",
         "job_id": job_ctx.job_id,
