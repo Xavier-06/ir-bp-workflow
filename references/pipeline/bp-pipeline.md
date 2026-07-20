@@ -20,6 +20,16 @@ Phase 01b 产出 profile 标记 `extraction_source: "public_search"` + `data_com
 搜不到 BP 是常态——天眼查 + web + westock 拼出的 profile 在多数维度比 BP 自述更可靠。
 唯一缺口是财务预测，Stage Tier 机制已兜住（T1/T2 不要求财务数据）。
 
+## BP PDF 自动发现与路由
+
+Phase 01b 子代理在搜索过程中会尝试发现公开的 BP PDF：
+1. 子代理搜到 PDF URL → 下载到 `bp_discovered_pdf.pdf`
+2. collect 阶段检测文件存在（>10KB）→ 返回 `reroute_to_phase01: true` + `reroute_input_file`
+3. coordinator 用 `start_phase=phase01_document_intake` 恢复管线
+4. Phase 01 handler 自动检测 `bp_discovered_pdf.pdf` → 执行完整 OCR + 结构化抽取
+5. Phase 01b 第二次经过时检测到 input_file → 自动跳过
+6. Phase 02-33 正常执行（此时有完整 OCR 数据）
+
 ```
 01 phase01_document_intake                    — VL OCR + Step0 结构化抽取（无 input_file 时跳过）
 01b phase01b_company_intake                   — 公司名搜索入库（无 PDF 时 → needs_dispatch 子代理）★新增

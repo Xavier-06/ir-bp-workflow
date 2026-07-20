@@ -99,6 +99,15 @@ def _run_document_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, A
     metadata = job_ctx.metadata or {}
     input_file = metadata.get("input_file", "")
 
+    # Phase 01b 发现 BP PDF → 自动路由回 Phase 01 做完整 OCR
+    task_dir = _task_dir(runtime_root, job_ctx)
+    discovered_pdf = task_dir / "bp_discovered_pdf.pdf"
+    if not input_file and discovered_pdf.exists() and discovered_pdf.stat().st_size > 10 * 1024:
+        input_file = str(discovered_pdf)
+        metadata["input_file"] = input_file
+        print(f"  🎉 [bp] phase01 检测到 Phase 01b 发现的 BP PDF: {input_file} "
+              f"({discovered_pdf.stat().st_size / 1024:.1f}KB)，执行完整 OCR", flush=True)
+
     # 无 input_file → 跳过 Phase 01，交给 Phase 01b 处理
     if not input_file:
         print(f"  ⏭️  [bp] phase01 跳过（无 input_file，由 phase01b 公司名搜索接管）", flush=True)

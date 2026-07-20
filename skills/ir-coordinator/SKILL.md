@@ -252,6 +252,8 @@ PipelineOrchestrator
 - **IC 任务**：query 包含行业研究关键词（"行业研究"/"产业分析"/"赛道扫描"/"行业分析"/"行业报告"/"产业链分析"/"行业深度"等）
 - **BP 任务（PDF 模式）**：有输入文件（PDF/PPTX/DOCX/图片）
 - **BP 任务（公司名模式）**：无输入文件 + 有公司名（entity）。管线自动走 phase01b 搜索入库，无需 PDF。
+  - 若 phase01b 子代理搜到 BP PDF → 下载到 `bp_discovered_pdf.pdf`，collect 返回 `reroute_to_phase01: true`
+  - coordinator 用 `start_phase=phase01_document_intake` 恢复，Phase 01 自动检测到下载的 PDF 并执行完整 OCR
 
 收到任务后，**立即读取对应管线的 reference 文件**获取详细流程。
 

@@ -122,12 +122,25 @@ def bp_build_company_intake_instruction(
         '"\n'
         "```\n"
         "\n"
-        "### Step 5: Try to Find BP PDF (Optional — best effort)\n"
-        "Try these web_search queries to find a public BP:\n"
-        f'- "{entity}" 商业计划书 filetype:pdf\n'
-        f'- "{entity}" BP 融资 路演 下载\n'
-        f'If you find a promising URL, use web_fetch to read it. If it\'s a PDF or contains\n'
-        f'structured BP content, incorporate it into the ocr_text.\n'
+        "### Step 5: Try to Find BP PDF (HIGH PRIORITY — found PDF triggers full OCR pipeline)\n"
+        "Search for a public BP PDF:\n"
+        f'- web_search: "{entity}" 商业计划书 filetype:pdf\n'
+        f'- web_search: "{entity}" BP 融资 路演 下载\n'
+        f'- web_search: "{entity}" pitch deck pdf\n'
+        "\n"
+        "If you find a promising PDF URL:\n"
+        f'1. Download it using Bash:\n'
+        "```bash\n"
+        f'curl -L -o "{task_dir / "bp_discovered_pdf.pdf"}" "<PDF_URL>"\n'
+        "```\n"
+        f'2. Verify the download succeeded (file size > 10KB):\n'
+        "```bash\n"
+        f'ls -la "{task_dir / "bp_discovered_pdf.pdf"}"\n'
+        "```\n"
+        f'3. Set `bp_pdf_found: true` in bp_company_intake_meta.json and record `bp_pdf_url`.\n'
+        "\n"
+        "⚠️ Do NOT try to read the PDF yourself. Just download it to the path above.\n"
+        "The pipeline will detect it and re-run full OCR extraction.\n"
         "\n"
         "## Output Requirements\n"
         "\n"
@@ -292,6 +305,18 @@ def bp_collect_company_intake(
         "has_team", "has_finance", "has_product", "has_tech", "has_market"
     ) if completeness.get(k))
 
+    # 检测子代理是否下载了 BP PDF
+    discovered_pdf = task_dir / "bp_discovered_pdf.pdf"
+    pdf_found = (
+        discovered_pdf.exists()
+        and discovered_pdf.stat().st_size > 10 * 1024  # > 10KB
+    )
+    pdf_url = meta.get("bp_pdf_url", "")
+
+    if pdf_found:
+        print(f"  🎉 [bp phase01b_collect] 发现 BP PDF! {discovered_pdf} "
+              f"({discovered_pdf.stat().st_size / 1024:.1f}KB)", flush=True)
+
     return {
         "ok": True,
         "mode": "bp_company_intake_collect",
@@ -306,6 +331,11 @@ def bp_collect_company_intake(
             "data_completeness": completeness,
             "completeness_score": f"{filled}/5",
             "tyc_company_found": meta.get("tyc_company_found", False),
-            "bp_pdf_found": meta.get("bp_pdf_found", False),
+            "bp_pdf_found": pdf_found,
+            "bp_pdf_path": str(discovered_pdf) if pdf_found else "",
+            "bp_pdf_url": pdf_url if pdf_found else "",
+            # reroute 信号：有 PDF → 重跑 Phase 01 做完整 OCR
+            "reroute_to_phase01": pdf_found,
+            "reroute_input_file": str(discovered_pdf) if pdf_found else "",
         },
     }
