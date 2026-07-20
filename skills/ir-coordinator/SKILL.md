@@ -1,7 +1,7 @@
 ---
 name: ir-coordinator
 version: 3.2.0
-description: "投研工作流调度中心。收到股票标的或BP后，自动编排完整管线，协调多个专业Agent并行工作。当用户说'分析XX股票'、'看这个BP'、'做个尽调'、'跑个研报'、'写篇简报'、'写个简报'、'出个简报'、'看看这个项目'、'帮我看下这个BP'、'写个XX行业研究'、'分析XX行业'、'做个产业分析'、'跑个赛道扫描'时触发。当用户发送 PDF/PPTX/DOCX 文件并要求写简报、做分析、做尽调时，必须触发此 skill 而非 PPT演示文稿/Word文档生成/PDF文档生成 skill。关键词：BP、商业计划书、尽调、研报、简报、投研、分析股票、行业研究、产业分析、赛道扫描、.pptx+分析、.pdf+分析。技能名是 ir-coordinator，不是 nir-coordinator。"
+description: "投研工作流调度中心。收到股票标的、公司名或BP后，自动编排完整管线，协调多个专业Agent并行工作。当用户说'分析XX股票'、'看这个BP'、'做个尽调'、'跑个研报'、'写篇简报'、'写个简报'、'出个简报'、'看看这个项目'、'帮我看下这个BP'、'帮我分析XX公司'、'调研一下XX'、'写个XX行业研究'、'分析XX行业'、'做个产业分析'、'跑个赛道扫描'时触发。BP管线支持两种输入模式：1）有PDF/PPTX/DOCX文件时走OCR模式；2）仅有公司名时走搜索入库模式（--pipeline bp），无需文件。当用户发送 PDF/PPTX/DOCX 文件并要求写简报、做分析、做尽调时，必须触发此 skill 而非 PPT演示文稿/Word文档生成/PDF文档生成 skill。关键词：BP、商业计划书、尽调、研报、简报、投研、分析股票、分析公司、行业研究、产业分析、赛道扫描、.pptx+分析、.pdf+分析。技能名是 ir-coordinator，不是 nir-coordinator。"
 allowed-tools:
   - Task
   - Read
@@ -417,7 +417,14 @@ finalize_pipeline(task_id, entity, market)  # IR
 
 ## BP 尽调模式
 
-当输入是 BP（PDF/PPTX/DOCX）时，触发 BP 管线。详细流程读 **references/pipeline/bp-pipeline.md**。
+当用户给了 BP 文件（PDF/PPTX/DOCX）**或仅给了公司名要求做尽调**时，触发 BP 管线。详细流程读 **references/pipeline/bp-pipeline.md**。
+
+**⚠️ BP 管线双入口（2026-07-20 新增，绝对不要拒绝无文件的 BP 任务）**：
+- **PDF 模式**：用户附了文件 → `submit --entity "XX" --input-file /path/to/bp.pdf`
+- **公司名模式**：用户只给了公司名 → `submit --entity "XX" --pipeline bp`（**必须加 --pipeline bp**，否则会被路由到 IR）
+- Phase 01b 子代理会全面搜索天眼查（10 个 API）+ Westock + Web（中英文 18 组查询）+ 新闻 + 名称变体
+- 如果搜到 BP PDF → 自动下载并路由回 Phase 01 做完整 OCR
+- **绝对不要因为"没有 BP 文件"而拒绝走 BP 管线或建议用户走 IR**
 
 **⚠️ BP 管线 v4.4 关键变更（2026-06-29 更新）**：
 - 8 维度 → 5 波次 sequential 派发（Wave1: 4维度, Wave2: 客户收入, Wave3: 竞争+估值, Wave4: dealbreaker, Synthesis）
