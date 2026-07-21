@@ -1,6 +1,6 @@
 ---
 name: ir-coordinator
-version: 3.2.0
+version: 3.3.0
 description: "投研工作流调度中心。收到股票标的、公司名或BP后，自动编排完整管线，协调多个专业Agent并行工作。当用户说'分析XX股票'、'看这个BP'、'做个尽调'、'跑个研报'、'写篇简报'、'写个简报'、'出个简报'、'看看这个项目'、'帮我看下这个BP'、'帮我分析XX公司'、'调研一下XX'、'写个XX行业研究'、'分析XX行业'、'做个产业分析'、'跑个赛道扫描'时触发。BP管线支持两种输入模式：1）有PDF/PPTX/DOCX文件时走OCR模式；2）仅有公司名时走搜索入库模式（--pipeline bp），无需文件。当用户发送 PDF/PPTX/DOCX 文件并要求写简报、做分析、做尽调时，必须触发此 skill 而非 PPT演示文稿/Word文档生成/PDF文档生成 skill。关键词：BP、商业计划书、尽调、研报、简报、投研、分析股票、分析公司、行业研究、产业分析、赛道扫描、.pptx+分析、.pdf+分析。技能名是 ir-coordinator，不是 nir-coordinator。"
 allowed-tools:
   - Task
@@ -28,8 +28,9 @@ allowed-tools:
 4. **Never delegate understanding** — 你必须理解每个 step 的产出
 5. **验证必须是 adversarial** — 不是"检查一下"，是"想尽办法推翻"
 6. **子代理必须用 team 模式派发（sequential，逐个）** — 同步 task() 会 code=10003 挂掉
-7. **Research Plan 由管线自动生成（v5.3）** — phase04_research_plan 自动派发子代理（有 westock-mcp/tyc-mcp 搜索能力）生成 research_plan.json，phase04_research_plan_collect 负责校验和落盘。**Coordinator 不应手动调用 `prepare_research_plan()`**，否则会在子代理派发前创建旧版脚本 plan，导致 collect 阶段冲突。让管线自己走完 phase04 即可。
-8. **Presearch 已废弃（v5.3 路径B）** — IR/BP/IC 三条管线的 phase03 presearch 全部砍掉，搜索由 phase04 子代理全权执行（westock-mcp + tyc-mcp + search_deep(Bash) + tencent_news）。Coordinator 不需要为 presearch 做任何准备工作。
+7. **Research Plan 由管线自动生成（v5.3）** — phase04_research_plan 自动派发子代理（有 westock-mcp/tyc-mcp/ima-mcp 搜索能力）生成 research_plan.json（含 ima_insights 字段），phase04_research_plan_collect 负责校验和落盘。**Coordinator 不应手动调用 `prepare_research_plan()`**，否则会在子代理派发前创建旧版脚本 plan，导致 collect 阶段冲突。让管线自己走完 phase04 即可。
+8. **Presearch 已废弃（v5.3 路径B）** — IR/BP/IC 三条管线的 phase03 presearch 全部砍掉，搜索由 phase04 子代理全权执行（westock-mcp + tyc-mcp + ima-mcp + search_deep(Bash) + tencent_news）。Coordinator 不需要为 presearch 做任何准备工作。
+9. **IMA 知识库已接入 IR 管线（2026-07-21）** — `IR_SUBAGENT_CONNECTOR_IDS` 新增 `ima-mcp`，5 个订阅知识库（12万+机构研报/专家纪要/外资研报/行业报告）对全部 10 个 step 子代理开放。Phase04 research plan 子代理新增 Step 6 IMA 预扫（搜 2-3 个 KB，输出 ima_insights 字段）。`launch_next_wave` 数据源路由表新增 IMA 行 + KB ID 速查 + 使用纪律。`_common_tool_guide.md` 新增完整 IMA 使用指南。
 9. **子代理无 web_search 工具（2026-07-20 固化）** — 本环境 general-purpose 子代理**没有 web_search 内置工具**，直接调用会静默失败。通用网络搜索统一用 Bash 调 `search_gateway`（`search_deep` / `neodata_search` / `tencent_news_search`）。管线的 launcher 和 `_common_tool_guide.md` 已全部替换，但如果 Coordinator 手动构建子代理 prompt，**必须在 prompt 中声明此约束**。
 10. **classify_job IC 关键词已扩展（2026-07-20）** — `_IC_KEYWORDS` 新增"产业全景/标的对标/赛道深度/产业对标"等 10 个关键词，不再需要给 query 加"【行业深度研究】"前缀来强制命中 IC。
 
