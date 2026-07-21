@@ -170,6 +170,10 @@ web_fetch: {搜索结果中的URL}
 | 可比公司板块/产业链 | westock-mcp | 板块归属和产业链位置 |
 | 可比交易（融资/估值/轮次） | WebSearch → WebFetch 深读 | 非上市公司交易数据 |
 | 行业估值水平（PS/PE 均值） | WebSearch + NeoData (doc) | 行业基准 |
+| **可比公司投关记录/估值纪要** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{可比公司名} 估值 投关 调研 纪要` | 上市可比公司投关记录原文 |
+| **机构对标的/行业的估值观点** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易` | 机构调研纪要中的估值判断 |
+
+**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 长安投研 —《标题》(日期)`
 
 ## 搜索策略（分步流程）
 

@@ -234,6 +234,10 @@ web_fetch: {搜索结果中的URL}
 | 竞品产品参数/价格 | WebSearch | 搜 datasheet/评测 |
 | 行业排名/市场份额 | WebSearch | 搜行业分析 |
 | 竞品官网/产品页 | WebFetch | 直接抓取 |
+| **竞品投关记录/管理层表态** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{竞品名} 投关 调研 纪要 竞争` | 上市竞品投关记录中的竞争表态 |
+| **机构对竞品的评价** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化` | 机构调研纪要中的竞争分析 |
+
+**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 长安投研 —《标题》(日期)`
 
 ## 搜索策略（分步流程）
 

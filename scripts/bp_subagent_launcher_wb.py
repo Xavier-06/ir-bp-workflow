@@ -979,21 +979,25 @@ _BP_SEARCH_TEMPLATES = {
         '"{entity}" investment thesis core hypothesis growth driver',
         '"{entity}" market consensus bull bear case',
         '"{entity}" 投资逻辑 增长驱动 市场预期 分歧',
+        # IMA: 长安投研 + 机构调研纪要（快速扫机构共识与分歧）
     ],
     'bp_consensus_challenge': [
         '"{entity}" analyst consensus market expectation sell side',
         '"{entity}" expectation gap contrarian view consensus vs reality',
         '"{entity}" 卖方共识 预期差 市场定价 非共识',
+        # IMA: 长安投研 + 机构调研纪要（搜卖方共识、外资非共识、预期差案例）
     ],
     'bp_catalyst': [
         '"{entity}" catalyst event timeline milestone trigger',
         '"{entity}" upcoming event policy product launch earnings',
         '"{entity}" 催化剂 事件 时间窗口 里程碑 触发器',
+        # IMA: 长安投研 + 机构调研纪要（搜催化事件时间线、政策落地节奏）
     ],
     'bp_industry_research': [
         '"{entity}" industry report market size TAM SAM deep research',
         '"{entity}" supply chain cost structure technology roadmap benchmark',
         '"{entity}" 行业研报 市场规模 技术路线 成本结构 产业链',
+        # IMA: 行研智库 + 精选报告 + 机构调研纪要（搜行业深度研报、第三方白皮书）
     ],
     'bp_团队与合规': [
         '"{entity}" founder background legal compliance litigation',

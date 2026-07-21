@@ -48,10 +48,16 @@
 ## 工具路由
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 券商行业研报 | westock-mcp: data_report | web_search |
-| 市场规模数据 | web_search | NeoData |
-| 头部公司财务 | westock-mcp: data_finance/data_quote | NeoData |
-| 行业动态 | web_search | 腾讯新闻 CLI |
+| 券商行业研报 | westock-mcp: data_report | **IMA 行研智库 (7311568991699459)** → web_search |
+| 市场规模/TAM/SAM | **IMA 精选行业报告 (7302509206984644)**: `search_knowledge` 搜 `{行业} 市场规模 TAM` | NeoData(doc) → web_search |
+| 技术路线横评 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 技术路线 对比 横评` | web_search |
+| 产业链成本结构 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 产业链 成本结构 拆解` | web_search |
+| 头部公司财务 | westock-mcp: data_finance/data_quote | **IMA 公司调研报告 (7302533890465245)** → NeoData |
+| 法规标准清单 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 法规 标准 国标 认证` | web_search |
+| 行业动态 | 腾讯新闻 CLI | **IMA 长安投研 (7297585010204027)** |
+
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。
+行业研报角色是 IMA 命中率最高的角色——行研智库 + 精选报告两个库直接对口。每个库搜 1-2 次，取 top 1 结果全文提取即可。
 
 ## 禁区
 - 不要分析标的公司的技术/产品/竞争地位

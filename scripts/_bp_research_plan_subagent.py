@@ -84,7 +84,7 @@ def bp_build_research_plan_instruction(
         f"- name = 'bp-research-planner'\n"
         f"- team_name = 'bp-{job_id}'\n"
         "- mode = 'bypassPermissions'\n"
-        "- connectorIds = ['tyc-mcp', 'westock-mcp']\n"
+        "- connectorIds = ['tyc-mcp', 'westock-mcp', 'ima-mcp']\n"
         "- prompt = the FULL prompt below (do not truncate)\n"
         "\n"
         "### Subagent Prompt (copy ALL to the Agent):\n"
@@ -158,16 +158,25 @@ def bp_build_research_plan_instruction(
         '"\n'
         "```\n"
         "\n"
+        "### Step 5: IMA Institutional Knowledge (ima-mcp — 12万+篇投研纪要/行业研报)\n"
+        "Search IMA knowledge bases for institutional-grade insights that web search cannot reach:\n"
+        "- ima-mcp.search_knowledge: knowledge_base_id='7311568991699459' (行研智库), query='[industry] 市场规模 技术路线 竞争格局' → industry deep reports\n"
+        "- ima-mcp.search_knowledge: knowledge_base_id='7297585010204027' (长安投研), query='{entity} OR [industry] 机构观点 调研纪要' → institutional analyst notes\n"
+        "- ima-mcp.search_knowledge: knowledge_base_id='7302533890465245' (公司调研报告), query='{entity} OR [competitor names]' → company investor relations records\n"
+        "- If search returns results, use ima-mcp.fetch_media_content on the top 1 most relevant media_id to get full text\n"
+        "- Record in search_summary: which KB was searched, query used, results found, content fetched\n"
+        "- IMA results are institution-grade alpha — broker phone call transcripts, expert exchanges, internal research notes\n"
+        "\n"
         "## Competitor Extraction (MANDATORY — do NOT skip)\n"
         "\n"
-        "After your searches, you MUST populate a `competitors` field in the output JSON.\n"
+        "After your searches (including IMA), you MUST populate a `competitors` field in the output JSON.\n"
         "This field is consumed downstream by the valuation sub-agent (Wave3) to pick comparable companies.\n"
         "If you skip it, the valuation step will have NO competitor list and will guess blindly.\n"
         "\n"
         "How to populate `competitors`:\n"
         "1. Read the BP OCR text (bp_ocr_text.txt) — look for company names mentioned as competitors/benchmarks\n"
         "2. Check the brief's `competitors` field if it already has names\n"
-        "3. From your tyc/westock/search_deep results — extract any named companies that compete with {entity}\n"
+        "3. From your tyc/westock/search_deep/IMA results — extract any named companies that compete with {entity}\n"
         "4. Include BOTH listed and unlisted companies (e.g., DJI, Insta360, GoPro, Proscenic, Roborock)\n"
         "5. For each competitor, record: name, ticker (if listed), and main business\n"
         "\n"
@@ -196,7 +205,7 @@ def bp_build_research_plan_instruction(
         f'  "entity": "{entity}",\n'
         f'  "market": "{market}",\n'
         f'  "stage_tier": "{stage_tier}",\n'
-        f'  "data_sources_used": ["tyc-mcp:company", "westock-mcp:industry/reports", "search_deep:public"],\n'
+        f'  "data_sources_used": ["tyc-mcp:company", "westock-mcp:industry/reports", "ima-mcp:institutional_research", "search_deep:public"],\n'
         f'  "competitors": [{{"name": "Insta360影石", "ticker": "", "main_business": "运动相机/全景相机"}}, {{"name": "大疆DJI", "ticker": "", "main_business": "无人机/影像系统"}}, {{"name": "GoPro", "ticker": "GPRO", "main_business": "运动相机"}}],\n'
         f'  "core_questions": [{{\n'
         f'    "question_id": "CQ1",\n'

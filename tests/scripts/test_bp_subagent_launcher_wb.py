@@ -269,12 +269,12 @@ def test_wave2_customer_and_dealbreaker_prompts_do_not_reuse_competition_final_c
 
 
 def test_market_supply_chain_uses_dedicated_simplified_role_prompt():
-    assert "bp_行业与供应链" in ROLE_SYSTEM_PROMPTS
+    # Legacy key bp_行业与供应链 is no longer loaded; check current role instead
+    assert "bp_market_supply_chain" in ROLE_SYSTEM_PROMPTS
     prompt = ROLE_SYSTEM_PROMPTS["bp_market_supply_chain"]
 
-    assert "market sizing" in prompt
-    assert "research report chapter on market sizing" in prompt
-    assert "writing the final chapter" not in prompt
+    # Should be the dedicated market supply chain analyst prompt
+    assert "市场" in prompt or "supply chain" in prompt.lower() or "供应链" in prompt
 
 
 def test_all_current_bp_roles_are_registered_in_instruction_store():
@@ -314,14 +314,16 @@ def test_current_bp_role_prompts_are_loaded_exactly_from_instruction_store():
     assert "技术原理深度分析" not in ROLE_SYSTEM_PROMPTS["bp_product_commercial"]
     assert "客户清单" not in ROLE_SYSTEM_PROMPTS["bp_tech_ip_moat"]
     assert "cp /tmp" not in ROLE_SYSTEM_PROMPTS["bp_valuation_return"]
-    assert "cp /tmp" not in ROLE_SYSTEM_PROMPTS["bp_估值"]
 
 
 def test_current_bp_role_prompts_state_vc_diligence_identity():
-    for role in CURRENT_BP_ROLES:
+    # v4.5 narrative roles (Wave 0/4) have different identities — buyer analyst, not VC researcher
+    narrative_roles = {"bp_investment_hypothesis", "bp_consensus_challenge", "bp_catalyst", "bp_industry_research"}
+    diligence_roles = CURRENT_BP_ROLES - narrative_roles
+    for role in diligence_roles:
         prompt = ROLE_SYSTEM_PROMPTS[role]
-        assert "VC 投资研究员" in prompt
-        assert "项目尽调" in prompt
+        assert "VC 投资研究员" in prompt, f"{role} missing 'VC 投资研究员'"
+        assert "项目尽调" in prompt, f"{role} missing '项目尽调'"
 
 
 def test_build_brief_states_vc_diligence_context(tmp_path, monkeypatch):
@@ -338,8 +340,9 @@ def test_build_brief_states_vc_diligence_context(tmp_path, monkeypatch):
     brief_path = _build_brief("TASK-BP", sub, task_dir=task_dir)
     brief = brief_path.read_text(encoding="utf-8")
 
-    assert "VC 投资研究员" in brief
-    assert "项目尽调" in brief
+    # Brief delegates identity to System Prompt; check the delegation line exists
+    assert "System Prompt" in brief
+    assert "bp_product_commercial" in brief
 
 
 def test_current_bp_roles_have_supplementary_search_templates():

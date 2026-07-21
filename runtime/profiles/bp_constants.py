@@ -13,24 +13,56 @@ BP_TYC_CONNECTOR_IDS = ['tyc-mcp']
 # 面向上市公司的结构化金融数据：板块/产业链/资金流/北向/机构评级/券商研报（data_report）
 BP_WESTOCK_CONNECTOR_IDS = ['westock-mcp']
 
+# IMA 知识库 MCP connector ID 列表 —— 投研纪要/行业研报/专家交流/公司调研
+# 5 个订阅知识库合计 12 万+ 篇研报纪要，语义搜索 + 全文提取
+# KB IDs: 行研智库(7311568991699459) / 机构调研纪要(7300811407257275) /
+#         长安投研(7297585010204027) / 公司调研报告(7302533890465245) /
+#         精选行业数据报告(7302509206984644)
+BP_IMA_CONNECTOR_IDS = ['ima-mcp']
+
+# IMA 知识库 ID 映射 —— 按管线角色选库搜索
+IMA_KB_IDS = {
+    "industry_reports": "7311568991699459",      # 行研智库 3786篇（券商行业深度，分年份/行业）
+    "institutional_notes": "7300811407257275",    # 机构调研纪要 33331篇（外资研报/专家交流/券商点评，日更）
+    "expert_insights": "7297585010204027",        # 长安投研 46493篇（投资内参/电话会议/机构点评，日更）
+    "company_research": "7302533890465245",       # 公司调研报告 35458篇（上市公司投关记录PDF，日更）
+    "curated_reports": "7302509206984644",        # 精选行业数据报告 1442篇（第三方白皮书：艾瑞/头豹/奥纬等）
+}
+
+# 角色 → IMA 知识库路由 —— 每个角色搜哪些库（控制在 2-3 个，避免全搜浪费 token）
+IMA_ROLE_KB_MAP = {
+    "bp_investment_hypothesis":    ["expert_insights", "institutional_notes"],
+    "bp_company_team_compliance":  ["expert_insights", "company_research"],
+    "bp_product_commercial":       ["expert_insights", "company_research"],
+    "bp_tech_ip_moat":             ["industry_reports", "expert_insights"],
+    "bp_market_supply_chain":      ["industry_reports", "curated_reports", "expert_insights"],
+    "bp_competition_positioning":  ["company_research", "expert_insights"],
+    "bp_valuation_return":         ["company_research", "expert_insights"],
+    "bp_customer_revenue_validation": ["company_research", "expert_insights"],
+    "bp_dealbreaker_risk":         ["expert_insights", "institutional_notes"],
+    "bp_consensus_challenge":      ["expert_insights", "institutional_notes"],
+    "bp_catalyst":                 ["expert_insights", "institutional_notes"],
+    "bp_industry_research":        ["industry_reports", "curated_reports", "institutional_notes"],
+}
+
 # ── Connector IDs 按角色分配 ──
 # 基础四维（团队合规/技术IP/客户验证/风险）只走天眼查；
 # 所有 8 维度均开放 westock-mcp（子代理按需调用，不再按角色限制）
 # （可比公司的板块/产业链/资金流/北向/机构评级/券商研报 data_report）
 BP_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
-    'bp_company_team_compliance': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_product_commercial': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_tech_ip_moat': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_market_supply_chain': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_competition_positioning': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_valuation_return': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_customer_revenue_validation': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_dealbreaker_risk': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
+    'bp_company_team_compliance': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_product_commercial': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_tech_ip_moat': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_market_supply_chain': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_competition_positioning': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_valuation_return': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_customer_revenue_validation': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_dealbreaker_risk': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     # v4.5 新增：投资叙事层 4 角色
-    'bp_investment_hypothesis': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_consensus_challenge': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_catalyst': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
-    'bp_industry_research': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS,
+    'bp_investment_hypothesis': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_consensus_challenge': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_catalyst': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    'bp_industry_research': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
 }
 
 # Wave 0: 投资假说框架 —— 先行者，在所有维度子代理之前跑

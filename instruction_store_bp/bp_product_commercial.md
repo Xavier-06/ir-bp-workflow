@@ -196,6 +196,10 @@ web_fetch: {搜索结果中的URL}
 | **上市客户/合作方研报** | **NeoData (`neodata_search` data_type=doc)** | **客户深度研报、行业分析** |
 | **可比上市公司客户所在 板块/产业链/资金流** | **westock-mcp（`data_sector`/`data_industry_chain`/`data_fund_flow`）** | **客户行业格局、产业链位置、资金动向——结构化，比 WebSearch 精准** |
 | 产品官网/产品页 | WebFetch | 直接抓取 |
+| **机构对产品/客户的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{公司/产品名} 产品 客户 订单 反馈` | 机构调研纪要中的产品/客户评价 |
+| **客户投关记录/管理层表态** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{客户名} 投关 调研 纪要` | 上市客户的投关记录原文 |
+
+**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 长安投研 —《标题》(日期)`
 
 ## 搜索策略（分步流程）
 

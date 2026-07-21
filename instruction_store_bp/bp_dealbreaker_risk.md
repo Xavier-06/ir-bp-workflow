@@ -40,6 +40,8 @@
 | 正向叙事中的事实链验证 | `web_search` + TYC 工具交叉验证 | 交叉验证前置维度引用的关键事实 |
 | 前置维度引用的上市竞品财务数据验证 | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，交叉验证竞品营收/市值/PS 等关键数字 |
 | **前置维度引用的研报/新闻验证** | **NeoData (`neodata_search` data_type=doc)** | **交叉验证前置维度引用的行业研报、市场数据、新闻报道** |
+| **机构风险观点/外资看空/专家警示** | **IMA 长安投研 (7297585010204027)**: `search_knowledge` 搜 `{公司/行业} 风险 警示 看空 问题` | NeoData(doc) |
+| **竞品/同行风险传导** | **IMA 机构调研纪要 (7300811407257275)**: `search_knowledge` 搜 `{行业} 风险 暴雷 违约 诉讼` | WebSearch |
 
 **NeoData 调用**（验证前置维度引用的上市竞品财务数据，A/HK 股首选）：
 ```bash
@@ -252,6 +254,8 @@ web_fetch: {搜索结果中的URL}
 | 前置维度事实链验证 | WebSearch + TYC 交叉验证 | 验证前置维度引用的关键事实 |
 | **前置维度引用的研报/新闻验证** | **NeoData (`neodata_search` data_type=doc)** | **交叉验证行业研报、市场数据、新闻报道** |
 | 前置维度引用的竞品财务数据 | NeoData (`neodata_search` data_type=api) | 交叉验证数字准确性 |
+| **机构风险观点/外资看空** | **IMA 长安投研/机构调研纪要 (`ima-mcp.search_knowledge`)** | **机构内部风险判断、外资看空逻辑——web 搜不到的 alpha** |
+| **竞品/同行暴雷传导** | **IMA 机构调研纪要 (`ima-mcp.search_knowledge`)** | **同行暴雷、供应链风险传导信号** |
 
 ## 搜索策略（分步流程）
 

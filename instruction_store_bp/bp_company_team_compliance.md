@@ -280,6 +280,10 @@ web_fetch: {搜索结果中的URL}
 | **创始人/高管财经报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻——比 web_search 更精准** |
 | 上市战略股东财务体量 | NeoData (`neodata_search` data_type=api) | 行情/财报结构化 |
 | **战略股东/关联方研报新闻** | **NeoData (`neodata_search` data_type=doc)** | **上市股东深度研报、投资分析、新闻动态** |
+| **机构对创始人/管理层的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{创始人/CEO名} 点评 履历 评价` | 机构内部人物评价，web 搜不到 |
+| **上市关联方投关记录** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{上市股东/战略方名} 投关 调研` | 机构调研纪要中的关联方表态 |
+
+**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 长安投研 —《标题》(日期)`
 
 ## 搜索策略（分步流程）
 

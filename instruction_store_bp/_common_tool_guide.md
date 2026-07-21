@@ -315,7 +315,11 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 司法诉讼/风险/处罚 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
 | 专利/商标/软著 | TYC `search_patents` / `search_trademarks` / `call_tool` | WebSearch |
 | 企业资质/招投标 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
-| **券商研报/行业深度报告** | **NeoData (`neodata_search` data_type=doc)** | WebSearch → WebFetch 深读 |
+| **券商研报/行业深度报告** | **NeoData (`neodata_search` data_type=doc)** | IMA行研智库 → WebSearch → WebFetch 深读 |
+| **机构调研纪要/专家交流** | **IMA 长安投研/机构调研纪要库 (`ima-mcp.search_knowledge`)** | NeoData(doc) → WebSearch |
+| **外资研报/非共识观点** | **IMA 机构调研纪要库 (`ima-mcp.search_knowledge`)** | WebSearch → WebFetch 深读 |
+| **上市公司投关记录/管理层表态** | **IMA 公司调研报告库 (`ima-mcp.search_knowledge`)** | westock-mcp data_report → WebSearch |
+| **第三方白皮书/市场规模** | **IMA 精选行业报告库 (`ima-mcp.search_knowledge`)** | NeoData(doc) → WebSearch |
 | **中文公司新闻（融资/产品/人事）** | **腾讯新闻 (`tencent_news_search`) — 0.7s最快** | NeoData(doc) → WebSearch |
 | **财经新闻/行业动态/政策** | **腾讯新闻 (`tencent_news_search`)** | NeoData(doc) → WebSearch |
 | **负面新闻/风险舆情** | **腾讯新闻 (`tencent_news_search`)** | NeoData(doc) → WebSearch |
@@ -323,6 +327,63 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 通用网络搜索 | WebSearch → WebFetch 深读 | — |
 | 读某个 URL 的正文 | WebFetch | — |
 | **可比公司板块/产业链/资金流/北向/机构评级** | **westock-mcp（`data_sector`/`data_industry_chain`/`data_fund_flow`/`data_north_holding`/`data_rating`）** | NeoData(doc) → WebSearch |
+
+### 3.6 IMA 知识库（ima-mcp，12万+篇投研纪要/行业研报/专家交流，全部12维度可用）
+
+**✅ 已对全部 12 个角色开放授权（connector `ima-mcp`）。5 个订阅知识库合计 120,000+ 篇专业投研内容，语义搜索 + 全文提取，是传统 web 搜索无法触达的机构级数据源。**
+
+**IMA 提供的是 web 搜索找不到的机构内部视角**——券商电话会议速记、专家交流纪要、外资内部研报、上市公司投关记录原文、第三方行业白皮书。
+
+| 知识库 | 总量 | 特色 | 何时用 |
+|--------|------|------|--------|
+| **长安投研** | 46,493篇 | 机构点评/投资内参/电话会议，日更 | 搜机构观点、业绩预测、行业分歧、催化剂事件 |
+| **机构调研纪要库** | 33,331篇 | 外资研报/专家交流/券商点评，日更 | 搜专家观点、外资视角、共识挑战、风险信号 |
+| **公司调研报告库** | 35,458篇 | 上市公司投关记录PDF/Word，日更 | 搜竞品财务数据、客户验证、管理层表态 |
+| **行研智库** | 3,786篇 | 券商行业深度（分年份/行业） | 搜行业研报、技术路线横评、TAM/SAM、产业链 |
+| **精选行业数据报告** | 1,442篇 | 第三方白皮书（艾瑞/头豹/奥纬等） | 搜市场规模、用户画像、竞争格局、趋势预测 |
+
+**ima-mcp 工具调用方式：**
+
+```
+# Step 1: 语义搜索（返回标题+摘要+media_id）
+ima-mcp.search_knowledge:
+  knowledge_base_id: "库ID（见角色路由表）"
+  query: "{行业名} {搜索主题}"
+
+# Step 2: 全文提取（用 media_id 读取完整内容）
+ima-mcp.fetch_media_content:
+  media_id: "搜索结果中的 media_id"
+```
+
+**角色 → IMA 知识库路由（从 bp_constants.IMA_ROLE_KB_MAP 读取）：**
+
+| 角色 | 首选库 | 补充库 |
+|------|--------|--------|
+| company_team_compliance | 长安投研、公司调研报告 | — |
+| product_commercial | 长安投研、公司调研报告 | — |
+| tech_ip_moat | 行研智库、长安投研 | — |
+| market_supply_chain | 行研智库、精选行业报告、长安投研 | — |
+| competition_positioning | 公司调研报告、长安投研 | — |
+| valuation_return | 公司调研报告、长安投研 | — |
+| customer_revenue_validation | 公司调研报告、长安投研 | — |
+| dealbreaker_risk | 长安投研、机构调研纪要 | — |
+| investment_hypothesis | 长安投研、机构调研纪要 | — |
+| consensus_challenge | 长安投研、机构调研纪要 | — |
+| catalyst | 长安投研、机构调研纪要 | — |
+| industry_research | 行研智库、精选行业报告、机构调研纪要 | — |
+
+**知识库 ID 速查：**
+- 行研智库: `7311568991699459`
+- 机构调研纪要: `7300811407257275`
+- 长安投研: `7297585010204027`
+- 公司调研报告: `7302533890465245`
+- 精选行业报告: `7302509206984644`
+
+**搜索纪律：**
+- IMA 搜索在 web 搜索**之后**做（先公开数据打底，再用 IMA 补机构视角）
+- 每次搜索最多取 top 3 结果，全文提取最多 1 篇（控制 token 消耗）
+- IMA 搜索结果标注来源时必须写清库名+标题，如 `[^N]: 长安投研 —《xxx》(2026-07)`
+- 如果 IMA 搜不到相关内容（返回空或无关），直接跳过，不要硬凑
 
 ### ⚠️ 不可用工具清单
 
@@ -354,9 +415,12 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 公司财务数据 | NeoData api / westock-mcp | "公司名 营收 利润" | N 条 |
 | 股东信息 | TYC call_tool | "公司名 股东" | N 条 |
 | 行业新闻 | 腾讯新闻 | "关键词" | N 条 |
+| 机构调研/专家观点 | IMA 长安投研/机构纪要 | "关键词" | N 条 |
+| 行业研报/白皮书 | IMA 行研智库/精选报告 | "关键词" | N 条 |
 | ... | ... | ... | ... |
 
 来源域名: [列出所有引用的域名]
+IMA 来源: [列出引用的 IMA 知识库名 + 标题]
 ```
 
 如果全部来源都是通用搜索(search_deep)，说明为什么没用结构化数据源（没有合理理由将被视为质量不合格）。
@@ -365,14 +429,14 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 | 角色 | 可以做 | 禁止做 |
 |------|--------|--------|
-| company_team_compliance | TYC 工商/股东/高管/实控人/风险/资质 + WebSearch 人物履历 + NeoData(api)上市股东 + **NeoData(doc)行业新闻/人物报道** + **westock-mcp 上市关联方板块/产业链/资金流** | 估值分析/市场规模推算/技术路线/论文 |
-| product_commercial | TYC 客户验证/招投标 + WebSearch 产品/客户/合同 + NeoData(api)上市客户 + **NeoData(doc)行业新闻/产品报道** + **westock-mcp 可比上市公司客户所在板块/产业链/资金流** | 估值分析/技术路线/市场规模 |
-| tech_ip_moat | TYC 专利/商标/软著 + WebSearch 技术路线/论文/标准 + NeoData(api)竞品研发 + **NeoData(doc)技术趋势/行业研报** + **westock-mcp 上市可比技术公司板块/产业链/机构评级** | 估值分析/市场规模/客户收入 |
-| market_supply_chain | NeoData(api+doc)行业研报/竞对/新闻 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 + **westock-mcp 上市竞对板块/产业链/资金流/北向/机构评级** | 估值建模/技术路线/团队分析 |
-| competition_positioning | TYC 竞品验证 + NeoData(api+doc)/yfinance 竞品财务/新闻/研报 + **westock-mcp 板块/产业链/资金流/北向/机构评级** + WebSearch 竞品情报 | 估值主模型/客户收入主结论/泛化风险 |
-| valuation_return | NeoData(api+doc)/yfinance/enrich_valuation 三源估值+研报 + **westock-mcp 板块/产业链/机构评级/资金流** + WebSearch 可比交易 | 客户验证/技术判断/竞品主分析/市场规模 |
-| customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData(api)上市客户 + **NeoData(doc)客户新闻/订单报道** + **westock-mcp 上市客户板块/产业链/资金流** | 估值分析/技术判断/市场规模/竞品主分析 |
-| dealbreaker_risk | TYC 风险全扫(35项) + **NeoData(doc)负面新闻/风险舆情/监管动态** + WebSearch 负面/舆情/监管 + NeoData(api)前置验证 + **westock-mcp 上市主体板块/产业链/资金流/北向/机构评级（风险佐证）** | 估值建模/客户主验证/技术判断/市场规模 |
+| company_team_compliance | TYC 工商/股东/高管/实控人/风险/资质 + WebSearch 人物履历 + NeoData(api)上市股东 + **NeoData(doc)行业新闻/人物报道** + **westock-mcp 上市关联方板块/产业链/资金流** + **IMA 长安投研/公司调研报告（机构点评/人物报道）** | 估值分析/市场规模推算/技术路线/论文 |
+| product_commercial | TYC 客户验证/招投标 + WebSearch 产品/客户/合同 + NeoData(api)上市客户 + **NeoData(doc)行业新闻/产品报道** + **westock-mcp 可比上市公司客户所在板块/产业链/资金流** + **IMA 长安投研/公司调研报告（产品/客户/订单纪要）** | 估值分析/技术路线/市场规模 |
+| tech_ip_moat | TYC 专利/商标/软著 + WebSearch 技术路线/论文/标准 + NeoData(api)竞品研发 + **NeoData(doc)技术趋势/行业研报** + **westock-mcp 上市可比技术公司板块/产业链/机构评级** + **IMA 行研智库/长安投研（技术路线横评/专家交流）** | 估值分析/市场规模/客户收入 |
+| market_supply_chain | NeoData(api+doc)行业研报/竞对/新闻 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 + **westock-mcp 上市竞对板块/产业链/资金流/北向/机构评级** + **IMA 行研智库/精选报告/长安投研（行业深度/白皮书/TAM）** | 估值建模/技术路线/团队分析 |
+| competition_positioning | TYC 竞品验证 + NeoData(api+doc)/yfinance 竞品财务/新闻/研报 + **westock-mcp 板块/产业链/资金流/北向/机构评级** + WebSearch 竞品情报 + **IMA 公司调研报告/长安投研（竞品投关记录/机构点评）** | 估值主模型/客户收入主结论/泛化风险 |
+| valuation_return | NeoData(api+doc)/yfinance/enrich_valuation 三源估值+研报 + **westock-mcp 板块/产业链/机构评级/资金流** + WebSearch 可比交易 + **IMA 公司调研报告/长安投研（可比公司估值/机构观点）** | 客户验证/技术判断/竞品主分析/市场规模 |
+| customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData(api)上市客户 + **NeoData(doc)客户新闻/订单报道** + **westock-mcp 上市客户板块/产业链/资金流** + **IMA 公司调研报告/长安投研（客户投关记录/机构点评）** | 估值分析/技术判断/市场规模/竞品主分析 |
+| dealbreaker_risk | TYC 风险全扫(35项) + **NeoData(doc)负面新闻/风险舆情/监管动态** + WebSearch 负面/舆情/监管 + NeoData(api)前置验证 + **westock-mcp 上市主体板块/产业链/资金流/北向/机构评级（风险佐证）** + **IMA 长安投研/机构调研纪要（风险信号/外资观点）** | 估值建模/客户主验证/技术判断/市场规模 |
 | 统稿 | Read 所有维度输出 + Write 完整报告 | 搜任何外部数据 |
 
 ## 搜索规范

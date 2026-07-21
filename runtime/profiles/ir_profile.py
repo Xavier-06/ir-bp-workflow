@@ -299,10 +299,12 @@ KB ID 速查：
 - 精选行业数据报告: `7302509206984644`
 
 搜索策略：
-1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7297585010204027", query="{entity} {行业关键词}")` — 专家调研视角
+> **占位符说明**：`{{行业关键词如半导体}}` 是模板示例。子代理应根据 entity 实际所属行业替换。
+> 行业识别方法：用 westock-mcp `data_sector` 查 entity 的申万行业分类 → 用 tyc-mcp 经营范围推断 → 取交集即得行业关键词。
+1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7297585010204027", query="{entity} {{行业关键词如半导体集成电路}}")` — 专家调研视角
 2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302533890465245", query="{entity}")` — 券商深度研报
-3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} {行业关键词}")` — 机构观点/外资视角
-4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{行业名} 市场规模 竞争格局")` — 行业深度报告
+3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} {{行业关键词如半导体集成电路}}")` — 机构观点/外资视角
+4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业名如半导体}} 市场规模 竞争格局")` — 行业深度报告
 
 从 IMA 搜索中提取：
 - 机构共识观点（多家券商一致看法）
