@@ -79,15 +79,44 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | `7311568991699459` | 行业研究报告库(行研智库) | 3,786 | 行研报告（新能源/AI/消费/医药/金融/地产） | 行业趋势、政策解读、TAM/竞争格局 |
 | `7302509206984644` | 精选行业数据报告 | 1,442 | 精选精品报告 | 高质量筛选的行业/公司报告 |
 
-#### 调用方式
+#### 调用方式（两种模式，按库权限区分 — 2026-07-21 实测）
 
-**search_knowledge — 语义搜索（核心工具）：**
+**模式 A：可 fetch 全文库（精选行业报告 / 行研智库 / 机构调研纪要 NOTE 类型）**
+```
+# Step 1: 语义搜索 → 拿到 media_id + introduction 摘要
+mcp__ima-mcp__search_knowledge(knowledge_base_id="库ID", query="搜索词")
+# Step 2: 全文提取 → 取 top 1 最相关结果的 media_id
+mcp__ima-mcp__fetch_media_content(media_id="搜索结果中的 media_id")
+```
+
+**模式 B：仅搜索摘要库（长安投研 / 公司调研报告 — 库主禁止导出，API 无法 fetch 全文）**
+```
+# 只做 Step 1: 语义搜索
+mcp__ima-mcp__search_knowledge(knowledge_base_id="库ID", query="搜索词")
+# introduction 字段已含 200-500 字结构化摘要（关键数据+机构观点+核心结论），直接引用
+# 如果返回 can_fetch_content=true 的结果，可尝试 fetch；fetch 失败则用 introduction
+```
+
+**⚠️ 长安投研特殊搜索技巧（重要！）：**
+长安投研库里有两种文件：`_导读.docx`（音频转写开头300字，信息密度低）和 `.txt`（机构短评正文，信息密度极高）。
+**搜索时必须加 TXT 类型过滤**，否则会被 `_导读.docx` 淹没：
 ```
 mcp__ima-mcp__search_knowledge(
   knowledge_base_id="7297585010204027",
-  query="公司名 行业 关键词"
+  query="{公司/行业} 关键词",
+  filters=[{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media_type": ["TXT"]}}]
 )
 ```
+TXT 文件的 `introduction` 字段就是完整正文（200-300字机构短评），含具体数据、投资观点、标的推荐。
+
+**⚠️ 各库 fetch 权限实测（2026-07-21）：**
+| 库 | fetch | 原因 | 策略 |
+|---|---|---|---|
+| 精选行业报告 | ✅ 100% | 库主允许导出 | search → fetch 全文 |
+| 行研智库 | ✅ 100% | 库主允许导出 | search → fetch 全文 |
+| 机构调研纪要 | ✅ NOTE 可 | NOTE 类型可导出 | search → 尝试 fetch，失败用 intro |
+| **长安投研** | ❌ 0% | **库主禁止导出（visible_export=2）** | **search 加 TXT 过滤 → intro 即正文** |
+| 公司调研报告 | ❌ 0% | 库主禁止导出 | search 直接用 introduction |
 
 **get_knowledge_list — 列出文档（按时间/标题排序）：**
 ```

@@ -352,7 +352,7 @@ ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
 ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 ```
 
-**模式 B：仅搜索摘要库（长安投研 / 公司调研报告 — 订阅库无法 fetch 全文）**
+**模式 B：仅搜索摘要库（长安投研 / 公司调研报告 — 库主禁止导出，API 无法 fetch 全文）**
 ```
 # 只做 Step 1: 语义搜索
 ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
@@ -360,14 +360,25 @@ ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
 # 如果返回 can_fetch_content=true 的结果，可尝试 fetch；fetch 失败则用 introduction
 ```
 
+**⚠️ 长安投研特殊搜索技巧（重要！）：**
+长安投研库里有两种文件：`_导读.docx`（音频转写开头300字，信息密度低）和 `.txt`（机构短评正文，信息密度极高）。
+**搜索时必须加 TXT 类型过滤**，否则会被 `_导读.docx` 淹没：
+```
+ima-mcp.search_knowledge:
+  knowledge_base_id: "7297585010204027"
+  query: "{公司/行业} 关键词"
+  filters: [{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media_type": ["TXT"]}}]
+```
+TXT 文件的 `introduction` 字段就是完整正文（200-300字机构短评），含具体数据、投资观点、标的推荐。
+
 **⚠️ 各库 fetch 权限实测（2026-07-21）：**
 | 库 | fetch | 原因 | 子代理策略 |
 |---|---|---|---|
-| 精选行业报告 | ✅ 100% | PDF 库 | search → fetch 全文 |
-| 行研智库 | ✅ 100% | PDF 库 | search → fetch 全文 |
-| 机构调研纪要 | ✅ NOTE 可 | 笔记可、WORD/PDF 部分不可 | search → 尝试 fetch，失败用 intro |
-| 长安投研 | ❌ 0% | 订阅库权限限制 | search 直接用 introduction |
-| 公司调研报告 | ❌ 0% | 订阅库权限限制 | search 直接用 introduction |
+| 精选行业报告 | ✅ 100% | 库主允许导出 | search → fetch 全文 |
+| 行研智库 | ✅ 100% | 库主允许导出 | search → fetch 全文 |
+| 机构调研纪要 | ✅ NOTE 可 | NOTE 类型可导出 | search → 尝试 fetch，失败用 intro |
+| **长安投研** | ❌ 0% | **库主禁止导出（visible_export=2）** | **search 加 TXT 过滤 → intro 即正文** |
+| 公司调研报告 | ❌ 0% | 库主禁止导出 | search 直接用 introduction |
 
 **来源标注格式：**
 - 全文提取成功：`[^N]: IMA {库名} —《{标题}》({日期})`

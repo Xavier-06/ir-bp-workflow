@@ -31,7 +31,8 @@ allowed-tools:
 7. **Research Plan 由管线自动生成（v5.3）** — phase04_research_plan 自动派发子代理（有 westock-mcp/tyc-mcp/ima-mcp 搜索能力）生成 research_plan.json（含 ima_insights 字段），phase04_research_plan_collect 负责校验和落盘。**Coordinator 不应手动调用 `prepare_research_plan()`**，否则会在子代理派发前创建旧版脚本 plan，导致 collect 阶段冲突。让管线自己走完 phase04 即可。
 8. **Presearch 已废弃（v5.3 路径B）** — IR/BP/IC 三条管线的 phase03 presearch 全部砍掉，搜索由 phase04 子代理全权执行（westock-mcp + tyc-mcp + ima-mcp + search_deep(Bash) + tencent_news）。Coordinator 不需要为 presearch 做任何准备工作。
 9. **IMA 知识库已接入 IR 管线（2026-07-21）** — `IR_SUBAGENT_CONNECTOR_IDS` 新增 `ima-mcp`，5 个订阅知识库（12万+机构研报/专家纪要/外资研报/行业报告）对全部 10 个 step 子代理开放。Phase04 research plan 子代理新增 Step 6 IMA 预扫（搜 2-3 个 KB，输出 ima_insights 字段）。`launch_next_wave` 数据源路由表新增 IMA 行 + KB ID 速查 + 使用纪律。`_common_tool_guide.md` 新增完整 IMA 使用指南。
-9. **子代理无 web_search 工具（2026-07-20 固化）** — 本环境 general-purpose 子代理**没有 web_search 内置工具**，直接调用会静默失败。通用网络搜索统一用 Bash 调 `search_gateway`（`search_deep` / `neodata_search` / `tencent_news_search`）。管线的 launcher 和 `_common_tool_guide.md` 已全部替换，但如果 Coordinator 手动构建子代理 prompt，**必须在 prompt 中声明此约束**。
+9b. **IMA 知识库已接入 BP 管线（2026-07-21，commit 6662582）** — `BP_ROLE_CONNECTOR_IDS` 全部 12 角色加 `ima-mcp`。`bp_constants.py` 新增 `IMA_KB_IDS`(5库) + `IMA_ROLE_KB_MAP`(12角色路由)。12 个角色指令文件数据源路由决策表均加 IMA 专属路由（含 KB ID + 精确调用方式）。Phase04 research plan 子代理加 Step 5 IMA 搜索。**fetch 权限实测**：精选行业报告/行研智库 100% 可 fetch；机构调研纪要 NOTE 可 fetch；长安投研/公司调研报告 0% 可 fetch（订阅库），但 introduction 摘要 200-500 字质量极高，子代理直接用。
+9c. **子代理无 web_search 工具（2026-07-20 固化）** — 本环境 general-purpose 子代理**没有 web_search 内置工具**，直接调用会静默失败。通用网络搜索统一用 Bash 调 `search_gateway`（`search_deep` / `neodata_search` / `tencent_news_search`）。管线的 launcher 和 `_common_tool_guide.md` 已全部替换，但如果 Coordinator 手动构建子代理 prompt，**必须在 prompt 中声明此约束**。
 10. **classify_job IC 关键词已扩展（2026-07-20）** — `_IC_KEYWORDS` 新增"产业全景/标的对标/赛道深度/产业对标"等 10 个关键词，不再需要给 query 加"【行业深度研究】"前缀来强制命中 IC。
 
 ## 环境常量

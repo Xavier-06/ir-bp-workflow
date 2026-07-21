@@ -302,10 +302,14 @@ KB ID 速查：
 搜索策略：
 > **占位符说明**：`{{行业关键词如半导体}}` 是模板示例。子代理应根据 entity 实际所属行业替换。
 > 行业识别方法：用 westock-mcp `data_sector` 查 entity 的申万行业分类 → 用 tyc-mcp 经营范围推断 → 取交集即得行业关键词。
-1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7297585010204027", query="{entity} {{行业关键词如半导体集成电路}}")` — 专家调研视角
-2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302533890465245", query="{entity}")` — 券商深度研报
-3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} {{行业关键词如半导体集成电路}}")` — 机构观点/外资视角
-4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业名如半导体}} 市场规模 竞争格局")` — 行业深度报告
+
+**⚠️ fetch 权限实测（2026-07-21）：精选行业报告/行研智库 100%可fetch全文；机构调研纪要仅NOTE可fetch；长安投研/公司调研报告0%可fetch（库主禁止导出），但introduction摘要200-500字质量极高。**
+
+1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7297585010204027", query="{entity} {{行业关键词如半导体集成电路}}", filters=[{{"filter_type":"MEDIA_TYPE_FILTER_TYPE","media_type_filter":{{"media_type":["TXT"]}}}}])` — 专家调研视角（**TXT过滤！intro即正文**）
+2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302533890465245", query="{entity}")` — 券商深度研报（intro摘要，不可fetch）
+3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} {{行业关键词如半导体集成电路}}")` — 机构观点/外资视角（NOTE可fetch全文：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
+4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业名如半导体}} 市场规模 竞争格局")` — 行业深度报告（**可fetch全文**：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
+5. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302509206984644", query="{{行业名如半导体}} 市场规模 TAM")` — 精选报告（**可fetch全文**）
 
 从 IMA 搜索中提取：
 - 机构共识观点（多家券商一致看法）
@@ -824,7 +828,14 @@ def _auto_generate_sidecars_from_md(
     避免整条管线因 sidecar 缺失而卡死。
     """
     md_text = md_path.read_text(encoding="utf-8")
-    step_upper = step_name.replace("_", " ").upper()
+    # fact_id 前缀：保留下划线，避免生成带空格的 id（如 "STEP1 DATA-F001"），
+    # 空格 id 在 section gate 的 fact_id 引用比对中易产生歧义且不利于跨文件溯源。
+    step_upper = step_name.upper()
+
+    # 兜底 fact 的内部溯源引用：这些 fact 由 md 抽取而来，无法逐条映射到外部 URL，
+    # 其可追溯性由 source_quote（报告原句）+ 指向本 step 报告的内部引用共同保证，
+    # 从而满足 fact-store 的 source_url 非空契约（见 scripts/ir_fact_store.py:_normalize_sidecar_fact）。
+    step_provenance = f"ir-report://{task_id}/{step_name}"
 
     # ── 提取 facts ──
     if facts_out is not None:
@@ -865,7 +876,7 @@ def _auto_generate_sidecars_from_md(
                     "value": num_match.group(0),
                     "unit": "",
                     "period": "",
-                    "source_url": url,
+                    "source_url": url or step_provenance,
                     "source_tier": "web" if url else "md_extraction",
                     "source_quote": source_quote,
                     "entity": "",
@@ -891,7 +902,7 @@ def _auto_generate_sidecars_from_md(
                         "value": stripped[:100],
                         "unit": "",
                         "period": "",
-                        "source_url": url_match.group(1) if url_match else "",
+                        "source_url": url_match.group(1) if url_match else step_provenance,
                         "source_tier": "md_extraction",
                         "source_quote": stripped[:200],
                         "entity": "",
@@ -940,12 +951,32 @@ def _auto_generate_sidecars_from_md(
             except Exception:
                 pass
 
+        # facts_used：section 中所有 claim 引用到的 fact_id 去重集合，
+        # 满足 REQUIRED_FIELDS 契约（scripts/ir_section_package.py:REQUIRED_FIELDS）。
+        facts_used: list[str] = []
+        _seen_fact_ids: set[str] = set()
+        for _c in claims:
+            for _fid in _c.get("fact_ids", []) or []:
+                if _fid not in _seen_fact_ids:
+                    _seen_fact_ids.add(_fid)
+                    facts_used.append(_fid)
+
         section_payload = {
             "schema_version": "ir_section_package.v1",
             "section_id": step_name,
             "section_title": key_messages[0] if key_messages else f"{step_name} 分析报告",
             "key_messages": key_messages,
             "claims": claims,
+            # ── REQUIRED_FIELDS 兜底（section gate 强制，缺任一即 FAIL）──
+            "facts_used": facts_used,
+            # 兜底抽取无法可靠区分反证，留空仅触发 WARN（非 FAIL），由人工/统稿补全
+            "counter_evidence": [],
+            "data_gaps": [
+                f"本 section 由 {step_name}.md 兜底自动抽取，未经子代理结构化产出，"
+                "counter_evidence 与部分定量口径待人工复核。"
+            ],
+            # markdown_draft 必须非空（缺失即 FAIL）：直接采用 step 报告全文
+            "markdown_draft": md_text,
             "auto_generated": True,
             "source": "md_extraction_fallback",
         }
