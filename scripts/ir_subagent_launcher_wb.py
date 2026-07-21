@@ -71,9 +71,10 @@ STEP_ROLE = {
 # IR 子代理可调用的数据源 connector（仅限实际可用、已验证的源）
 # tyc-mcp: 天眼查（工商/股东/司法/专利/知产）
 # westock-mcp: 腾讯自选股（A/HK/美股实时行情/财务/券商研报/板块/产业链/资金流/北向/评级/新闻/选股）
+# ima-mcp: IMA 知识库（12万+机构研报/专家纪要/外资研报/行业报告，语义搜索）
 # ⚠️ 之前写死为 ['tyc-mcp']，导致 westock 从未授权给子代理，
 #   子代理只能用 neodata(bash) + web_search + 天眼查，金融数据源利用率极低。
-IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp']
+IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp', 'ima-mcp']
 
 # 步间依赖关系
 STEP_DEPS = {
@@ -1454,15 +1455,24 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'| 企业工商/股东/高管/专利/司法/招投标 | **tyc-mcp** | search_companies → call_tool | search_deep(Bash) |\n'
             f'| A/HK 股行情/财报/估值(结构化数字) | **NeoData api** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search(\\"查询词\\", data_type=\\"api\\"), ensure_ascii=False))"` | yfinance → search_deep(Bash) |\n'
             f'| **券商研报/行业深度/财经新闻/政策分析** | **NeoData doc** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search(\\"查询词\\", data_type=\\"doc\\"), ensure_ascii=False))"` | search_deep(Bash) |\n'
+            f'| **机构调研纪要/专家交流/外资研报/行业深度报告** | **ima-mcp** | MCP 直接调用 `mcp__ima-mcp__search_knowledge(knowledge_base_id="KB_ID", query="查询词")` | search_deep(Bash) |\n'
             f'| 突发新闻/实时动态（分钟级，中文） | **腾讯新闻** | Bash: `sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search "{{关键词}}" --limit 5` | search_deep(Bash) |\n'
             f'| 美股估值/财务 | **yfinance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "import yfinance as yf; print(yf.Ticker(\\"AAPL\\").info)"` | westock-mcp → search_deep(Bash) |\n'
             f'| **美股英文新闻/earnings/分析师动态** | **Yahoo Finance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import _yahoo_search; import json; print(json.dumps(_yahoo_search(\\"NVDA earnings\\", max_results=5), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| 学术论文/政策文件/英文技术文档 | **search_deep(Bash)** | Bash 调用 | web_fetch 读全文 |\n\n'
+            f'⚠️ IMA 知识库使用提示（ima-mcp，已授权，直接调用）：\n'
+            f'- KB ID 速查：长安投研=7297585010204027 | 公司调研报告=7302533890465245 | 机构调研纪要=7300811407257275 | 行研智库=7311568991699459 | 精选报告=7302509206984644\n'
+            f'- 行业深度/TAM/竞争格局 → 优先搜「行研智库」+「长安投研」\n'
+            f'- 公司基本面/财务/券商研报 → 优先搜「公司调研报告」\n'
+            f'- 机构观点/电话会纪要/外资视角 → 优先搜「机构调研纪要」\n'
+            f'- 每个查询建议搜 2-3 个 KB，取交叉验证后的高价值信息\n'
+            f'- 脚注格式：IMA知识库 — {{KB名称}} — "{{文档标题}}" (检索日期)\n\n'
             f'⚠️ 禁止行为：\n'
             f'- 禁止用通用搜索搜公司财务数据（用 westock-mcp: data_finance）\n'
             f'- 禁止用通用搜索搜公司股东信息（用 tyc-mcp: search_companies → call_tool）\n'
             f'- 禁止用通用搜索搜行业板块走势（用 westock-mcp: data_sector）\n'
-            f'- 禁止用通用搜索搜最新新闻动态（用腾讯新闻 CLI）\n\n'
+            f'- 禁止用通用搜索搜最新新闻动态（用腾讯新闻 CLI）\n'
+            f'- 禁止忽略 IMA 知识库——机构调研/专家纪要是公开 web 搜不到的增量信息，行业分析/竞争格局/投资逻辑类查询必须搜 IMA\n\n'
         )
 
         prompt_body += (

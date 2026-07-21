@@ -233,7 +233,7 @@ Agent tool 参数：
 - name = 'ir-research-planner'
 - team_name = 'ir-{job_ctx.job_id}'
 - mode = 'bypassPermissions'
-- connectorIds = ['westock-mcp', 'tyc-mcp']
+- connectorIds = ['westock-mcp', 'tyc-mcp', 'ima-mcp']
 - prompt = 下面的完整 prompt
 
 ### 子代理 Prompt:
@@ -285,6 +285,33 @@ result = tencent_news_search('{entity} 最新动态 财报 事件', max_results=
 print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
+
+### Step 6: IMA 知识库预扫描（机构研报/纪要 — 增量信息层）
+
+用 ima-mcp 的 search_knowledge 搜索 5 个订阅知识库，提取机构级增量信息。
+**必须搜 2-3 个最相关的 KB，每个 KB 用不同关键词搜 1-2 次。**
+
+KB ID 速查：
+- 长安投研(专家调研纪要): `7297585010204027`
+- 公司调研报告(券商研报): `7302533890465245`
+- 机构调研纪要(电话会/专家/外资): `7300811407257275`
+- 行研智库(行业报告): `7311568991699459`
+- 精选行业数据报告: `7302509206984644`
+
+搜索策略：
+1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7297585010204027", query="{entity} {行业关键词}")` — 专家调研视角
+2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302533890465245", query="{entity}")` — 券商深度研报
+3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} {行业关键词}")` — 机构观点/外资视角
+4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{行业名} 市场规模 竞争格局")` — 行业深度报告
+
+从 IMA 搜索中提取：
+- 机构共识观点（多家券商一致看法）
+- 独特洞察（专家交流中的非公开信息）
+- 外资视角（外资券商的独立分析）
+- 关键数据点（行业 TAM/增速/市占率等 IMA 独有数据）
+
+将提取的 insights 写入输出的 `ima_insights` 字段（见下方 JSON 格式）。
+
 - 你是唯一的搜索者，请系统性地完成以上所有搜索
 
 ## 分析任务
@@ -305,11 +332,14 @@ step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, st
   "schema_version": "ir_research_plan.v3",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}", "market": "{market}",
   "query": "{query}", "ticker": "{ticker}", "english_name": "{english_name}",
-  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "web_search:公开信息", "tencent_news:实时动态"],
+  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "ima-mcp:机构研报/纪要", "web_search:公开信息", "tencent_news:实时动态"],
   "core_questions": [...], "strategic_questions": [...],
   "fact_requirements": [...], "section_requirements": {{}},
   "coverage_matrix": {{}}, "plan_status": "ready",
-  "search_summary": {{"westock_quote_found": true, "analyst_views": 0, "web_evidence_count": 0}}
+  "search_summary": {{"westock_quote_found": true, "analyst_views": 0, "web_evidence_count": 0}},
+  "ima_insights": [
+    {{"kb_name": "KB名称", "doc_title": "文档标题", "key_points": ["要点1", "要点2"], "relevance": "high/medium"}},
+  ]
 }}
 ```
 """
@@ -320,7 +350,7 @@ step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, st
         "phase": "phase04_research_plan", "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
-            "subagent_connector_ids": ["westock-mcp", "tyc-mcp"],
+            "subagent_connector_ids": ["westock-mcp", "tyc-mcp", "ima-mcp"],
             "task_dir": str(tasks_dir),
         },
         "instruction": instruction,
