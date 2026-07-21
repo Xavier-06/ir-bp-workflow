@@ -44,7 +44,7 @@
 | 机构预期催化时间 | **IMA 机构调研纪要 (7300811407257275)**: 搜 `{行业} 催化 时间 预期 落地` | 腾讯新闻 |
 | 竞品催化对标 | **IMA 公司调研报告 (7302533890465245)**: 搜 `{竞品名} 产品发布 上市 融资` | westock-mcp data_report |
 
-**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要）。若 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。
 
 ## 禁区
 - 不要列已经发生的事件

@@ -56,7 +56,7 @@
 | 法规标准清单 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 法规 标准 国标 认证` | web_search |
 | 行业动态 | 腾讯新闻 CLI | **IMA 长安投研 (7297585010204027)** |
 
-**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（行研智库/精选报告/机构调研纪要均可 fetch）。
 行业研报角色是 IMA 命中率最高的角色——行研智库 + 精选报告两个库直接对口。每个库搜 1-2 次，取 top 1 结果全文提取即可。
 
 ## 禁区

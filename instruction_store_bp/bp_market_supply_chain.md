@@ -236,7 +236,7 @@ web_fetch: {搜索结果中的URL}
 | **第三方白皮书/市场规模** | **IMA 精选行业报告 `7302509206984644`**: `search_knowledge` 搜 `{行业名} 市场规模 增长 趋势 白皮书` | 艾瑞/头豹/奥纬等第三方独立口径 |
 | **机构对行业的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{行业/公司名} 行业 供应链 政策 产能` | 机构调研纪要中的行业判断 |
 
-**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 行研智库 —《标题》(日期)`
+**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（行研智库/精选报告可 fetch；长安投研仅搜索用 `introduction` 摘要）。来源标注：`[^N]: IMA 行研智库 —《标题》(日期)`
 
 ## 搜索策略（分步流程）
 

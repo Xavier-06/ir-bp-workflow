@@ -209,7 +209,7 @@ web_fetch: {搜索结果中的URL}
 | **客户投关记录/管理层表态** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{客户名} 投关 调研 纪要 供应商` | 上市客户投关记录原文中的供应商/采购表态 |
 | **机构对客户/收入的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{公司/客户名} 客户 订单 收入 验证` | 机构调研纪要中的收入/客户评价 |
 
-**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 长安投研 —《标题》(日期)`
+**IMA 调用（长安投研/公司调研报告无法 fetch 全文，用搜索摘要）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要，含关键数据+机构观点）。若返回 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。来源标注：`[^N]: IMA 搜索摘要 —《标题》(日期)`
 
 ## 搜索策略（分步流程）
 

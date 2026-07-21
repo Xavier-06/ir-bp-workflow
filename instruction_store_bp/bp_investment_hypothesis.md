@@ -55,7 +55,7 @@
 | 市场分歧/非共识 | **IMA 机构调研纪要 (7300811407257275)**: `search_knowledge` 搜 `{行业/公司} 分歧 非共识 超预期` | WebSearch |
 | 可比公司最新调研 | **IMA 公司调研报告 (7302533890465245)**: `search_knowledge` 搜 `{竞品名} 调研 纪要` | westock-mcp data_report |
 
-**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1-2 最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要）。若 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。
 先行者阶段搜索要快而广，每个库最多搜 1 次、取 top 2 结果即可。
 
 ## 禁区

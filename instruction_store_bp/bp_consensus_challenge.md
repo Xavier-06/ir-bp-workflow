@@ -31,7 +31,7 @@
 | 催化剂事件时间线 | 腾讯新闻 + **IMA 长安投研**: 搜 `{行业} 政策 催化 落地` | NeoData(doc) |
 | 预期差案例/历史教训 | **IMA 机构调研纪要**: 搜 `{行业} 预期差 超预期 不及预期` | WebSearch |
 
-**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要）。若 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。
 
 ## 禁区
 - 不要重复前序 wave 的分析——你的价值是挑战和判断

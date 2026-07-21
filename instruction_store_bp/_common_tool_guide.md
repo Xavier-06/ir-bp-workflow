@@ -342,18 +342,36 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | **行研智库** | 3,786篇 | 券商行业深度（分年份/行业） | 搜行业研报、技术路线横评、TAM/SAM、产业链 |
 | **精选行业数据报告** | 1,442篇 | 第三方白皮书（艾瑞/头豹/奥纬等） | 搜市场规模、用户画像、竞争格局、趋势预测 |
 
-**ima-mcp 工具调用方式：**
+**ima-mcp 工具调用方式（两种模式，按库权限区分 — 2026-07-21 实测）：**
 
+**模式 A：可 fetch 全文库（精选行业报告 / 行研智库 / 机构调研纪要 NOTE 类型）**
 ```
-# Step 1: 语义搜索（返回标题+摘要+media_id）
-ima-mcp.search_knowledge:
-  knowledge_base_id: "库ID（见角色路由表）"
-  query: "{行业名} {搜索主题}"
+# Step 1: 语义搜索 → 拿到 media_id + introduction 摘要
+ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
+# Step 2: 全文提取 → 取 top 1 最相关结果的 media_id
+ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
+```
 
-# Step 2: 全文提取（用 media_id 读取完整内容）
-ima-mcp.fetch_media_content:
-  media_id: "搜索结果中的 media_id"
+**模式 B：仅搜索摘要库（长安投研 / 公司调研报告 — 订阅库无法 fetch 全文）**
 ```
+# 只做 Step 1: 语义搜索
+ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
+# introduction 字段已含 200-500 字结构化摘要（关键数据+机构观点+核心结论），直接引用
+# 如果返回 can_fetch_content=true 的结果，可尝试 fetch；fetch 失败则用 introduction
+```
+
+**⚠️ 各库 fetch 权限实测（2026-07-21）：**
+| 库 | fetch | 原因 | 子代理策略 |
+|---|---|---|---|
+| 精选行业报告 | ✅ 100% | PDF 库 | search → fetch 全文 |
+| 行研智库 | ✅ 100% | PDF 库 | search → fetch 全文 |
+| 机构调研纪要 | ✅ NOTE 可 | 笔记可、WORD/PDF 部分不可 | search → 尝试 fetch，失败用 intro |
+| 长安投研 | ❌ 0% | 订阅库权限限制 | search 直接用 introduction |
+| 公司调研报告 | ❌ 0% | 订阅库权限限制 | search 直接用 introduction |
+
+**来源标注格式：**
+- 全文提取成功：`[^N]: IMA {库名} —《{标题}》({日期})`
+- 仅用摘要：`[^N]: IMA {库名} 搜索摘要 —《{标题}》({日期})`
 
 **角色 → IMA 知识库路由（从 bp_constants.IMA_ROLE_KB_MAP 读取）：**
 

@@ -229,7 +229,7 @@ web_fetch: {搜索结果中的URL}
 | **技术路线横评/行业深度** | **IMA 行研智库 `7311568991699459`**: `search_knowledge` 搜 `{技术/行业名} 技术路线 对比 横评 壁垒` | 券商行业深度报告中的技术路线分析 |
 | **机构对技术壁垒的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{公司/技术名} 技术 壁垒 护城河 专利` | 机构调研纪要中的技术评价 |
 
-**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 行研智库 —《标题》(日期)`
+**IMA 调用**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取 top 1 结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（行研智库/精选报告可 fetch；长安投研仅搜索用 `introduction` 摘要）。来源标注：`[^N]: IMA 行研智库 —《标题》(日期)`
 
 ## 搜索策略（分步流程）
 
