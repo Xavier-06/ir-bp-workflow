@@ -46,6 +46,23 @@
 
 **IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要）。若 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。
 
+## 搜索策略（分步流程）
+
+**Step 1: IMA 催化剂信号搜索（首选，不是补充）**
+- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/行业} 催化剂 事件 时间窗口 政策 落地`（加 TXT 过滤）
+- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业} 催化 时间 预期 落地`
+- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{竞品名} 产品发布 上市 融资`
+- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+
+**Step 2: 腾讯新闻 + NeoData 补充（与 Step 1 并行）**
+- 腾讯新闻: `{公司名} 发布 上市 获批 合作`（0.7s 最快）
+- NeoData(doc): `{行业} 政策 催化 监管`
+
+**Step 3: 催化剂排序与传导链分析**
+- 综合 Step 1-2 结果，按"影响力 × 未被定价程度"排序
+- 每个催化剂锚定时间窗口 + 传导链
+
 ## 禁区
 - 不要列已经发生的事件
 - 不要给模糊的"未来"时间

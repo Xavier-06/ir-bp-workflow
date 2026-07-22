@@ -33,5 +33,21 @@
 
 **IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要）。若 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。
 
+## 搜索策略（分步流程）
+
+**Step 1: IMA 共识与非共识搜索（首选，不是补充）**
+- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{行业/公司} 卖方共识 一致预期 调研 纪要`（加 TXT 过滤）
+- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业/公司} 外资 非共识 分歧 预期差 超预期`
+- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+
+**Step 2: NeoData + 腾讯新闻补充（与 Step 1 并行）**
+- NeoData(doc): `{行业/公司} 研报 共识 一致预期`
+- 腾讯新闻: `{行业} 政策 催化 落地`
+
+**Step 3: 预期差表构建**
+- 综合 Step 1-2 结果，归纳 3-5 条共识并逐条挑战
+- 构建预期差表：预期差 | 市场假设 | 我们的判断 | 依据 | 投资价值(L/M/H)
+
 ## 禁区
 - 不要重复前序 wave 的分析——你的价值是挑战和判断

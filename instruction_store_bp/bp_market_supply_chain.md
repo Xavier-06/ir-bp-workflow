@@ -240,11 +240,16 @@ web_fetch: {搜索结果中的URL}
 
 ## 搜索策略（分步流程）
 
-**Step 1: 市场定义 + TAM/SAM/SOM 推算（WebSearch 多源交叉）**
+**Step 1: 市场定义 + TAM/SAM/SOM 推算（WebSearch + IMA 并行）**
 - 中英文各搜 3 次以上不同来源的市场规模数据
 - 自上而下（行业报告）+ 自下而上（单价×数量）两套方法
 - 区分保守/基准/乐观三种情景
 - ⚠️ 不得直接采用 BP 的 TAM/SAM/SOM
+- **同步 IMA 搜索**（不是兜底，与 WebSearch 并行）：
+  - 行研智库 `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{行业名} 市场规模 TAM SAM 产业链 竞争格局` → 取 top 1 结果 `fetch_media_content` 读全文
+  - 精选行业报告 `7302509206984644`: `ima-mcp.search_knowledge` 搜 `{行业名} 市场规模 增长 趋势 白皮书` → 取 top 1 结果 `fetch_media_content` 读全文
+  - 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{行业/公司名} 行业 供应链 政策 产能`（加 TXT 过滤）→ 用 `introduction` 摘要
+  - 每库最多取 top 2 结果，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 
 **Step 2: 行业格局 + 政策环境（WebSearch）**
 - 搜索行业竞争格局、替代路线、政策驱动

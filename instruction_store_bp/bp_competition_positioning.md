@@ -252,17 +252,24 @@ web_fetch: {搜索结果中的URL}
 - `call_tool` 查股东/融资/资质/招投标
 - 结果写入 facts sidecar
 
-**Step 3: 上市竞品财务对比（NeoData + yfinance）**
+**Step 3: IMA 竞品机构视角搜索（与 Step 2 并行，不是兜底）**
+- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{竞品名} 投关 调研 纪要 竞争 份额`
+- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化`（加 TXT 过滤）
+- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+- 搜不到直接跳过，不硬凑
+
+**Step 4: 上市竞品财务对比（NeoData + yfinance）**
 - A/HK 竞品走 NeoData 查市值/PE/PS
 - 美股竞品走 yfinance 查估值快照
 - 构建可比公司财务对比表
 
-**Step 4: 产品级参数+价格对比（WebSearch）**
+**Step 5: 产品级参数+价格对比（WebSearch）**
 - 对每条产品线搜索竞品参数/价格
 - 横向 ≥8 个维度对比
 - 否定结论（"竞品没有 X"）必须有搜索证据
 
-**Step 5: 差异化判断 + 可复制性评估**
+**Step 6: 差异化判断 + 可复制性评估**
 - 综合以上数据判断差异化来源
 - 评估可复制性：时间/资金/认证/客户迁移/IP 防御
 

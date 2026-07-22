@@ -299,12 +299,19 @@ web_fetch: {搜索结果中的URL}
 - TYC `get_person_profile` + `get_person_risk_profile` 验证任职和风险
 - ⚠️ 搜不到必须标注 "该人员信息经搜索未找到独立来源验证"
 
-**Step 3: 交叉验证**
+**Step 3: IMA 机构视角搜索（与 Step 1-2 并行，不是兜底）**
+- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{创始人/CEO名} 点评 履历 评价 管理`（加 TXT 过滤）
+- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{上市股东/战略方名} 投关 调研 纪要`
+- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+- 搜不到直接跳过，不硬凑
+
+**Step 4: 交叉验证**
 - TYC 数据与 WebSearch 数据交叉比对（如 TYC 显示法人=张三，WebSearch 应能验证）
 - BP 自述 vs 外部证据逐条对比
 - 矛盾之处标注 ⚠️ 并在 .md 中说明
 
-**Step 4: 缺口补搜**
+**Step 5: 缺口补搜**
 - 检查 facts sidecar，对空字段做针对性补搜
 - 补搜结果追加，不覆盖已有内容
 
