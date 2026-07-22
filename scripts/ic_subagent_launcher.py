@@ -1000,101 +1000,122 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     )
     if role == 'ic_executive_hypothesis':
         return (
-            f'⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            f'⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             f'- 行业板块走势/估值 → westock-mcp: data_sector（查 {sector_hint} 板块）\n'
             f'- 最新行业动态 → 腾讯新闻 CLI（Bash 调用，见 System Prompt 工具指南）\n'
             f'- 龙头公司实时估值锚 → westock-mcp: data_quote（查 {sector_hint} 龙头公司）\n'
             f'- 行业研报/市场规模 → westock-mcp: data_report\n'
+            f'- **机构观点/行业共识/预期差** → ima-mcp: search_knowledge(KB="7297585010204027", query="{sector_hint} 行业 共识 预期 投资逻辑")（加 TXT 过滤）\n'
+            f'- **行业深度研报/TAM** → ima-mcp: search_knowledge(KB="7311568991699459", query="{sector_hint} 行业深度 市场规模 TAM") → fetch_media_content 读全文\n'
             f'- 通用搜索兜底 → {_SEARCH_DEEP_HINT}\n\n'
         )
     elif role == 'ic_market_overview':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 行业板块走势/估值水平 → westock-mcp: data_sector\n'
             '- 行业市场规模/TAM/CAGR → NeoData(Bash) → search_deep(Bash) 兜底\n'
             '- 券商行业研报 → westock-mcp: data_report → NeoData(Bash)\n'
+            '- **行业深度研报/TAM/产业链** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 市场规模 TAM 产业链 竞争格局") → fetch_media_content 读全文\n'
+            '- **第三方白皮书/市场规模** → ima-mcp: search_knowledge(KB="7302509206984644", query="{行业} 市场规模 增长 趋势 白皮书") → fetch_media_content 读全文\n'
+            '- **机构对行业的点评** → ima-mcp: search_knowledge(KB="7297585010204027", query="{行业} 行业 供应链 政策 产能", filters=TXT) → 用 introduction 摘要\n'
             '- 突发行业动态 → 腾讯新闻 CLI(Bash)\n'
             '- 可比公司估值/财务 → westock-mcp: data_finance\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role in ('ic_competitive', 'ic_segment_deep'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 企业工商/股东/融资 → tyc-mcp: search_companies → call_tool\n'
             '- 上市公司财务对比 → westock-mcp: data_finance + data_quote\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 竞品最新动态 → 腾讯新闻 CLI(Bash)\n'
             '- 专利布局/研发能力 → tyc-mcp: call_tool(search_patents)\n'
             '- 市场份额/CR3/CR5 → westock-mcp + search_deep(Bash) 交叉验证\n'
+            '- **竞品投关记录/管理层表态** → ima-mcp: search_knowledge(KB="7302533890465245", query="{竞品名} 投关 调研 纪要 竞争 份额") → 用 introduction 摘要\n'
+            '- **机构对竞争格局的评价** → ima-mcp: search_knowledge(KB="7297585010204027", query="{行业} 竞争 格局 份额 差异化", filters=TXT) → 用 introduction 摘要\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role in ('ic_tech_product', 'ic_route_deep'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 技术论文/arxiv → search_deep(Bash, "arxiv {关键词}") + web_fetch 读全文\n'
             '- 专利检索 → tyc-mcp: search_patents\n'
             '- 产品参数/性能对比 → search_deep(Bash) + web_fetch\n'
             '- 技术突破新闻 → 腾讯新闻 CLI(Bash)\n'
             '- 公司研发投入/研发费用率 → westock-mcp: data_finance\n'
+            '- **技术路线横评/行业深度** → ima-mcp: search_knowledge(KB="7311568991699459", query="{技术/行业} 技术路线 对比 横评 壁垒") → fetch_media_content 读全文\n'
+            '- **机构对技术壁垒的点评** → ima-mcp: search_knowledge(KB="7297585010204027", query="{公司/技术} 技术 壁垒 护城河", filters=TXT) → 用 introduction 摘要\n'
             '- search_deep 用于学术/技术类搜索是合理的，但商业数据仍优先结构化源\n\n'
         )
     elif role == 'ic_supply_chain':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 产业链图谱/环节梳理 → westock-mcp: data_industry_chain\n'
             '- 企业画像/技术能力 → tyc-mcp: search_companies → get_company_capabilities\n'
             '- 招投标/政府采购 → tyc-mcp: search_bids\n'
             '- 产能/订单动态 → 腾讯新闻 CLI(Bash)\n'
             '- 行业深度数据 → NeoData(Bash)\n'
+            '- **行业深度研报/产业链成本结构** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 产业链 成本结构 拆解 供应格局") → fetch_media_content 读全文\n'
+            '- **机构对供应链的点评** → ima-mcp: search_knowledge(KB="7297585010204027", query="{行业} 供应链 产能 格局 国产替代", filters=TXT) → 用 introduction 摘要\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role == 'ic_policy_risk':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 国内政策文件/产业规划 → search_deep(Bash, "site:gov.cn {关键词}")\n'
             '- 企业司法/风险/行政处罚 → tyc-mcp: call_tool（风险扫描类）\n'
             '- 出口管制/制裁清单 → search_deep(Bash, "BIS entity list {关键词}")\n'
             '- 政策最新动态/解读 → 腾讯新闻 CLI(Bash)\n'
+            '- **机构对政策影响的研判** → ima-mcp: search_knowledge(KB="7297585010204027", query="{行业} 政策 监管 影响 风险", filters=TXT) → 用 introduction 摘要\n'
+            '- **外资/专家对风险的观点** → ima-mcp: search_knowledge(KB="7300811407257275", query="{行业} 风险 政策 地缘 外资") → 用 introduction 摘要\n'
             '- 地缘风险/贸易摩擦 → search_deep(Bash) + 腾讯新闻 CLI\n\n'
         )
     elif role in ('ic_unit_economics', 'ic_business_overview'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 公司财务 → westock-mcp: data_finance\n'
             '- 客户/供应商关系 → tyc-mcp: call_tool\n'
             '- 定价/收费模式 → search_deep(Bash) + web_fetch（产品官网）\n'
-            '- 用户数据/留存/渗透率 → search_deep(Bash)\n\n'
+            '- 用户数据/留存/渗透率 → search_deep(Bash)\n'
+            '- **机构对商业模式/客户的评价** → ima-mcp: search_knowledge(KB="7297585010204027", query="{公司/行业} 商业模式 客户 订单 收入", filters=TXT) → 用 introduction 摘要\n'
+            '- **可比公司投关记录** → ima-mcp: search_knowledge(KB="7302533890465245", query="{公司名} 投关 调研 纪要") → 用 introduction 摘要\n\n'
         )
     elif role == 'ic_feasibility':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 学术论文/前沿研究 → search_deep(Bash, "arxiv ...") + web_fetch\n'
             '- 实验进展/里程碑 → search_deep(Bash) + 腾讯新闻 CLI(Bash)\n'
             '- 专利 → tyc-mcp: search_patents\n'
-            '- 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)\n\n'
+            '- 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)\n'
+            '- **机构对技术可行性的判断** → ima-mcp: search_knowledge(KB="7297585010204027", query="{技术/行业} 可行性 里程碑 量产 时间表", filters=TXT) → 用 introduction 摘要\n'
+            '- **行业研报/技术路线横评** → ima-mcp: search_knowledge(KB="7311568991699459", query="{技术/行业} 技术路线 成熟度 产业化") → fetch_media_content 读全文\n\n'
         )
     elif role in ('ic_catalyst', 'ic_consensus'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 重大事件/业绩会/并购 → westock-mcp: data_events\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 资金流向/北向持仓 → westock-mcp: data_fund_flow + data_north_holding\n'
             '- 最新动态 → 腾讯新闻 CLI(Bash)\n'
+            '- **卖方共识/机构预期** → ima-mcp: search_knowledge(KB="7297585010204027", query="{行业/公司} 卖方共识 一致预期 催化", filters=TXT) → 用 introduction 摘要\n'
+            '- **外资/专家非共识观点** → ima-mcp: search_knowledge(KB="7300811407257275", query="{行业/公司} 外资 非共识 分歧 预期差") → 用 introduction 摘要\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role == 'ic_report_synthesizer':
         return (
             '⚠️ 数据源路由：统稿不搜索新数据。综合全部前序 wave 输出。\n'
-            '如需补充验证，仅通过 westock-mcp / tyc-mcp 定向查询，不超过 2 次。\n\n'
+            '如需补充验证，仅通过 westock-mcp / tyc-mcp / ima-mcp 定向查询，不超过 2 次。\n\n'
         )
     else:
         # 通用 fallback
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先）：\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 公司财务/行情/估值 → westock-mcp: data_finance / data_quote\n'
             '- 企业工商/股东/专利 → tyc-mcp: search_companies → call_tool\n'
             '- 行业研报/板块数据 → westock-mcp: data_report / data_sector\n'
             '- **券商研报/行业深度报告/财经新闻** → NeoData Bash(`data_type="doc"`) — 质量远优于通用搜索\n'
+            '- **机构研报/专家纪要/外资观点** → ima-mcp: search_knowledge(KB="7297585010204027", query="{关键词}", filters=TXT) → 用 introduction 摘要\n'
+            '- **行业深度研报/TAM/白皮书** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 行业深度 市场规模") → fetch_media_content 读全文\n'
             '- 中文实时新闻 → 腾讯新闻 CLI(Bash)\n'
             '- **美股新闻/earnings/分析师** → Yahoo Finance Bash(`_yahoo_search`) — 英文金融新闻首选\n'
             '- 美股估值 → yfinance(Bash)\n'

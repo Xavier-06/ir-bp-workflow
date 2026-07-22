@@ -106,31 +106,32 @@ IC_JUDGE_STEPS: tuple[str, ...] = (
 )
 
 # ── Connector 配置 ──
-# 按 step 前缀授予 connectorIds。tyc-mcp（天眼查）+ westock-mcp（腾讯自选股）。
+# 按 step 前缀授予 connectorIds。tyc-mcp（天眼查）+ westock-mcp（腾讯自选股）+ ima-mcp（IMA知识库）。
 # tdx（通达信）/ qcc（企查查）当前环境不可用。
+# ima-mcp: 5 库 12万+篇机构研报/专家纪要/外资研报/行业白皮书（2026-07-22 全角色接入）
 # ★ 单一真实来源：在此 dict 维护，ic_subagent_launcher.py 从本文件导入。
 IC_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
-    "step_ind_overview": ["tyc-mcp", "westock-mcp"],
-    "step_policy_scan": ["tyc-mcp", "westock-mcp"],
-    "step_value_chain": ["tyc-mcp", "westock-mcp"],
-    "step_competitive": ["tyc-mcp", "westock-mcp"],
-    "step_tech": ["tyc-mcp", "westock-mcp"],
-    "step_market": ["tyc-mcp", "westock-mcp"],
-    "step_financial": ["westock-mcp"],
-    "step_valuation": ["westock-mcp"],
-    "step_capital": ["tyc-mcp", "westock-mcp"],
-    "step_executive_hypothesis": ["tyc-mcp", "westock-mcp"],
-    "step_cross_chain_compare": ["tyc-mcp", "westock-mcp"],
-    "step_catalyst_analysis": ["tyc-mcp", "westock-mcp"],
-    "step_consensus_challenge": ["tyc-mcp", "westock-mcp"],
-    "step_investment_thesis": ["tyc-mcp", "westock-mcp"],
-    "step_risk_assessment": ["tyc-mcp", "westock-mcp"],
-    "step_scenario_sensitivity": ["tyc-mcp", "westock-mcp"],
-    "step_master_synthesis": ["tyc-mcp", "westock-mcp"],
-    "step_investment_playbook": ["tyc-mcp", "westock-mcp"],
+    "step_ind_overview": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_policy_scan": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_value_chain": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_competitive": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_tech": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_market": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_financial": ["westock-mcp", "ima-mcp"],
+    "step_valuation": ["westock-mcp", "ima-mcp"],
+    "step_capital": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_executive_hypothesis": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_cross_chain_compare": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_catalyst_analysis": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_consensus_challenge": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_investment_thesis": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_risk_assessment": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_scenario_sensitivity": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_master_synthesis": ["tyc-mcp", "westock-mcp", "ima-mcp"],
+    "step_investment_playbook": ["tyc-mcp", "westock-mcp", "ima-mcp"],
 }
 
-IC_DEFAULT_CONNECTOR_IDS: list[str] = ["tyc-mcp", "westock-mcp"]
+IC_DEFAULT_CONNECTOR_IDS: list[str] = ["tyc-mcp", "westock-mcp", "ima-mcp"]
 
 # ── Dispatch Retry 参数 ──
 IC_COLLECT_RETRY_COUNT: int = 20

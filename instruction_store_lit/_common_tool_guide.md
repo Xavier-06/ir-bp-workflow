@@ -132,6 +132,11 @@ WebSearch → WebFetch 爬取
 | NeoData | `python3 scripts/search/neodata_search.py "关键词" --json` | A股/港股券商行业研报 |
 | WeStock | westock-data MCP | 个股研报+分析师评级 |
 | SEC EDGAR | WebFetch | 美股上市公司 10-K/S-1 |
+| **IMA 行研智库** | `ima-mcp.search_knowledge(KB="7311568991699459", query="关键词")` → `fetch_media_content` | 券商行业深度报告（可 fetch 全文） |
+| **IMA 精选行业报告** | `ima-mcp.search_knowledge(KB="7302509206984644", query="关键词")` → `fetch_media_content` | 第三方白皮书：艾瑞/头豹/奥纬（可 fetch 全文） |
+| **IMA 长安投研** | `ima-mcp.search_knowledge(KB="7297585010204027", query="关键词", filters=TXT)` | 机构点评/电话会议纪要（仅 introduction 摘要） |
+| **IMA 公司调研报告** | `ima-mcp.search_knowledge(KB="7302533890465245", query="关键词")` | 上市公司投关记录（仅 introduction 摘要） |
+| **IMA 机构调研纪要** | `ima-mcp.search_knowledge(KB="7300811407257275", query="关键词")` | 外资研报/专家交流（NOTE 可 fetch） |
 
 ### D. 企业情报
 
@@ -213,16 +218,55 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 3. **时间过滤**: 优先近 3 年，seminal paper 不限年份
 4. **去重**: DOI + title fuzzy match
 
+## IMA 知识库使用指南（ima-mcp，全部角色可用，academic_scout 除外）
+
+**IMA 与结构化源（westock/NeoData）并行执行，不是兜底。** IMA 提供 web 搜索找不到的机构内部视角——券商电话会议速记、专家交流纪要、外资内部研报、上市公司投关记录原文、第三方行业白皮书。
+
+**调用方式（MCP 工具直接调用，connectorIds 已授权）：**
+
+**模式 A：可 fetch 全文（行研智库 / 精选行业报告 / 机构调研纪要 NOTE）**
+```
+ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
+→ 取 top 1 结果的 media_id
+→ ima-mcp.fetch_media_content(media_id="...")  # 读全文
+```
+
+**模式 B：仅搜索摘要（长安投研 / 公司调研报告 — 库主禁止导出）**
+```
+ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
+→ 直接使用 introduction 字段（200-500字结构化摘要）
+```
+
+**⚠️ 长安投研必须加 TXT 过滤**（否则被 `_导读.docx` 淹没）：
+```
+filters: [{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media_type": ["TXT"]}}]
+```
+
+**知识库 ID 速查：**
+- 行研智库: `7311568991699459`（券商行业深度，可 fetch）
+- 机构调研纪要: `7300811407257275`（外资/专家交流，NOTE 可 fetch）
+- 长安投研: `7297585010204027`（机构点评/电话会，仅 intro，加 TXT 过滤）
+- 公司调研报告: `7302533890465245`（投关记录，仅 intro）
+- 精选行业报告: `7302509206984644`（第三方白皮书，可 fetch）
+
+**来源标注：** `[^N]: IMA {库名} —《{标题}》({日期})`
+
+**搜索纪律：**
+- 每库最多取 top 2 结果，全文提取最多 1 篇
+- 搜不到直接跳过，不硬凑
+- industry_scout / tech_decomposition / tech_strategist 角色**必须**搜 IMA 行研智库+精选报告（行业研报首选）
+- enterprise_scout 角色搜 IMA 公司调研报告+长安投研（企业机构视角）
+
 ## 角色边界（写在每个角色指令开头）
 
 | 角色 | 可以做 | 禁止做 |
 |------|--------|--------|
-| academic_scout | 搜论文 (arXiv/DBLP/PMC/Crossref, 4源必用) | 搜研报/新闻/企业信息/下载全文 |
-| industry_scout | 搜研报/报告/新闻/板块/产业链/机构评级 (NeoData/westock-mcp/腾讯新闻/Yahoo/WebSearch) | 搜论文/企业信息 |
-| enterprise_scout | 企业尽调 (TYC + NeoData/yfinance + 腾讯新闻 + Yahoo + SEC/WebSearch + **westock-mcp 板块/产业链/机构评级/资金流**) | 搜论文/研报 |
-| deep_reader | 读全文+压缩笔记 | 搜新文档 |
-| tech_decomposition | 快速预搜+拆解方向 | 下载全文/深度阅读 |
-| tech_strategist | 读笔记+分析 | 搜任何外部数据 |
+| academic_scout | 搜论文 (arXiv/DBLP/PMC/Crossref, 4源必用) | 搜研报/新闻/企业信息/下载全文/IMA |
+| industry_scout | 搜研报/报告/新闻/板块/产业链/机构评级 (NeoData/westock-mcp/腾讯新闻/Yahoo/WebSearch) + **IMA 行研智库/精选报告/长安投研/机构纪要** | 搜论文/企业信息 |
+| enterprise_scout | 企业尽调 (TYC + NeoData/yfinance + 腾讯新闻 + Yahoo + SEC/WebSearch + **westock-mcp 板块/产业链/机构评级/资金流** + **IMA 公司调研报告/长安投研**) | 搜论文/研报 |
+| deep_reader | 读全文+压缩笔记 + **IMA 行研智库 fetch 全文（按需补充行业背景）** | 搜新文档 |
+| tech_decomposition | 快速预搜+拆解方向 + **IMA 行研智库/精选报告（行业研报首选）** | 下载全文/深度阅读 |
+| tech_strategist | 读笔记+分析 + **IMA 长安投研/机构纪要（按需补充机构观点）** | 搜任何外部数据（IMA 按需除外） |
 | report_writer | 读分析+写报告 | 搜任何外部数据 |
 
 **通用禁止**: ❌ 所有角色不编造引用

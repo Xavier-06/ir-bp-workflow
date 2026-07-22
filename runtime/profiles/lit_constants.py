@@ -49,14 +49,15 @@ LIT_WAVE_ROLES: dict[int, list[str]] = {
 LIT_ALL_SLUGS: list[str] = list(LIT_ALL_ROLE_SLUGS.values())
 
 # ── Connector IDs 按角色分配 ────────────────────────────────
+# ima-mcp: IMA 知识库（12万+机构研报/专家纪要/外资研报/行业白皮书，2026-07-22 接入）
 LIT_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
-    "tech_decomposition": ['westock-mcp'],       # 板块/产业链/机构评级/资金流（技术背景补充）
+    "tech_decomposition": ['westock-mcp', 'ima-mcp'],       # 板块/产业链/机构评级/资金流 + IMA行业研报
     "academic_scout": [],                    # 纯学术搜索(arXiv/PMC/Crossref/DBLP/OpenAlex 脚本)，无需 MCP
-    "industry_scout": ['westock-mcp'],           # 板块/产业链/机构评级/券商研报（westock-mcp），补充 NeoData 行业研报
-    "enterprise_scout": LIT_TYC_CONNECTOR_IDS + ['westock-mcp'],  # 天眼查 MCP + westock-mcp（板块/产业链/机构评级/资金流）
-    "deep_reader": ['westock-mcp'],              # 板块/产业链（按需查标的背景）
-    "tech_strategist": ['westock-mcp'],          # 板块/产业链/机构评级/资金流（补充技术路线行业背景）
-    "report_writer": ['westock-mcp'],            # 板块/产业链/机构评级（按需引用）
+    "industry_scout": ['westock-mcp', 'ima-mcp'],           # 板块/产业链/机构评级/券商研报 + IMA行业研报/白皮书
+    "enterprise_scout": LIT_TYC_CONNECTOR_IDS + ['westock-mcp', 'ima-mcp'],  # 天眼查 + westock + IMA公司调研/机构点评
+    "deep_reader": ['westock-mcp', 'ima-mcp'],              # 板块/产业链 + IMA研报全文（按需查标的背景）
+    "tech_strategist": ['westock-mcp', 'ima-mcp'],          # 板块/产业链/机构评级 + IMA技术横评/机构观点
+    "report_writer": ['westock-mcp', 'ima-mcp'],            # 板块/产业链/机构评级 + IMA研报引用（按需）
 }
 
 # ── Collect 重试参数 ─────────────────────────────────────────

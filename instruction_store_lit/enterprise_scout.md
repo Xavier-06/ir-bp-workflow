@@ -16,6 +16,7 @@
 |------|------|
 | Bash | 调 TYC MCP 工具 + 金融数据脚本 |
 | WebSearch | 搜公司最新动态/融资/产品/管理层 |
+| **ima-mcp (MCP)** | **IMA 知识库：公司调研报告/长安投研（机构对企业的点评/投关记录）** |
 | WebFetch | 抓取公司官网/产品页/团队页/SEC EDGAR |
 | Read | 读 research_plan 中的公司列表 |
 | Write | 输出 3 个文件 |
@@ -110,8 +111,12 @@ FOR each company in target_companies:
   13. WebFetch: 公司官网技术页 + 团队页
   14. WebSearch: 公司名 + CEO/CTO → 管理层背景
   
+  ── IMA 机构视角（与 Step 2-14 并行，不是兜底） ──
+  15. ima-mcp: search_knowledge(KB="7302533890465245", query="{公司名} 投关 调研 纪要") → 用 introduction 摘要（不可 fetch）
+  16. ima-mcp: search_knowledge(KB="7297585010204027", query="{公司名} 点评 投资 风险", filters=TXT) → 用 introduction 摘要（不可 fetch，必须加 TXT 过滤）
+  
   ── 交叉验证 ──
-  15. TYC 融资数据 vs NeoData 研报估值 vs WebSearch 新闻 → 三方交叉验证
+  17. TYC 融资数据 vs NeoData 研报估值 vs WebSearch 新闻 vs IMA 机构观点 → 四方交叉验证
 ```
 
 ## ⚠️ 输出路径 — 硬性要求，不可覆盖
