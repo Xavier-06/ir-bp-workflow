@@ -255,7 +255,7 @@ web_fetch: {搜索结果中的URL}
 **Step 3: IMA 竞品机构视角搜索（与 Step 2 并行，不是兜底）**
 - 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{竞品名} 投关 调研 纪要 竞争 份额`
 - 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化`（加 TXT 过滤）
-- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
 - 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 - 搜不到直接跳过，不硬凑
 

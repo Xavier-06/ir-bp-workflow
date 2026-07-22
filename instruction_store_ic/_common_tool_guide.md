@@ -364,7 +364,7 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 ```
 # Step 1: 语义搜索 → 拿到 media_id + introduction 摘要
 ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
-# Step 2: 全文提取 → 取 top 1 最相关结果的 media_id
+# Step 2: 全文提取 → 取最相关 1-3 篇结果的 media_id（多源交叉验证）
 ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 ```
 
@@ -408,7 +408,7 @@ ima-mcp.search_knowledge:
 
 **搜索纪律：**
 - **IMA 与结构化源（westock/tyc/NeoData）并行执行，不是兜底**——每个角色的数据源路由中已有显式 IMA 行，必须执行
-- 每次搜索最多取 top 3 结果，全文提取最多 1 篇（控制 token 消耗）
+- 每次搜索最多取 top 5 结果（浏览标题+摘要选最相关的），全文提取最多 3 篇/库（可 fetch 的库：行研智库/精选报告/机构纪要 NOTE）；仅摘要库（长安投研/公司调研报告）top 5 的 introduction 全部可用
 - IMA 搜索结果标注来源时必须写清库名+标题
 - 如果 IMA 搜不到相关内容（返回空或无关），直接跳过，不要硬凑
 

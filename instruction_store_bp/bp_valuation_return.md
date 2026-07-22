@@ -209,7 +209,7 @@ web_search: "{行业}" 龙头 上市公司 排名
 **Step 3: IMA 估值机构视角搜索（与 Step 2 并行，不是兜底）**
 - 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{可比公司名} 估值 投关 调研 纪要`
 - 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易`（加 TXT 过滤）
-- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
 - 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 - 搜不到直接跳过，不硬凑
 

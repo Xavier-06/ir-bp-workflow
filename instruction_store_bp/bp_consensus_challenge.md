@@ -38,7 +38,7 @@
 **Step 1: IMA 共识与非共识搜索（首选，不是补充）**
 - 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{行业/公司} 卖方共识 一致预期 调研 纪要`（加 TXT 过滤）
 - 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业/公司} 外资 非共识 分歧 预期差 超预期`
-- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
 - 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 
 **Step 2: NeoData + 腾讯新闻补充（与 Step 1 并行）**

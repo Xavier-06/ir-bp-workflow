@@ -272,7 +272,7 @@ web_fetch: {搜索结果中的URL}
 **Step 3: IMA 风险信号搜索（与 Step 2 并行，不是兜底）**
 - 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 风险 暴雷 诉讼 监管 看空`（加 TXT 过滤）
 - 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 风险 传导 供应链 暴雷 外资`
-- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
 - 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 - 搜不到直接跳过，不硬凑
 

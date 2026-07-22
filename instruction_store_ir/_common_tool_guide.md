@@ -85,7 +85,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 ```
 # Step 1: 语义搜索 → 拿到 media_id + introduction 摘要
 mcp__ima-mcp__search_knowledge(knowledge_base_id="库ID", query="搜索词")
-# Step 2: 全文提取 → 取 top 1 最相关结果的 media_id
+# Step 2: 全文提取 → 取最相关 1-3 篇结果的 media_id（多源交叉验证）
 mcp__ima-mcp__fetch_media_content(media_id="搜索结果中的 media_id")
 ```
 

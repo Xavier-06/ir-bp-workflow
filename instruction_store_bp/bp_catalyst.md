@@ -52,7 +52,7 @@
 - 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/行业} 催化剂 事件 时间窗口 政策 落地`（加 TXT 过滤）
 - 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业} 催化 时间 预期 落地`
 - 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{竞品名} 产品发布 上市 融资`
-- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
 - 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 
 **Step 2: 腾讯新闻 + NeoData 补充（与 Step 1 并行）**

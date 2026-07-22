@@ -230,7 +230,7 @@ web_fetch: {搜索结果中的URL}
 **Step 3: IMA 客户机构视角搜索（与 Step 2 并行，不是兜底）**
 - 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{客户名} 投关 调研 纪要 供应商 采购`
 - 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/客户名} 客户 订单 收入 验证`（加 TXT 过滤）
-- 每库最多取 top 2 结果，直接使用 `introduction` 字段
+- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
 - 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 - 搜不到直接跳过，不硬凑
 

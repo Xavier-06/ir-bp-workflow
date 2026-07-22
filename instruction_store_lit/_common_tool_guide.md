@@ -227,7 +227,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 **模式 A：可 fetch 全文（行研智库 / 精选行业报告 / 机构调研纪要 NOTE）**
 ```
 ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
-→ 取 top 1 结果的 media_id
+→ 取最相关 1-3 篇结果的 media_id（多源交叉验证）
 → ima-mcp.fetch_media_content(media_id="...")  # 读全文
 ```
 
@@ -252,7 +252,7 @@ filters: [{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media
 **来源标注：** `[^N]: IMA {库名} —《{标题}》({日期})`
 
 **搜索纪律：**
-- 每库最多取 top 2 结果，全文提取最多 1 篇
+- 每库最多取 top 5 结果，全文提取最多 3 篇（可 fetch 的库：行研智库/精选报告/机构纪要 NOTE）
 - 搜不到直接跳过，不硬凑
 - industry_scout / tech_decomposition / tech_strategist 角色**必须**搜 IMA 行研智库+精选报告（行业研报首选）
 - enterprise_scout 角色搜 IMA 公司调研报告+长安投研（企业机构视角）

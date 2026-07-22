@@ -90,11 +90,11 @@ print(json.dumps(results, ensure_ascii=False))
 - 用 `data_fund_flow` 看资金面/筹码
 
 **维度 7（ima-mcp，机构研报/专家纪要 — 与维度 1-6 并行，不是兜底）：IMA 知识库搜索**
-- **行研智库** `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{行业} 行业深度 市场规模 技术路线 产业链` → 取 top 1 结果 `fetch_media_content` 读全文（100% 可 fetch）
-- **精选行业报告** `7302509206984644`: `ima-mcp.search_knowledge` 搜 `{行业} 市场规模 增长 趋势 白皮书` → 取 top 1 结果 `fetch_media_content` 读全文（100% 可 fetch）
+- **行研智库** `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{行业} 行业深度 市场规模 技术路线 产业链` → 取最相关 1-3 篇结果 `fetch_media_content` 读全文（100% 可 fetch，多源交叉验证）
+- **精选行业报告** `7302509206984644`: `ima-mcp.search_knowledge` 搜 `{行业} 市场规模 增长 趋势 白皮书` → 取最相关 1-3 篇结果 `fetch_media_content` 读全文（100% 可 fetch，多源交叉验证）
 - **长安投研** `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{行业} 行业 投资逻辑 竞争格局 催化`（**必须加 TXT 过滤**：`filters: [{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media_type": ["TXT"]}}]`）→ 用 `introduction` 摘要（不可 fetch）
 - **机构调研纪要** `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业} 专家交流 外资 分歧` → 尝试 `fetch_media_content`（NOTE 类型可 fetch），失败用 `introduction`
-- 每库最多取 top 2 结果，全文提取最多 1 篇
+- 每库最多取 top 5 结果，全文提取最多 3 篇
 - 来源标注：`[^N]: IMA {库名} —《{标题}》({日期})`
 - 搜不到直接跳过，不硬凑
 
