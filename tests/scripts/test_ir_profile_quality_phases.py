@@ -14,18 +14,19 @@ def test_ir_profile_registers_quality_production_phases(tmp_path):
     profile = IRProfile(runtime_root=tmp_path)
 
     phases = profile.phases()
-    assert "phase03_research_plan" in phases
-    assert "phase03_research_plan_collect" in phases
+    assert "phase04_research_plan" in phases
+    assert "phase04_research_plan_collect" in phases
     assert "phase06_fact_store_bootstrap" in phases
     assert "phase10_fact_store_merge" in phases
-    assert phases.index("phase03_research_plan") < phases.index("phase03_research_plan_collect")
-    assert phases.index("phase03_research_plan_collect") < phases.index("phase04_presearch")
+    assert phases.index("phase04_research_plan") < phases.index("phase04_research_plan_collect")
+    assert phases.index("phase04_research_plan_collect") < phases.index("phase06_fact_store_bootstrap")
     assert phases.index("phase06_fact_store_bootstrap") < phases.index("phase08_dispatch_prepare")
     assert phases.index("phase09_dispatch_collect") < phases.index("phase10_fact_store_merge")
     assert phases.index("phase10_fact_store_merge") < phases.index("phase11_section_package_validation")
 
 
 def test_run_research_plan_writes_skeleton_and_returns_needs_dispatch(tmp_path):
+    """v5.2: 子代理派发模式，生成 brief 而非 skeleton。"""
     job_ctx = SimpleNamespace(job_id="TASK-GENERIC", entity="任意公司", query="写券商版研报", market="cn", metadata={}, workspace=None)
 
     result = _run_research_plan(tmp_path, job_ctx)
@@ -33,14 +34,11 @@ def test_run_research_plan_writes_skeleton_and_returns_needs_dispatch(tmp_path):
     assert result["ok"] is True
     assert result["needs_dispatch"] is True
     assert result["has_more"] is False
-    # 骨架文件已写入
-    skeleton_path = tmp_path / "data" / "tasks" / "TASK-GENERIC-ir_research_plan_skeleton.json"
-    assert skeleton_path.exists()
-    payload = json.loads(skeleton_path.read_text(encoding="utf-8"))
-    assert payload["entity"] == "任意公司"
-    assert payload["plan_status"] == "skeleton_ready"
-    assert payload["enrichment_status"] == "pending"
-    assert len(payload["investment_questions"]) >= 5
+    # brief 文件已写入（v5.2 用 brief 替代 skeleton）
+    brief_path = tmp_path / "data" / "tasks" / "TASK-GENERIC-ir_phase04_brief.json"
+    assert brief_path.exists()
+    brief = json.loads(brief_path.read_text(encoding="utf-8"))
+    assert brief["entity"] == "任意公司"
 
 
 def test_run_research_plan_collect_merges_enrichment(tmp_path):

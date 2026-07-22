@@ -49,7 +49,71 @@ except ModuleNotFoundError:  # direct script execution from scripts/
 ROOT = Path(__file__).resolve().parent.parent
 TASKS_DIR = ROOT / 'data' / 'tasks'
 INSTRUCTION_STORE = ROOT / 'instruction_store_ir'
+INDUSTRY_OVERLAYS_DIR = INSTRUCTION_STORE / 'industry_overlays'
 REFS_DIR = ROOT / 'skills' / 'ir-coordinator' / 'references'
+
+# 行业关键词 → overlay 文件名映射
+_INDUSTRY_KEYWORDS = {
+    'semiconductor': [
+        '半导体', '芯片', '晶圆', '封测', '光刻', 'EDA', 'ASIC', 'GPU', 'CPU',
+        'DRAM', 'NAND', '存储', '模拟', '射频', '功率', 'MCU', 'FPGA', 'SoC',
+        '澜起', '中芯', '台积电', '海光', '寒武纪', '韦尔', '兆易', '北方华创',
+        'semiconductor', 'chip', 'foundry', 'wafer',
+    ],
+    'consumer': [
+        '白酒', '食品', '饮料', '零售', '餐饮', '消费', '美妆', '服装', '家电',
+        '茅台', '五粮液', '海天', '伊利', '农夫山泉', '海底捞', '安踏', '美的',
+        'consumer', 'liquor', 'beverage', 'food',
+    ],
+    'internet': [
+        '互联网', '电商', '游戏', '社交', '广告', 'SaaS', '直播', '短视频',
+        '阿里巴巴', '腾讯', '美团', '拼多多', '京东', '字节', '百度', '快手',
+        'MiniMax', '商汤', '科大讯飞', '金山办公',
+        'internet', 'ecommerce', 'gaming', 'social', 'AI', 'cloud',
+    ],
+    'heavy_asset': [
+        '锂电', '光伏', '储能', '风电', '电动车', '化工', '钢铁', '航运', '养殖',
+        '水泥', '有色', '铜', '铝', '锂', '钴', '镍', '稀土',
+        '宁德', '隆基', '通威', '比亚迪', '中远', '万华', '紫金',
+        'solar', 'battery', 'lithium', 'shipping', 'chemical',
+    ],
+    'financial': [
+        '银行', '保险', '券商', '证券', '信托', '基金', '金融', '金融科技',
+        '工商', '建设', '招商', '平安', '中信', '国泰', '华泰', '新华', '中国人寿',
+        'bank', 'insurance', 'broker', 'securities', 'financial',
+    ],
+}
+
+# Overlay 缓存（避免每次 build_step_prompt 都读文件）
+_OVERLAY_CACHE: dict[str, str] = {}
+
+
+def _infer_ir_industry(entity: str) -> str:
+    """从标的名称推断行业 overlay 标签。返回 overlay 文件名（不含 .md）或空字符串。"""
+    entity_lower = entity.lower()
+    scores: dict[str, int] = {}
+    for industry, keywords in _INDUSTRY_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw.lower() in entity_lower)
+        if score > 0:
+            scores[industry] = score
+    if not scores:
+        return ''
+    return max(scores, key=scores.get)
+
+
+def _load_industry_overlay(industry: str) -> str:
+    """加载行业 overlay 文件内容。带缓存。行业为空则返回空字符串。"""
+    if not industry:
+        return ''
+    if industry in _OVERLAY_CACHE:
+        return _OVERLAY_CACHE[industry]
+    overlay_path = INDUSTRY_OVERLAYS_DIR / f'{industry}.md'
+    if not overlay_path.exists():
+        return ''
+    content = overlay_path.read_text(encoding='utf-8')
+    _OVERLAY_CACHE[industry] = content
+    return content
+
 
 # 质量线
 STEP_QUALITY_THRESHOLD = 3
@@ -721,6 +785,12 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
         tool_guide = tool_guide.replace('{TASK_DIR}', str(TASKS_DIR))
         tool_guide = tool_guide.replace('{SKILL_DIR}', str(Path.home() / '.workbuddy' / 'skills' / 'skill_2053082907836022784'))
         prompt = prompt + '\n\n' + tool_guide
+
+    # ── 行业 Overlay（轻量版 archetype，v2.0 新增）──
+    industry = _infer_ir_industry(entity)
+    overlay = _load_industry_overlay(industry)
+    if overlay:
+        prompt = prompt + '\n\n# INDUSTRY-SPECIFIC ANALYSIS FRAMEWORK\n\n' + overlay
 
     return prompt
 
@@ -1416,6 +1486,17 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'【规则2】市占率/份额/渗透率数据必须完整保留：TAM/SAM/SOM分层推算及每层具体数字、各细分市场渗透率及驱动力、竞品市占率（具体数字和百分比，不能只写"垄断竞争"等模糊表述）、标的公司渗透率——这些是判断市场空间的核心依据。\n\n'
                 f'【规则3】去重只做跨step，不做step内压缩：跨step重复内容可合并，但单个step内部的表格、数据、分析段落不得删除或压缩。\n\n'
                 f'【规则4】来源合并不得丢来源：所有step的来源索引表/脚注列表都必须合并到统稿末尾"来源附录"章节；不能因格式不同（[^N]脚注/编号表格/URL直接引用/评级格式）就丢弃；非[^N]格式的来源必须转换为[^N]脚注格式纳入统一编号；目标：统稿来源总数 ≥ 各step来源去重后总数。统稿完成后必须自检：数末尾来源附录条目数，对比各step来源总数，显著减少则说明有来源丢失，必须补回。\n\n'
+            )
+
+        # ── 行业 Overlay（轻量版 archetype，v2.0 新增）──
+        _industry = _infer_ir_industry(entity)
+        _overlay = _load_industry_overlay(_industry)
+        if _overlay and entity:
+            _overlay = _overlay.replace('{entity}', entity)
+            prompt_body += (
+                f'【行业专属分析框架（{_industry}）】\n\n'
+                f'以下是针对该标的所在行业的专属分析要求，必须在你的分析中覆盖：\n\n'
+                f'{_overlay}\n\n'
             )
 
         prompt_body += (

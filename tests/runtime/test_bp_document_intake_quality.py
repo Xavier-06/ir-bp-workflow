@@ -40,7 +40,7 @@ def test_pdf_ocr_uses_pdftoppm_vl_when_pdf2image_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(bp_document_intake.subprocess, "run", fake_run)
     monkeypatch.setattr(bp_document_intake, "_ocr_image", fake_ocr_image)
 
-    text, pages = bp_document_intake._ocr_pdf(pdf, output_dir)
+    text, pages, timed_out = bp_document_intake._ocr_pdf(pdf, output_dir)
 
     assert pages == 2
     assert len(calls) == 2
@@ -52,8 +52,8 @@ def test_document_intake_rejects_ocr_failure_placeholder(tmp_path, monkeypatch):
     input_file = tmp_path / "deck.pdf"
     input_file.write_bytes(b"%PDF-1.4 placeholder")
 
-    def fake_ocr_pdf(_pdf_path, _output_dir):
-        return "[无法提取 PDF 文本: deck.pdf，请安装 pdf2image、pdfminer 或 PyPDF2]", 0
+    def fake_ocr_pdf(_pdf_path, _output_dir, deadline=0):
+        return "[无法提取 PDF 文本: deck.pdf，请安装 pdf2image、pdfminer 或 PyPDF2]", 0, False
 
     monkeypatch.setattr(bp_document_intake, "_ocr_pdf", fake_ocr_pdf)
     workspace = SimpleNamespace(root=tmp_path / "job", extraction_dir=tmp_path / "job" / "extraction")
@@ -76,8 +76,8 @@ def test_document_intake_rejects_multi_page_ocr_failures(tmp_path, monkeypatch):
     input_file = tmp_path / "deck.pdf"
     input_file.write_bytes(b"%PDF-1.4 placeholder")
 
-    def fake_ocr_pdf(_pdf_path, _output_dir):
-        return "\n\n".join(f"--- 第{i}页 ---\n[OCR失败: timeout and model unavailable]" for i in range(1, 8)), 7
+    def fake_ocr_pdf(_pdf_path, _output_dir, deadline=0):
+        return "\n\n".join(f"--- 第{i}页 ---\n[OCR失败: timeout and model unavailable]" for i in range(1, 8)), 7, False
 
     monkeypatch.setattr(bp_document_intake, "_ocr_pdf", fake_ocr_pdf)
     workspace = SimpleNamespace(root=tmp_path / "job2", extraction_dir=tmp_path / "job2" / "extraction")
@@ -96,9 +96,9 @@ def test_document_intake_rejects_low_success_page_ratio(tmp_path, monkeypatch):
     input_file.write_bytes(b"%PDF-1.4 placeholder")
     good_text = "这是一页有效 BP 内容，包含团队、产品、市场、客户、融资、收入、订单、技术壁垒、竞争格局和资金用途。" * 10
 
-    def fake_ocr_pdf(_pdf_path, _output_dir):
+    def fake_ocr_pdf(_pdf_path, _output_dir, deadline=0):
         failed = "\n\n".join(f"--- 第{i}页 ---\n[OCR失败: timeout]" for i in range(2, 10))
-        return f"--- 第1页 ---\n{good_text}\n\n{failed}", 9
+        return f"--- 第1页 ---\n{good_text}\n\n{failed}", 9, False
 
     monkeypatch.setattr(bp_document_intake, "_ocr_pdf", fake_ocr_pdf)
     workspace = SimpleNamespace(root=tmp_path / "job_ratio", extraction_dir=tmp_path / "job_ratio" / "extraction")
@@ -119,8 +119,8 @@ def test_document_intake_accepts_plain_full_document_text_without_page_markers(t
     input_file.write_bytes(b"%PDF-1.4 placeholder")
     good_text = "这是一份从 PDF 纯文本 fallback 提取出的 BP 内容，包含团队、产品、市场、客户、融资、收入、订单、技术壁垒、竞争格局和资金用途。" * 40
 
-    def fake_ocr_pdf(_pdf_path, _output_dir):
-        return good_text, 16
+    def fake_ocr_pdf(_pdf_path, _output_dir, deadline=0):
+        return good_text, 16, False
 
     monkeypatch.setattr(bp_document_intake, "_ocr_pdf", fake_ocr_pdf)
     monkeypatch.setattr(bp_document_intake, "extract_structured_info", lambda _text: {"company_name": "测试公司", "industry": "测试行业"})
@@ -144,8 +144,8 @@ def test_document_intake_writes_success_manifest(tmp_path, monkeypatch):
     input_file.write_bytes(b"%PDF-1.4 placeholder")
     good_text = "这是一页有效 BP 内容，包含团队、产品、市场、客户、融资、收入、订单、技术壁垒、竞争格局和资金用途。" * 20
 
-    def fake_ocr_pdf(_pdf_path, _output_dir):
-        return "\n\n".join(f"--- 第{i}页 ---\n{good_text}" for i in range(1, 4)), 3
+    def fake_ocr_pdf(_pdf_path, _output_dir, deadline=0):
+        return "\n\n".join(f"--- 第{i}页 ---\n{good_text}" for i in range(1, 4)), 3, False
 
     monkeypatch.setattr(bp_document_intake, "_ocr_pdf", fake_ocr_pdf)
     monkeypatch.setattr(bp_document_intake, "extract_structured_info", lambda _text: {"company_name": "测试公司", "industry": "测试行业"})
@@ -167,8 +167,8 @@ def test_document_intake_rejects_multi_page_no_text(tmp_path, monkeypatch):
     input_file = tmp_path / "deck.pdf"
     input_file.write_bytes(b"%PDF-1.4 placeholder")
 
-    def fake_ocr_pdf(_pdf_path, _output_dir):
-        return "\n\n".join(f"--- 第{i}页 ---\n（VL识别无文字）" for i in range(1, 12)), 11
+    def fake_ocr_pdf(_pdf_path, _output_dir, deadline=0):
+        return "\n\n".join(f"--- 第{i}页 ---\n（VL识别无文字）" for i in range(1, 12)), 11, False
 
     monkeypatch.setattr(bp_document_intake, "_ocr_pdf", fake_ocr_pdf)
     workspace = SimpleNamespace(root=tmp_path / "job3", extraction_dir=tmp_path / "job3" / "extraction")

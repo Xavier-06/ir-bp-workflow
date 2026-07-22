@@ -36,7 +36,7 @@ def test_bp_profile_registers_research_plan_before_presearch(tmp_path):
     profile = BPProfile(runtime_root=tmp_path)
 
     phases = profile.phases()
-    assert "phase03_research_plan" in phases
+    assert "phase04_research_plan" in phases
     assert "phase05_bp_shared_page_init" in phases
     assert "phase06_search_plan_compile" in phases
     assert "phase07_bp_fact_store_bootstrap" in phases
@@ -170,9 +170,10 @@ def test_bp_narrative_assembly_keeps_machine_metadata_out_of_delivery_markdown(t
 
 
 def test_run_research_plan_writes_bp_due_diligence_plan(tmp_path):
-    """Phase03 v5: 脚本生成骨架 → needs_dispatch → 主 AI enrichment → collect 合并。
+    """Phase04 v5.2: 子代理派发 → needs_dispatch → collect fallback 到脚本骨架。
 
-    本测试验证骨架生成 + enrichment collect 的完整路径（无 LLM enrichment 时走 fallback）。
+    v5.2 不再生成 skeleton 文件，改为生成 brief + 返回 needs_dispatch。
+    collect 无子代理输出时 fallback 到旧脚本生成完整 plan。
     """
     job_ctx = SimpleNamespace(
         job_id="BP-PLAN",
@@ -183,26 +184,20 @@ def test_run_research_plan_writes_bp_due_diligence_plan(tmp_path):
         workspace=None,
     )
 
-    # Step 1: 骨架生成（返回 needs_dispatch）
+    # Step 1: 派发（返回 needs_dispatch）
     result = _run_research_plan(tmp_path, job_ctx)
     assert result["ok"] is True
     assert result.get("needs_dispatch") is True
 
     task_dir = tmp_path / "tasks" / "BP-PLAN"
 
-    # 骨架文件应存在
-    skeleton_path = task_dir / "bp_research_plan_skeleton.json"
-    assert skeleton_path.exists()
-    skeleton = json.loads(skeleton_path.read_text(encoding="utf-8"))
-    assert skeleton["schema_version"] == "bp_research_plan.v2"
-    assert skeleton["entity"] == "测试公司"
-    assert skeleton["plan_status"] == "skeleton_ready"
-    assert len(skeleton["core_questions"]) >= 7
-    assert len(skeleton["strategic_questions"]) >= 3
-    assert skeleton["fact_requirements"]
-    assert skeleton["section_requirements"]
+    # brief 文件应存在（v5.2 用 brief 替代 skeleton）
+    brief_path = task_dir / "bp_phase04_brief.json"
+    assert brief_path.exists()
+    brief = json.loads(brief_path.read_text(encoding="utf-8"))
+    assert brief["entity"] == "测试公司"
 
-    # Step 2: collect（无 enrichment 文件 → fallback 到模板版）
+    # Step 2: collect（无子代理输出 → fallback 到脚本）
     result_collect = _run_research_plan_collect(tmp_path, job_ctx)
     assert result_collect["ok"] is True
 
@@ -1447,9 +1442,11 @@ def test_bp_readability_review_fails_dimension_concat_report(tmp_path):
 
     result = _run_bp_readability_review(tmp_path, job_ctx)
 
-    assert result["ok"] is False
-    review = json.loads((task_dir / "bp_readability_review.json").read_text(encoding="utf-8"))
-    assert review["verdict"] == "FAIL"
+    # readability FAIL 降级为 WARN 放行（phase31 不再硬阻断）
+    assert result["ok"] is True
+    review = result["result"]
+    assert review["verdict"] == "WARN"
+    assert review["degraded_from"] == "FAIL"
     assert any(issue["code"] == "OPENING_NO_INVESTMENT_RECOMMENDATION" for issue in review["issues"])
     assert any(issue["code"] == "DIMENSION_REPORT_TRACE" for issue in review["issues"])
 
@@ -1484,8 +1481,11 @@ def test_bp_readability_review_fails_redundant_unstructured_report(tmp_path):
 
     result = _run_bp_readability_review(tmp_path, job_ctx)
 
-    assert result["ok"] is False
-    review = json.loads((task_dir / "bp_readability_review.json").read_text(encoding="utf-8"))
+    # readability FAIL 降级为 WARN 放行（phase31 不再硬阻断）
+    assert result["ok"] is True
+    review = result["result"]
+    assert review["verdict"] == "WARN"
+    assert review["degraded_from"] == "FAIL"
     codes = {issue["code"] for issue in review["issues"]}
     assert "MISSING_STRUCTURED_SUMMARY" in codes
     assert "DUPLICATED_BULLET_CONTENT" in codes
@@ -1508,7 +1508,9 @@ def test_bp_delivery_blocks_when_readability_or_coverage_gate_fails(tmp_path):
 
     assert result["ok"] is False
     assert result["deliver_to_user"] is False
-    assert result["result"]["block_reason"] == "READABILITY_REWRITE_REQUIRED"
+    # readability FAIL 已降级为 WARN（deferred_fixes），不再阻断交付
+    # 实际阻断来自 verification（测试未提供 verification result 文件）
+    assert "VERIFICATION" in result["result"]["block_reason"]
 
 
 def test_bp_final_assembly_discloses_unverified_claim_data_gaps(tmp_path):
@@ -1584,8 +1586,11 @@ def test_bp_readability_review_fails_agent_dimension_headings_and_repeated_facts
 
     result = _run_bp_readability_review(tmp_path, job_ctx)
 
-    assert result["ok"] is False
-    review = json.loads((task_dir / "bp_readability_review.json").read_text(encoding="utf-8"))
+    # readability FAIL 降级为 WARN 放行（phase31 不再硬阻断）
+    assert result["ok"] is True
+    review = result["result"]
+    assert review["verdict"] == "WARN"
+    assert review["degraded_from"] == "FAIL"
     codes = {issue["code"] for issue in review["issues"]}
     assert "AGENT_DIMENSION_HEADING" in codes
     assert "REPEATED_FACT_PHRASE" in codes
