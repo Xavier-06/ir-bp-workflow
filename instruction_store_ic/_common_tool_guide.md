@@ -20,7 +20,7 @@
 | 公司专利数量/技术布局/研发能力 | tyc-mcp: `call_tool(search_patents)` | search_deep(Bash, "arxiv/patent {公司名}") | — |
 | 公司招投标/政府采购/中标信息 | tyc-mcp: `call_tool(search_bids)` | search_deep(Bash) | — |
 | 公司司法风险/诉讼/被执行/失信 | tyc-mcp: `call_tool` (风险扫描类) | search_deep(Bash) | — |
-| 公司最新融资/IPO/并购动态 | 腾讯新闻 CLI | search_deep(Bash) | — |
+| 公司最新融资/IPO/并购动态 | 中文实时新闻(tencent_news_search) | search_deep(Bash) | — |
 | 公司集团关系/股权穿透/子公司 | tyc-mcp: `call_tool(get_company_group_profile)` | search_deep(Bash) | — |
 | 未上市公司的基本信息 | tyc-mcp: `search_companies` | search_deep(Bash) | — |
 
@@ -35,9 +35,9 @@
 | **机构研报/专家纪要/外资观点** | **ima-mcp: `search_knowledge`**（★自建研报库/行研智库/机构调研纪要/精选报告，全文可取） | NeoData `data_type='doc'` | search_deep(Bash) |
 | **行业深度研报/TAM/白皮书** | **ima-mcp: `search_knowledge`**（行研智库/精选行业报告 → fetch 全文） | NeoData `data_type='doc'` | search_deep(Bash) |
 | 行业竞争格局/市占率/CR3/CR5 | **NeoData `data_type='doc'`** + westock-mcp 交叉验证 | search_deep(Bash) | — |
-| 行业政策/法规/准入标准 | search_deep(Bash, "site:gov.cn {关键词}") | **NeoData `data_type='doc'`** | 腾讯新闻 CLI |
-| 行业突发新闻/最新动态 | 腾讯新闻 CLI | **NeoData `data_type='doc'`** | search_deep(Bash) |
-| 财经深度分析/政策解读 | **NeoData `data_type='doc'`**（200-500字深度摘要） | 腾讯新闻 CLI | search_deep(Bash) |
+| 行业政策/法规/准入标准 | search_deep(Bash, "site:gov.cn {关键词}") | **NeoData `data_type='doc'`** | 中文实时新闻(tencent_news_search) |
+| 行业突发新闻/最新动态 | 中文实时新闻(tencent_news_search) | **NeoData `data_type='doc'`** | search_deep(Bash) |
+| 财经深度分析/政策解读 | **NeoData `data_type='doc'`**（200-500字深度摘要） | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
 | 宏观数据(GDP/CPI/PMI/利率) | NeoData `data_type='api'` | search_deep(Bash) | — |
 
 ### 投资/资本市场类
@@ -47,9 +47,9 @@
 | 机构评级/一致预期/目标价 | westock-mcp: `data_rating` | search_deep(Bash) | — |
 | 资金流向/主力/散户/北向资金 | westock-mcp: `data_fund_flow` | — | search_deep(Bash) |
 | 北向持仓/外资动向 | westock-mcp: `data_north_holding` | — | search_deep(Bash) |
-| 重大事件(业绩会/产品发布/并购) | westock-mcp: `data_events` | 腾讯新闻 CLI | search_deep(Bash) |
+| 重大事件(业绩会/产品发布/并购) | westock-mcp: `data_events` | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
 | 美股公司估值/财务 | yfinance (Python) | westock-mcp: `data_quote` | search_deep(Bash) |
-| **美股公司新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** (Bash) | 腾讯新闻 CLI(中文) | search_deep(Bash) |
+| **美股公司新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** (Bash) | 中文实时新闻(tencent_news_search)(中文) | search_deep(Bash) |
 | A/HK 股估值快照(PE/PB/PS/换手率) | valuation_enricher (Bash) | westock-mcp: `data_quote` | — |
 | 可比公司财务对比(多公司横比) | westock-mcp: `data_finance` | NeoData | — |
 
@@ -59,7 +59,7 @@
 |---|---|---|---|
 | 技术论文/学术前沿/arxiv | search_deep(Bash, "arxiv {关键词} {YYYY}", fetch_top_n) | — | — |
 | 技术参数/产品规格/性能对比 | search_deep(Bash, fetch_top_n) | — | — |
-| 技术突破/产品发布新闻 | 腾讯新闻 CLI | search_deep(Bash) | — |
+| 技术突破/产品发布新闻 | 中文实时新闻(tencent_news_search) | search_deep(Bash) | — |
 | 技术路线成熟度/TRL评估 | search_deep(Bash, "{技术} technology readiness level", fetch_top_n) | — | — |
 | 专利检索(技术方向) | tyc-mcp: `search_patents` | search_deep(Bash, "patent {关键词}") | — |
 | 公司研发投入/研发费用率 | westock-mcp: `data_finance` | tyc-mcp: `get_company_capabilities` | search_deep(Bash) |
@@ -68,11 +68,11 @@
 
 | 我要搜什么 | 首选 | 备用 | 兜底 |
 |---|---|---|---|
-| 国内政策文件/产业规划 | search_deep(Bash, "site:gov.cn {关键词}") | 腾讯新闻 CLI | — |
+| 国内政策文件/产业规划 | search_deep(Bash, "site:gov.cn {关键词}") | 中文实时新闻(tencent_news_search) | — |
 | 出口管制/制裁清单(BIS/OFAC) | search_deep(Bash, "BIS entity list {关键词}") | — | — |
-| 政策最新动态/解读 | 腾讯新闻 CLI | search_deep(Bash) | — |
+| 政策最新动态/解读 | 中文实时新闻(tencent_news_search) | search_deep(Bash) | — |
 | 企业合规/行政处罚/环保问题 | tyc-mcp: `call_tool` (风险类) | search_deep(Bash) | — |
-| 地缘风险/贸易摩擦 | search_deep(Bash) | 腾讯新闻 CLI | — |
+| 地缘风险/贸易摩擦 | search_deep(Bash) | 中文实时新闻(tencent_news_search) | — |
 
 ---
 
@@ -129,20 +129,24 @@
 - 没有行情/财务(只有工商年报里的粗略数据)
 - 没有新闻/研报
 
-### 2.3 腾讯新闻 CLI — 实时新闻首选
+### 2.3 中文实时新闻（tencent_news_search） — 实时新闻首选
 
-**一句话**：分钟级时效的中文新闻搜索。当你要知道"刚刚发生了什么"或"最近一周的动态"，用它。
+**一句话**：中文突发新闻/实时动态搜索。当你要知道"刚刚发生了什么"或"最近一周的动态"，用它。
 
-**调用方式**：Bash 脚本。
+**调用方式**：Bash 走 search_gateway（⚠️ 不要直接调 CLI 脚本——原 skill 目录已失效且腾讯新闻 API 积分耗尽；gateway 会自动降级 NeoData doc，返回格式不变）。
 
 ```bash
-sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search "{关键词}" --limit 5
+cd {RUNTIME_ROOT} && python3 -c "
+import sys; sys.path.insert(0, '.')
+from scripts.search_gateway import tencent_news_search
+import json
+print(json.dumps(tencent_news_search('{关键词}', max_results=5), ensure_ascii=False, indent=2))
+"
 ```
 
-- `search "{关键词}"` — 搜索新闻，返回标题/摘要/来源/时间/链接
-- `hot` — 当前热点榜
-- `morning` / `evening` — 早报/晚报
-- `--limit N` — 返回条数（默认10）
+- 返回字段：title / content（摘要100-500字）/ url / source / publishedDate
+- `source` 标记 `tencent_news` 或 `tencent_news:neodata_fallback`（后者=走了 NeoData doc 降级）
+- ⚠️ **publishedDate 常为空** → 从 content 文本提取时间线索判断新旧
 
 **最佳场景**：
 - 公司/产品最新动态（"英伟达 H200 量产"）
@@ -152,8 +156,8 @@ sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh 
 
 **⚠️ 局限**：
 - 只有新闻，没有结构化数据
-- 中文为主，英文新闻覆盖弱
-- 搜索结果按时间排序，不按相关性
+- 中文为主，英文新闻覆盖弱（英文用 search_deep / Yahoo Finance）
+- 降级到 NeoData doc 时偏研报深度、弱突发实时
 
 ### 2.4 NeoData (Bash) — 深度行业数据 + 券商研报 + 财经新闻
 
@@ -255,7 +259,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 **⚠️ 局限**：
 - yfinance: 部分数据有 15 分钟延迟，基本不支持 A 股
-- Yahoo 新闻: 只有英文，中文新闻用腾讯新闻 CLI
+- Yahoo 新闻: 只有英文，中文新闻用中文实时新闻(tencent_news_search)
 
 **最佳场景**：
 - 美股公司 PE/PB/PS/EV-EBITDA
@@ -324,7 +328,7 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 ### 3.1 搜索优先级原则
 
 1. **结构化数据优先**：能用 westock-mcp / tyc-mcp / NeoData 解决的，不用通用搜索
-2. **时效性数据优先**：需要最新动态的，先搜腾讯新闻 CLI
+2. **时效性数据优先**：需要最新动态的，先搜中文实时新闻(tencent_news_search)
 3. **search_deep(Bash) 是兜底**：只有结构化数据源都搜不到时才用
 4. **多源交叉验证**：关键数据点至少 2 个独立来源确认
 
@@ -350,7 +354,7 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 | 用通用搜索搜行业板块走势 | 用 westock-mcp: data_sector |
 | 用腾讯新闻搜结构化市场数据 | 用 NeoData 或 westock-mcp |
 | 用 NeoData 搜美股数据 | 用 yfinance 或 westock-mcp |
-| 用通用搜索搜最新新闻动态 | 用腾讯新闻 CLI（分钟级时效） |
+| 用通用搜索搜最新新闻动态 | 用中文实时新闻(tencent_news_search)（分钟级时效） |
 | 用通用搜索搜机构研报/专家纪要 | 用 ima-mcp: search_knowledge（12万+篇机构内容） |
 
 ### 3.5 IMA 知识库（ima-mcp，12万+篇投研纪要/行业研报/专家交流，全部角色可用）
@@ -415,7 +419,7 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 ### ic_executive_hypothesis (投研假说)
 快速扫描基本面，最多2轮搜索。
 - 行业概况 → westock-mcp: data_sector
-- 最新动态 → 腾讯新闻 CLI
+- 最新动态 → 中文实时新闻(tencent_news_search)
 - 快速估值锚 → westock-mcp: data_quote
 - **机构观点/行业共识** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 - **行业深度研报** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
@@ -426,14 +430,14 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 - 券商行业研报 → westock-mcp: data_report → NeoData
 - **行业深度研报/TAM/产业链** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
 - **第三方白皮书** → ima-mcp: search_knowledge(KB="7302509206984644") → fetch 全文
-- 突发行业动态 → 腾讯新闻 CLI
+- 突发行业动态 → 中文实时新闻(tencent_news_search)
 - 可比公司估值 → westock-mcp: data_finance
 
 ### ic_competitive / ic_segment_deep (竞争格局 / 环节深度)
 - 企业工商/股东 → tyc-mcp: search_companies + call_tool
 - 上市公司财务对比 → westock-mcp: data_finance + data_quote
 - 机构评级 → westock-mcp: data_rating
-- 竞品最新动态 → 腾讯新闻 CLI
+- 竞品最新动态 → 中文实时新闻(tencent_news_search)
 - 专利布局 → tyc-mcp: search_patents
 - **竞品投关记录/管理层表态** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 - **机构对竞争格局的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
@@ -442,7 +446,7 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 - 技术论文 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文
 - 专利检索 → tyc-mcp: search_patents
 - 产品参数 → search_deep(Bash, fetch_top_n) 读全文
-- 技术突破新闻 → 腾讯新闻 CLI
+- 技术突破新闻 → 中文实时新闻(tencent_news_search)
 - 公司研发投入 → westock-mcp: data_finance
 - **技术路线横评** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
 - **机构对技术壁垒的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
@@ -451,7 +455,7 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 - 产业链图谱 → westock-mcp: data_industry_chain
 - 企业画像 → tyc-mcp: search_companies + get_company_capabilities
 - 招投标 → tyc-mcp: search_bids
-- 产能/订单动态 → 腾讯新闻 CLI
+- 产能/订单动态 → 中文实时新闻(tencent_news_search)
 - 行业数据 → NeoData
 - **产业链成本结构/供应格局** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
 - **机构对供应链的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
@@ -460,7 +464,7 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 - 政策文件 → search_deep(Bash, "site:gov.cn {关键词}")
 - 企业司法/风险 → tyc-mcp: call_tool（风险扫描）
 - 出口管制 → search_deep(Bash, "BIS entity list {关键词}")
-- 政策动态 → 腾讯新闻 CLI
+- 政策动态 → 中文实时新闻(tencent_news_search)
 - **机构对政策影响的研判** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 - **外资/专家对风险的观点** → ima-mcp: search_knowledge(KB="7300811407257275")
 
@@ -474,7 +478,7 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 
 ### ic_feasibility (可行性评估 — early_theme 专用)
 - 学术论文 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文
-- 实验进展/里程碑 → search_deep(Bash) + 腾讯新闻 CLI
+- 实验进展/里程碑 → search_deep(Bash) + 中文实时新闻(tencent_news_search)
 - 专利 → tyc-mcp: search_patents
 - 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)
 - **机构对技术可行性的判断** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
@@ -484,7 +488,7 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 - 重大事件/业绩会 → westock-mcp: data_events
 - 机构评级/一致预期 → westock-mcp: data_rating
 - 资金流向/北向 → westock-mcp: data_fund_flow + data_north_holding
-- 最新动态 → 腾讯新闻 CLI
+- 最新动态 → 中文实时新闻(tencent_news_search)
 - **卖方共识/机构预期** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 - **外资/专家非共识观点** → ima-mcp: search_knowledge(KB="7300811407257275")
 
@@ -504,7 +508,7 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 |---------|--------|-----------|-------|
 | 行业市场规模 | westock-mcp: data_sector | "AI芯片 板块" | 15 条 |
 | 龙头财务数据 | NeoData | "英伟达 营收 毛利率" | 3 条 |
-| 最新政策动态 | 腾讯新闻 CLI | "芯片 出口管制 2026" | 5 条 |
+| 最新政策动态 | 中文实时新闻(tencent_news_search) | "芯片 出口管制 2026" | 5 条 |
 | 技术论文 | search_deep(Bash) | "arxiv HBM4 2026" | 2 条 |
 | ... | ... | ... | ... |
 

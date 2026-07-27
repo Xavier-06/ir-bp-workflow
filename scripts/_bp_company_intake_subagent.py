@@ -141,7 +141,7 @@ def bp_build_company_intake_instruction(
         f'- "{entity}" Crunchbase OR PitchBook OR AngelList\n'
         f'- "{entity}" patent OR publication OR research\n'
         "\n"
-        "### Step 6: 腾讯新闻 — 多轮搜索\n"
+        "### Step 6: 中文实时新闻(tencent_news_search) — 多轮搜索\n"
         "```bash\n"
         f'cd {runtime_root} && python3 -c "\n'
         "import json, sys; sys.path.insert(0, '.')\n"

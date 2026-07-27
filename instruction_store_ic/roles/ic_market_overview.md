@@ -28,7 +28,7 @@
 | 行业板块/指数 | westock-mcp: data_sector | NeoData |
 | 券商行业研报 | westock-mcp: data_report | NeoData |
 | 市场规模数据 | NeoData | web_search |
-| 突发行业动态 | 腾讯新闻 CLI | web_search |
+| 突发行业动态 | 中文实时新闻(tencent_news_search) | web_search |
 | 可比公司对标 | westock-mcp: data_finance | tyc-mcp |
 
 ## 输出章节

@@ -54,7 +54,7 @@
 | 产业链成本结构 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 产业链 成本结构 拆解` → fetch 全文 | search_deep(Bash) |
 | 头部公司财务 | westock-mcp: data_finance/data_quote | **IMA 自建研报库 (001a89fa4b807b92)** → NeoData |
 | 法规标准清单 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 法规 标准 国标 认证` → fetch 全文 | search_deep(Bash) |
-| 行业动态 | 腾讯新闻 CLI | **IMA 自建研报库 (001a89fa4b807b92)** |
+| 行业动态 | 中文实时新闻(tencent_news_search) | **IMA 自建研报库 (001a89fa4b807b92)** |
 
 **IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（自建研报库/行研智库/精选报告/机构调研纪要均可 fetch）。
 行业研报角色是 IMA 命中率最高的角色——自建研报库 + 行研智库 + 精选报告三个库直接对口。每个库搜 2-3 次不同关键词，取最相关 1-3 篇全文提取（多源交叉验证，不要只看 1 篇）。
@@ -67,10 +67,10 @@
 - 行研智库 `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{行业} 法规 标准 国标 认证` → 取最相关 1-3 篇结果 `fetch_media_content` 读全文
 - 来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 
-**Step 2: westock-mcp + 腾讯新闻补充（与 Step 1 并行）**
+**Step 2: westock-mcp + 中文实时新闻(tencent_news_search)补充（与 Step 1 并行）**
 - westock-mcp `data_report`: 搜券商行业研报
 - westock-mcp `data_finance`/`data_quote`: 头部公司财务快照
-- 腾讯新闻: `{行业} 最新动态 政策`
+- 中文实时新闻(tencent_news_search): `{行业} 最新动态 政策`
 
 **Step 3: search_deep(Bash) 第三方白皮书兜底**
 - 搜 EVTank/GGII/IIM/恒州诚思等机构的行业白皮书

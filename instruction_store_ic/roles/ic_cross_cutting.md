@@ -50,7 +50,7 @@
 | 环节对比数据 | web_search | tyc-mcp |
 | 行业趋势 | westock-mcp: data_industry_chain | NeoData |
 | 公司财务 | westock-mcp: data_finance | NeoData |
-| 最新动态 | 腾讯新闻 CLI | web_search |
+| 最新动态 | 中文实时新闻(tencent_news_search) | web_search |
 
 ## 输出章节
 

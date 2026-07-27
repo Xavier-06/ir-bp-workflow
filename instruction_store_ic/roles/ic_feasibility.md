@@ -31,7 +31,7 @@
 | 专利检索 | tyc-mcp: search_patents | web_search |
 | 公司/项目融资 | tyc-mcp: search_companies | web_search |
 | 行业研报 | westock-mcp: data_report | web_search |
-| 新闻动态 | 腾讯新闻 CLI | web_search |
+| 新闻动态 | 中文实时新闻(tencent_news_search) | web_search |
 
 ## 输出章节
 

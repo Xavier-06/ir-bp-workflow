@@ -29,7 +29,7 @@
 | 上市公司财务对比 | westock-mcp: data_finance, data_quote | NeoData |
 | 机构评级/一致预期 | westock-mcp: data_rating | web_search |
 | 资金流向/北向持仓 | westock-mcp: data_fund_flow, data_north_holding | - |
-| 竞品最新动态 | 腾讯新闻 CLI | web_search |
+| 竞品最新动态 | 中文实时新闻(tencent_news_search) | web_search |
 | 专利布局对比 | tyc-mcp: search_patents | web_search |
 
 ## 输出章节

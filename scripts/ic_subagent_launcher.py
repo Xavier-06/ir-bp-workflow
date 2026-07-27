@@ -807,10 +807,10 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '',
         f'1. `westock-mcp` — 行业/公司/财务/估值数据（MCP 直接调用）',
         f'2. `tyc-mcp` — 工商/股东/专利/风险信息（MCP 直接调用）',
         f'3. NeoData（Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; ..."`）— A/HK股行业深度研报/宏观数据',
-        f'4. 腾讯新闻（Bash: `sh ~/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search "关键词" --limit 5`）— 突发新闻/实时动态',
+        f'4. 中文实时新闻（Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import tencent_news_search; ..."`）— 突发新闻/实时动态（CLI 积分耗尽时自动降级 NeoData doc）',
         f'5. `search_deep`（Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import search_deep; ..."`）— 通用搜索+自动抓正文（兜底，替代 web_search）',
         f'',
-        f'⚠️ NeoData/腾讯新闻/yfinance 是 Bash 脚本调用，不是直接工具。完整 Bash 代码块见 System Prompt 中的工具指南。',
+        f'⚠️ NeoData/中文实时新闻/yfinance 是 Bash 脚本调用，不是直接工具。完整 Bash 代码块见 System Prompt 中的工具指南。',
         f'',
         f'### 补搜纪律',
         f'- 最多补搜 3 轮',
@@ -1002,7 +1002,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         return (
             f'⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             f'- 行业板块走势/估值 → westock-mcp: data_sector（查 {sector_hint} 板块）\n'
-            f'- 最新行业动态 → 腾讯新闻 CLI（Bash 调用，见 System Prompt 工具指南）\n'
+            f'- 最新行业动态 → 中文实时新闻 tencent_news_search（Bash 调用，见 System Prompt 工具指南）\n'
             f'- 龙头公司实时估值锚 → westock-mcp: data_quote（查 {sector_hint} 龙头公司）\n'
             f'- 行业研报/市场规模 → westock-mcp: data_report\n'
             f'- **投行研报/行业共识/预期差** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{sector_hint} 行业 共识 预期 投资逻辑 研报") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
@@ -1018,7 +1018,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- **行业深度研报/TAM/产业链** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 市场规模 TAM 产业链 竞争格局") → fetch_media_content 读全文\n'
             '- **第三方白皮书/市场规模** → ima-mcp: search_knowledge(KB="7302509206984644", query="{行业} 市场规模 增长 趋势 白皮书") → fetch_media_content 读全文\n'
             '- **机构对行业的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 行业 供应链 政策 产能") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
-            '- 突发行业动态 → 腾讯新闻 CLI(Bash)\n'
+            '- 突发行业动态 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- 可比公司估值/财务 → westock-mcp: data_finance\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
@@ -1028,7 +1028,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 企业工商/股东/融资 → tyc-mcp: search_companies → call_tool\n'
             '- 上市公司财务对比 → westock-mcp: data_finance + data_quote\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
-            '- 竞品最新动态 → 腾讯新闻 CLI(Bash)\n'
+            '- 竞品最新动态 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- 专利布局/研发能力 → tyc-mcp: call_tool(search_patents)\n'
             '- 市场份额/CR3/CR5 → westock-mcp + search_deep(Bash) 交叉验证\n'
             '- **竞品投关记录/管理层表态** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{竞品名} 投关 调研 纪要 竞争 份额") → search 后取 media_id 调 fetch_media_content 读全文\n'
@@ -1041,7 +1041,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 技术论文/arxiv → search_deep(Bash, "arxiv {关键词}", fetch_top_n) 读全文\n'
             '- 专利检索 → tyc-mcp: search_patents\n'
             '- 产品参数/性能对比 → search_deep(Bash, fetch_top_n) 读全文\n'
-            '- 技术突破新闻 → 腾讯新闻 CLI(Bash)\n'
+            '- 技术突破新闻 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- 公司研发投入/研发费用率 → westock-mcp: data_finance\n'
             '- **技术路线横评/行业深度** → ima-mcp: search_knowledge(KB="7311568991699459", query="{技术/行业} 技术路线 对比 横评 壁垒") → fetch_media_content 读全文\n'
             '- **机构对技术壁垒的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司/技术} 技术 壁垒 护城河") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
@@ -1053,7 +1053,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 产业链图谱/环节梳理 → westock-mcp: data_industry_chain\n'
             '- 企业画像/技术能力 → tyc-mcp: search_companies → get_company_capabilities\n'
             '- 招投标/政府采购 → tyc-mcp: search_bids\n'
-            '- 产能/订单动态 → 腾讯新闻 CLI(Bash)\n'
+            '- 产能/订单动态 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- 行业深度数据 → NeoData(Bash)\n'
             '- **行业深度研报/产业链成本结构** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 产业链 成本结构 拆解 供应格局") → fetch_media_content 读全文\n'
             '- **机构对供应链的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 供应链 产能 格局 国产替代") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
@@ -1065,10 +1065,10 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 国内政策文件/产业规划 → search_deep(Bash, "site:gov.cn {关键词}")\n'
             '- 企业司法/风险/行政处罚 → tyc-mcp: call_tool（风险扫描类）\n'
             '- 出口管制/制裁清单 → search_deep(Bash, "BIS entity list {关键词}")\n'
-            '- 政策最新动态/解读 → 腾讯新闻 CLI(Bash)\n'
+            '- 政策最新动态/解读 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- **机构对政策影响的研判** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 政策 监管 影响 风险") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
             '- **外资/专家对风险的观点** → ima-mcp: search_knowledge(KB="7300811407257275", query="{行业} 风险 政策 地缘 外资") → 用 introduction 摘要\n'
-            '- 地缘风险/贸易摩擦 → search_deep(Bash) + 腾讯新闻 CLI\n\n'
+            '- 地缘风险/贸易摩擦 → search_deep(Bash) + 中文实时新闻 tencent_news_search\n\n'
         )
     elif role in ('ic_unit_economics', 'ic_business_overview'):
         return (
@@ -1084,7 +1084,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         return (
             '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 学术论文/前沿研究 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文\n'
-            '- 实验进展/里程碑 → search_deep(Bash) + 腾讯新闻 CLI(Bash)\n'
+            '- 实验进展/里程碑 → search_deep(Bash) + 中文实时新闻 tencent_news_search(Bash)\n'
             '- 专利 → tyc-mcp: search_patents\n'
             '- 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)\n'
             '- **机构对技术可行性的判断** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{技术/行业} 可行性 里程碑 量产 时间表") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
@@ -1096,7 +1096,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 重大事件/业绩会/并购 → westock-mcp: data_events\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 资金流向/北向持仓 → westock-mcp: data_fund_flow + data_north_holding\n'
-            '- 最新动态 → 腾讯新闻 CLI(Bash)\n'
+            '- 最新动态 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- **卖方共识/机构预期** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业/公司} 卖方共识 一致预期 催化") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
             '- **外资/专家非共识观点** → ima-mcp: search_knowledge(KB="7300811407257275", query="{行业/公司} 外资 非共识 分歧 预期差") → 用 introduction 摘要\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
@@ -1116,7 +1116,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- **券商研报/行业深度报告/财经新闻** → NeoData Bash(`data_type="doc"`) — 质量远优于通用搜索\n'
             '- **机构研报/专家纪要/外资观点** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{关键词}") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
             '- **行业深度研报/TAM/白皮书** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 行业深度 市场规模") → fetch_media_content 读全文\n'
-            '- 中文实时新闻 → 腾讯新闻 CLI(Bash)\n'
+            '- 中文实时新闻 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- **美股新闻/earnings/分析师** → Yahoo Finance Bash(`_yahoo_search`) — 英文金融新闻首选\n'
             '- 美股估值 → yfinance(Bash)\n'
             '- 通用搜索兜底 → search_deep(Bash)，结构化源搜不到才用\n\n'
@@ -1152,13 +1152,13 @@ def build_step_prompt(step: str, entity: str, market: str = 'cn',
         f"If you cannot find specific data, SUPPLEMENTARY SEARCH FIRST before writing '未找到独立外部证据'. "
         f"Use thinking=high — reason carefully before writing each section.\n\n"
         f"CRITICAL: You must autonomously close the loop. When you discover data gaps during analysis:\n"
-        f"1. Search for the missing data yourself (westock-mcp → tyc-mcp → NeoData(Bash) → 腾讯新闻(Bash) → search_deep(Bash))\n"
+        f"1. Search for the missing data yourself (westock-mcp → tyc-mcp → NeoData(Bash) → tencent_news_search(Bash) → search_deep(Bash))\n"
         f"2. Integrate the found data into your analysis\n"
         f"3. Only mark as '待核实' after 3 rounds of supplementary search still yield nothing\n"
         f"Do NOT return to the coordinator for search instructions — you ARE the search agent.\n\n"
     )
 
-    # 注入 _common_tool_guide.md — 子代理需要 Bash 调用示例才能使用 NeoData/腾讯新闻/yfinance
+    # 注入 _common_tool_guide.md — 子代理需要 Bash 调用示例才能使用 NeoData/中文实时新闻/yfinance
     tool_guide = _load_tool_guide()
     if tool_guide:
         base += f"\n\n## 数据源使用指南（Bash 调用示例）\n\n{tool_guide}\n\n"

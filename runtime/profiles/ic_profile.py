@@ -1319,7 +1319,7 @@ Agent tool 参数：
 **F. 关键公司搜索（必做）:**
 - 对 brief 中每个 `key_company` → web_search: "{{company}} {entity} 业务 市场 融资 {year}"
 
-**G. 新闻搜索（必做，Bash 调用腾讯新闻）:**
+**G. 新闻搜索（必做，Bash 调用 tencent_news_search）:**
 ```bash
 cd ~/.workbuddy/ir_runtime && python3 -c "
 import json, sys; sys.path.insert(0, '.')

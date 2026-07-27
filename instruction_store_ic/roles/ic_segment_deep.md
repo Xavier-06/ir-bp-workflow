@@ -58,7 +58,7 @@
 | 企业工商/股东 | tyc-mcp: search_companies, call_tool | web_search |
 | 产业链上下游 | westock-mcp: data_industry_chain | web_search |
 | 专利检索 | tyc-mcp: search_patents | web_search |
-| 最新动态/新闻 | 腾讯新闻 CLI | web_search |
+| 最新动态/新闻 | 中文实时新闻(tencent_news_search) | web_search |
 
 ## 输出章节
 

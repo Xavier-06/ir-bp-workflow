@@ -365,8 +365,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
     output_path = step_output_path(task_id, step)
     research_plan_path = TASKS_DIR / f'{task_id}-research_plan.json'
     fact_store_path = TASKS_DIR / f'{task_id}-fact_store.json'
-    skill_dir = Path.home() / '.workbuddy' / 'skills' / 'skill_2053082907836022784'
-    
+
     brief_lines = [
         f'# Step Brief: {STEP_ROLE.get(step, step)} ({step})',
         f'',
@@ -469,7 +468,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'| A/HK 股行情/财报/估值 | NeoData api → yfinance 交叉 | search_deep(Bash) |',
         f'| 美股行情/估值/分红 | yfinance | NeoData → search_deep(Bash) |',
         f'| **券商研报/行业深度/产业链** | **NeoData doc + 腾讯自选股 data_report/data_sector/data_industry_chain** | search_deep(Bash) |',
-        f'| **突发新闻/实时动态(分钟级)** | 腾讯新闻 CLI (Bash) | search_deep(Bash) |',
+        f'| **突发新闻/实时动态(中文)** | 中文实时新闻 tencent_news_search (Bash, 自动降级NeoData doc) | search_deep(Bash) |',
         f'| **产品发布/技术动态/新闻分析** | NeoData doc + 腾讯新闻补充 | search_deep(Bash) |',
         f'| 企业工商/司法/专利 | 天眼查 MCP (已配置) | search_deep(Bash) |',
         f'| 技术论文/arxiv | search_deep(Bash, "arxiv ... 年份", fetch_top_n) 读全文 | — |',
@@ -782,7 +781,6 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
         # 替换占位符
         tool_guide = tool_guide.replace('{RUNTIME_ROOT}', str(ROOT))
         tool_guide = tool_guide.replace('{TASK_DIR}', str(TASKS_DIR))
-        tool_guide = tool_guide.replace('{SKILL_DIR}', str(Path.home() / '.workbuddy' / 'skills' / 'skill_2053082907836022784'))
         prompt = prompt + '\n\n' + tool_guide
 
     # ── 行业 Overlay（轻量版 archetype，v2.0 新增）──
@@ -1536,7 +1534,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'| A/HK 股行情/财报/估值(结构化数字) | **NeoData api** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search(\\"查询词\\", data_type=\\"api\\"), ensure_ascii=False))"` | yfinance → search_deep(Bash) |\n'
             f'| **券商研报/行业深度/财经新闻/政策分析** | **NeoData doc** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search(\\"查询词\\", data_type=\\"doc\\"), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| **机构调研纪要/专家交流/外资研报/行业深度报告** | **ima-mcp** | MCP 直接调用 `mcp__ima-mcp__search_knowledge(knowledge_base_id="KB_ID", query="查询词")` | search_deep(Bash) |\n'
-            f'| 突发新闻/实时动态（分钟级，中文） | **腾讯新闻** | Bash: `sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search "{{关键词}}" --limit 5` | search_deep(Bash) |\n'
+            f'| 突发新闻/实时动态（中文） | **中文实时新闻** | Bash: `cd {ROOT} && python3 -c "from scripts.search_gateway import tencent_news_search; import json; print(json.dumps(tencent_news_search(\\"{{关键词}}\\", max_results=5), ensure_ascii=False))"`（CLI积分耗尽自动降级NeoData doc） | search_deep(Bash) |\n'
             f'| 美股估值/财务 | **yfinance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "import yfinance as yf; print(yf.Ticker(\\"AAPL\\").info)"` | westock-mcp → search_deep(Bash) |\n'
             f'| **美股英文新闻/earnings/分析师动态** | **Yahoo Finance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import _yahoo_search; import json; print(json.dumps(_yahoo_search(\\"NVDA earnings\\", max_results=5), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| 学术论文/政策文件/英文技术文档 | **search_deep(Bash, fetch_top_n)** | Bash 调用，自动抓全文 | — |\n\n'
@@ -1554,7 +1552,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'- 禁止用通用搜索搜公司财务数据（用 westock-mcp: data_finance）\n'
             f'- 禁止用通用搜索搜公司股东信息（用 tyc-mcp: search_companies → call_tool）\n'
             f'- 禁止用通用搜索搜行业板块走势（用 westock-mcp: data_sector）\n'
-            f'- 禁止用通用搜索搜最新新闻动态（用腾讯新闻 CLI）\n'
+            f'- 禁止用通用搜索搜最新新闻动态（用 tencent_news_search，自动降级 NeoData doc）\n'
             f'- 禁止忽略 IMA 知识库——机构调研/专家纪要是公开 web 搜不到的增量信息，行业分析/竞争格局/投资逻辑类查询必须搜 IMA\n\n'
         )
 

@@ -607,12 +607,41 @@ def _yahoo_search(query: str, max_results: int = 8) -> list:
 _TENCENT_NEWS_CLI = os.path.expanduser("~/.tencent-news-cli/bin/tencent-news-cli")
 
 def tencent_news_search(query: str, max_results: int = 5) -> list:
-    """通过腾讯新闻 CLI 搜索实时中文新闻。
+    """通过腾讯新闻 CLI 搜索实时中文新闻，CLI 不可用时自动降级到 NeoData doc。
 
     7×24 新闻资讯，比 web_search 更精准、更结构化。
     适合：搜新闻、行业动态、公司报道、政策变化。
     CLI 无 --json 参数，解析结构化文本输出。
+
+    v4.8.1（2026-07-27）：腾讯新闻 API 积分耗尽（code:4007），CLI 返回空。
+    降级策略：CLI 优先 → 失败/空结果时 fallback 到 neodata_search(doc)，
+    引擎标记为 tencent_news:neodata_fallback，返回格式与 CLI 一致。
+    积分恢复后自动切回 CLI，无需改代码。
     """
+    cli_results = _tencent_news_cli_search(query, max_results)
+    if cli_results:
+        return cli_results
+    # ── 降级：NeoData doc 财经新闻 ──
+    try:
+        neodata_results = neodata_search(query, data_type="doc")
+        # neodata 返回格式已含 title/url/content/publishedDate，只需改 engine 标记
+        out = []
+        for r in neodata_results[:max_results]:
+            out.append({
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "content": r.get("content", "")[:500],
+                "engine": "tencent_news",
+                "source": "tencent_news:neodata_fallback",
+                "publishedDate": r.get("publishedDate", ""),
+            })
+        return out
+    except Exception:
+        return []
+
+
+def _tencent_news_cli_search(query: str, max_results: int = 5) -> list:
+    """腾讯新闻 CLI 底层调用（内部函数，供 tencent_news_search 降级链使用）。"""
     if not os.path.exists(_TENCENT_NEWS_CLI):
         return []
     try:

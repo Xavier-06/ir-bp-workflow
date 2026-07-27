@@ -276,8 +276,8 @@ Agent tool 参数：
 - `"{{entity}}" risk bear case downside {{year}}`
 - `"{{entity}}" business model moat competitive advantage`
 
-### Step 5: 腾讯新闻（实时中文新闻，Bash 调用）
-你是唯一的搜索者（没有上游 presearch），必须用 Bash 调腾讯新闻补充实时动态：
+### Step 5: 中文实时新闻（tencent_news_search，Bash 调用，自动降级NeoData doc）
+你是唯一的搜索者（没有上游 presearch），必须用 Bash 调 tencent_news_search 补充实时动态（自动降级NeoData doc）：
 ```bash
 cd ~/.workbuddy/ir_runtime && python3 -c "
 import json, sys; sys.path.insert(0, '.')

@@ -252,9 +252,9 @@ westock-mcp 提供 NeoData/yfinance 之外**独有**的结构化维度，是做�
 **与 NeoData 的关系**：NeoData 仍是 A/HK 行情/财报/研报主力；westock-mcp 补充板块/产业链/资金流/北向/评级这些 NeoData 覆盖弱的维度，二者交叉验证。**非上市标的没有 westock 数据，直接走 NeoData + WebSearch。**
 
 
-### 4. 腾讯新闻搜索（实时中文新闻，BP 管线专用）
+### 4. 中文实时新闻搜索（tencent_news_search，BP 管线专用）
 
-**⚠️ 搜中文公司新闻的首选——速度最快（0.7s）、覆盖融资/产品/人事报道，NeoData doc 的新闻有时效延迟。**
+**⚠️ 搜中文公司新闻的首选——覆盖融资/产品/人事报道。v4.8.1：腾讯新闻 API 积分耗尽，该函数已改为 CLI 优先 → 失败自动降级 NeoData doc，对调用方透明。**
 
 ```bash
 cd {RUNTIME_ROOT} && python3 -c "
@@ -275,10 +275,11 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 行业政策/监管动态 | `{行业名} 政策 监管 新规` |
 | 早期公司报道 | `{公司名} 创业 获投` |
 
-- 返回：title + url + content(摘要) + publishedDate(精确到秒) + source(媒体名)
-- 优势：0.7s 出结果，有精确发布时间，覆盖 7×24 实时新闻
+- 返回：title + url + content(摘要) + publishedDate + source
+- `source` 字段为 `tencent_news`（CLI）或 `tencent_news:neodata_fallback`（降级 NeoData doc）
+- ⚠️ 降级后偏研报/深度分析、弱突发实时；`publishedDate` 常为空，从 content 文本提取时间线索
 - 局限：纯中文新闻源，英文查询噪声大；不支持结构化金融数据
-- **search_gateway auto 模式已自动集成**：中文查询自动补充腾讯新闻
+- **search_gateway auto 模式已自动集成**：中文查询自动补充中文实时新闻
 
 ### 5. Yahoo Finance 搜索（美股新闻 + quote 页面）
 

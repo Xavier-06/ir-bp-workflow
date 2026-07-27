@@ -535,52 +535,24 @@ def execute_presearch(
 
 
 def _search_tencent_news(query_text: str) -> list[dict[str, str]]:
-    """Search tencent news via CLI. Returns list of {title, url, summary}."""
-    # Try to use tencent-news skill's CLI
-    skill_dir = Path(os.path.expanduser("~/.workbuddy/skills-marketplace/skills/tencent-news"))
-    if not skill_dir.exists():
-        return []
+    """Search Chinese real-time news via search_gateway. Returns list of {title, url, summary}.
 
-    scripts_dir = skill_dir / "scripts"
-    cli_state = scripts_dir / "cli-state.sh"
-    run_cli = scripts_dir / "run-cli.sh"
-
-    if not run_cli.exists():
-        return []
-
+    v4.8.1（2026-07-27）：原直调腾讯新闻 CLI 已废弃（skill 目录失效 + API 积分耗尽），
+    改为走 search_gateway.tencent_news_search（CLI 优先，失败自动降级 NeoData doc）。
+    """
     try:
-        import subprocess
-        # Quick test if CLI works
-        result = subprocess.run(
-            ["sh", str(run_cli), "top", "--limit", "3", "--raw"],
-            capture_output=True, text=True, timeout=15,
-        )
-        if result.returncode != 0:
-            # Try with --search
-            result = subprocess.run(
-                ["sh", str(run_cli), "search", query_text, "--limit", "5", "--raw"],
-                capture_output=True, text=True, timeout=15,
-            )
-
-        if result.stdout.strip():
-            items = []
-            try:
-                data = json.loads(result.stdout)
-                news_list = data if isinstance(data, list) else data.get("data", data.get("news", []))
-                for item in news_list[:5]:
-                    if isinstance(item, dict):
-                        items.append({
-                            "title": item.get("title", "") or item.get("name", ""),
-                            "url": item.get("url", "") or item.get("link", ""),
-                            "summary": item.get("summary", "") or item.get("abstract", ""),
-                        })
-            except json.JSONDecodeError:
-                pass
-            return items
+        from scripts.search_gateway import tencent_news_search
+        results = tencent_news_search(query_text, max_results=5)
+        return [
+            {
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "summary": r.get("content", ""),
+            }
+            for r in results
+        ]
     except Exception:
-        pass
-
-    return []
+        return []
 
 
 def _write_domain_result(

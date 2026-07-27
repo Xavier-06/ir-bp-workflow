@@ -48,7 +48,7 @@
 | 专利检索 | tyc-mcp: search_patents | search_deep(Bash) |
 | 公司工商/融资 | tyc-mcp: search_companies, get_company_capabilities | search_deep(Bash) |
 | 公司财务/估值 | westock-mcp: data_finance, data_quote | NeoData |
-| 行业动态 | 腾讯新闻 CLI | search_deep(Bash) |
+| 行业动态 | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
 
 ## 输出章节
 

@@ -149,7 +149,7 @@ WebSearch → WebFetch 爬取
 | **NeoData** | `python3 scripts/search/neodata_search.py "公司名" --data-type all --json` | A股/港股研报+行情估值 |
 | **yfinance** | `python3 -c "from scripts.search_gateway import yfinance_summary; yfinance_summary('AAPL')"` | 美股估值快照 (price/PE/PB/market_cap) |
 | **SEC EDGAR** | WebFetch | 美股上市公司 10-K/S-1 |
-| **腾讯新闻** | `python3 -c "from scripts.search_gateway import tencent_news_search; tencent_news_search('公司名 融资', max_results=5)"` | 中文企业融资/产品/人事动态 (0.7s 最快) |
+| **中文实时新闻** | `python3 -c "from scripts.search_gateway import tencent_news_search; tencent_news_search('公司名 融资', max_results=5)"` | 中文企业融资/产品/人事动态 (0.7s 最快) |
 | **Yahoo Finance** | `python3 -c "from scripts.search_gateway import _yahoo_search; _yahoo_search('NVDA earnings revenue', max_results=5)"` | 美股竞品新闻/earnings/quote |
 
 ### E. 通用搜索
@@ -161,9 +161,9 @@ WebSearch → WebFetch 爬取
 
 ### F. 新闻搜索（中文快讯 + 美股竞品）
 
-> 与 BP 管线一致：中文公司/行业新闻走腾讯新闻（最快），美股竞品新闻/earnings 走 Yahoo Finance。两者都在 `scripts/search_gateway.py`，子代理用 Bash 调用。
+> 与 BP 管线一致：中文公司/行业新闻走 tencent_news_search（自动降级NeoData doc），美股竞品新闻/earnings 走 Yahoo Finance。两者都在 `scripts/search_gateway.py`，子代理用 Bash 调用。
 
-**腾讯新闻搜索（实时中文新闻，0.7s 出结果）**
+**中文实时新闻搜索（tencent_news_search，自动降级NeoData doc）**
 ```bash
 cd {RUNTIME_ROOT} && python3 -c "
 import json, sys; sys.path.insert(0, '.')
@@ -200,7 +200,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 | 你要查什么 | 首选 | 兜底 |
 |-----------|------|------|
-| 中文公司/行业新闻（融资/产品/人事/政策） | 腾讯新闻 `tencent_news_search` | NeoData(doc) → WebSearch |
+| 中文公司/行业新闻（融资/产品/人事/政策） | `tencent_news_search` | NeoData(doc) → WebSearch |
 | 美股竞品新闻/earnings | Yahoo `_yahoo_search` | WebSearch |
 
 ## PDF 提取器选择
@@ -262,11 +262,11 @@ filters: [{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media
 | 角色 | 可以做 | 禁止做 |
 |------|--------|--------|
 | academic_scout | 搜论文 (arXiv/DBLP/PMC/Crossref, 4源必用) | 搜研报/新闻/企业信息/下载全文/IMA |
-| industry_scout | 搜研报/报告/新闻/板块/产业链/机构评级 (NeoData/westock-mcp/腾讯新闻/Yahoo/WebSearch) + **IMA 行研智库/精选报告/长安投研/机构纪要** | 搜论文/企业信息 |
-| enterprise_scout | 企业尽调 (TYC + NeoData/yfinance + 腾讯新闻 + Yahoo + SEC/WebSearch + **westock-mcp 板块/产业链/机构评级/资金流** + **IMA 公司调研报告/长安投研**) | 搜论文/研报 |
+| industry_scout | 搜研报/报告/新闻/板块/产业链/机构评级 (NeoData/westock-mcp/中文实时新闻/Yahoo/WebSearch) + **IMA 自建研报库/行研智库/精选报告/机构纪要** | 搜论文/企业信息 |
+| enterprise_scout | 企业尽调 (TYC + NeoData/yfinance + 中文实时新闻 + Yahoo + SEC/WebSearch + **westock-mcp 板块/产业链/机构评级/资金流** + **IMA 自建研报库/机构纪要**) | 搜论文/研报 |
 | deep_reader | 读全文+压缩笔记 + **IMA 行研智库 fetch 全文（按需补充行业背景）** | 搜新文档 |
 | tech_decomposition | 快速预搜+拆解方向 + **IMA 行研智库/精选报告（行业研报首选）** | 下载全文/深度阅读 |
-| tech_strategist | 读笔记+分析 + **IMA 长安投研/机构纪要（按需补充机构观点）** | 搜任何外部数据（IMA 按需除外） |
+| tech_strategist | 读笔记+分析 + **IMA 自建研报库/机构纪要（按需补充机构观点）** | 搜任何外部数据（IMA 按需除外） |
 | report_writer | 读分析+写报告 | 搜任何外部数据 |
 
 **通用禁止**: ❌ 所有角色不编造引用
