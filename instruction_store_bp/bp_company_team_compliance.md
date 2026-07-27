@@ -59,9 +59,9 @@
 1. 读取 `bp_step0_profile.json`，提取 `team_highlights`（数组，格式 `"姓名 - 职务 - 背景"`）和 `founders`（数组，纯姓名）
 2. 合并去重，得到完整人物清单
 3. **对清单中每个人**，至少发起以下 2 次独立搜索：
-   - `web_search`: `"{姓名}" 履历 背景 工作经历 前公司`
-   - `web_search`: `"{姓名}" {公司名} 持股 任职`
-4. 如果搜索有结果，用 `web_fetch` 深读至少 1 个 URL 获取详细信息
+   - `search_deep(Bash)`: `"{姓名}" 履历 背景 工作经历 前公司`
+   - `search_deep(Bash)`: `"{姓名}" {公司名} 持股 任职`
+4. 如果搜索有结果，用 `search_deep(Bash)` 深读至少 1 个 URL 获取详细信息
 5. 将搜索结果与 BP 自述做交叉验证：
    - ✅ 一致 → 标注"经外部来源验证"
    - ⚠️ 部分一致 → 标注差异点
@@ -97,8 +97,8 @@
 | 招投标 | `search_bids(query="公司名 招投标")` 或 TYC `call_tool`（取「招投标」tool_name） | 招投标记录 |
 | 历史股东变更 | TYC `call_tool`（先 `get_company_capabilities` 取「历史股东」真实 tool_name） | 已退出股东、历史股权结构 |
 | 历史投资 | TYC `call_tool`（先 `get_company_capabilities` 取「历史投资」真实 tool_name） | 历史对外投资 |
-| 团队履历外部验证、负面舆情 | `web_search` + `web_fetch` | 搜索高管公开信息、媒体报道 |
-| **创始人/高管新闻报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻、行业媒体——比 web_search 更精准** |
+| 团队履历外部验证、负面舆情 | search_deep(Bash) | 搜索高管公开信息、媒体报道 |
+| **创始人/高管新闻报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻、行业媒体——比 search_deep(Bash) 更精准** |
 | 上市战略股东财务数据（市值/PE/PS） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证战略股东体量和持股价值 |
 | **战略股东/关联方研报** | **NeoData (`neodata_search` data_type=doc)** | **上市股东的深度研报、投资分析** |
 
@@ -113,7 +113,7 @@ print(neodata_search('{股东公司名} 市值 市盈率 市销率', data_type='
 - `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
 - 用途：验证战略投资方（如产业基金、上市公司）的财务体量，判断其投资行为的合理性
 
-⚠️ 天眼查是**结构性数据的首选**——不要只用 `web_search` 搜工商信息。`web_search` 搜到的是新闻报道，不是结构化股东列表。
+⚠️ 天眼查是**结构性数据的首选**——不要只用 `search_deep(Bash)` 搜工商信息。`search_deep(Bash)` 搜到的是新闻报道，不是结构化股东列表。
 ⚠️ 天眼查 IP 数据不含集成电路布图设计，需到国家知识产权局布图设计系统单独核实。
 
 ## ⚠️ 工具限制
@@ -249,14 +249,14 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 ### WebSearch 搜索模板（创始人/高管履历验证）
 ```
 # 中文搜索
-web_search: "{姓名}" 履历 背景 工作经历 前公司
-web_search: "{姓名}" {公司名} 持股 任职 创始人
+# search_deep(Bash) 查询词: "{姓名}" 履历 背景 工作经历 前公司
+# search_deep(Bash) 查询词: "{姓名}" {公司名} 持股 任职 创始人
 
 # 英文搜索（如有海外背景）
-web_search: "{Name English}" {company} background experience
+# search_deep(Bash) 查询词: "{Name English}" {company} background experience
 
-# 搜到有结果后，用 web_fetch 深读最相关的 2-3 个 URL
-web_fetch: {搜索结果中的URL}
+# 搜到有结果后，用 search_deep(Bash) 深读最相关的 2-3 个 URL
+# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
 ```
 
 ## 数据源路由决策表
@@ -277,7 +277,7 @@ web_fetch: {搜索结果中的URL}
 | 资质许可 | TYC `call_tool` (企业资质) | 结构化 |
 | 招投标记录 | TYC `search_bids` 或 `call_tool` | 结构化 |
 | 创始人/高管公开履历 | WebSearch (中英文) → WebFetch 深读 | 非结构化，TYC 不覆盖个人背景报道 |
-| **创始人/高管财经报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻——比 web_search 更精准** |
+| **创始人/高管财经报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻——比 search_deep(Bash) 更精准** |
 | 上市战略股东财务体量 | NeoData (`neodata_search` data_type=api) | 行情/财报结构化 |
 | **战略股东/关联方研报新闻** | **NeoData (`neodata_search` data_type=doc)** | **上市股东深度研报、投资分析、新闻动态** |
 | **机构对创始人/管理层的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{创始人/CEO名} 点评 履历 评价` | 机构内部人物评价，web 搜不到 |

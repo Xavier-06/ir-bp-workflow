@@ -50,8 +50,8 @@
 | 竞品资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期 |
 | 上市竞品财务数据（市值/PE/PS） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData |
 | 美股竞品估值交叉验证 | `yfinance` | A股代码: `{代码}.SS`/`.SZ`，港股: `{代码}.HK` |
-| 竞品产品/客户/新闻 | `web_search` + `web_fetch` | 搜竞品官网、媒体报道、行业排名 |
-| **竞品新闻/行业研报/市场动态** | **NeoData (`neodata_search` data_type=doc)** | **券商竞品分析、行业新闻、市场份额研报——比 web_search 更精准** |
+| 竞品产品/客户/新闻 | search_deep(Bash) | 搜竞品官网、媒体报道、行业排名 |
+| **竞品新闻/行业研报/市场动态** | **NeoData (`neodata_search` data_type=doc)** | **券商竞品分析、行业新闻、市场份额研报——比 search_deep(Bash) 更精准** |
 
 **NeoData 调用**（可比公司市值/PE/PS 的首选数据源，A/HK 股必用）：
 ```bash
@@ -62,7 +62,7 @@ print(neodata_search('{公司名} 市值 市盈率 市销率', data_type='all'))
 "
 ```
 - `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
-- 备用：`web_search` 搜 `{公司名} {股票代码} 最新市值 市盈率 市销率 site:eastmoney.com OR site:xueqiu.com`
+- 备用：`search_deep(Bash)` 搜 `{公司名} {股票代码} 最新市值 市盈率 市销率 site:eastmoney.com OR site:xueqiu.com`
 
 **yfinance 调用**（美股竞品估值交叉验证）：
 ```bash
@@ -183,7 +183,7 @@ result = neodata_search('{行业名} 竞争格局 市场份额 主要厂商 市�
 print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
-- 备用：`web_search` 搜 `{公司名} {股票代码} 最新市值 市盈率 site:eastmoney.com OR site:xueqiu.com`
+- 备用：`search_deep(Bash)` 搜 `{公司名} {股票代码} 最新市值 市盈率 site:eastmoney.com OR site:xueqiu.com`
 
 ### yfinance 调用（美股竞品估值交叉验证）
 ```bash
@@ -198,23 +198,23 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 ### WebSearch 搜索模板（竞品情报）
 ```
 # 竞品清单构建
-web_search: "{行业/细分市场}" 主要厂商 竞品 市场份额 market share
-web_search: "{产品类别}" competitors landscape players
+# search_deep(Bash) 查询词: "{行业/细分市场}" 主要厂商 竞品 市场份额 market share
+# search_deep(Bash) 查询词: "{产品类别}" competitors landscape players
 
 # 竞品产品/客户/新闻
-web_search: "{竞品名}" 产品 客户 案例 签约
-web_search: "{竞品名}" product customers revenue
-web_search: "{竞品名}" 融资 估值 IPO
+# search_deep(Bash) 查询词: "{竞品名}" 产品 客户 案例 签约
+# search_deep(Bash) 查询词: "{竞品名}" product customers revenue
+# search_deep(Bash) 查询词: "{竞品名}" 融资 估值 IPO
 
 # 竞品产品参数/价格
-web_search: "{竞品名}" "{产品型号}" 参数 规格 价格
-web_search: "{竞品名}" pricing datasheet specifications
+# search_deep(Bash) 查询词: "{竞品名}" "{产品型号}" 参数 规格 价格
+# search_deep(Bash) 查询词: "{竞品名}" pricing datasheet specifications
 
 # 行业排名
-web_search: "{行业}" 排名 ranking top players 市占率
+# search_deep(Bash) 查询词: "{行业}" 排名 ranking top players 市占率
 
 # 搜到后深读
-web_fetch: {搜索结果中的URL}
+# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
 ```
 
 ## 数据源路由决策表

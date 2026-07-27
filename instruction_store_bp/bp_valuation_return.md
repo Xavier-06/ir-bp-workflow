@@ -37,8 +37,8 @@
    ```
 3. **WebSearch 补搜融资新闻**：
    ```
-   web_search: "{公司名}" 融资 估值 轮次 投资方 投后
-   web_search: "{公司名}" funding valuation Series round
+   # search_deep(Bash) 查询词: "{公司名}" 融资 估值 轮次 投资方 投后
+   # search_deep(Bash) 查询词: "{公司名}" funding valuation Series round
    ```
 
 ### ⚠️ 可比上市公司估值（硬性要求 — 每家必须有实时数据 + 主营业务重合度说明）
@@ -143,19 +143,19 @@ print(json.dumps(v, ensure_ascii=False, indent=2))
 ### WebSearch 搜索模板（可比交易/融资/历史估值）
 ```
 # 历史融资估值
-web_search: "{公司名}" 融资 估值 投后 轮次 投资方
-web_search: "{公司名}" funding valuation Series round investors
+# search_deep(Bash) 查询词: "{公司名}" 融资 估值 投后 轮次 投资方
+# search_deep(Bash) 查询词: "{公司名}" funding valuation Series round investors
 
 # 可比交易
-web_search: "{行业/赛道}" 融资 估值 投后 Pre-A A轮 B轮 2024 2025
-web_search: "{行业}" funding valuation Series A B round 2024 2025
+# search_deep(Bash) 查询词: "{行业/赛道}" 融资 估值 投后 Pre-A A轮 B轮 2024 2025
+# search_deep(Bash) 查询词: "{行业}" funding valuation Series A B round 2024 2025
 
 # 行业估值水平
-web_search: "{行业}" 估值 PS PE EV/Revenue 行业平均 benchmark
-web_search: "{行业}" valuation multiples industry average
+# search_deep(Bash) 查询词: "{行业}" 估值 PS PE EV/Revenue 行业平均 benchmark
+# search_deep(Bash) 查询词: "{行业}" valuation multiples industry average
 
 # 搜到后深读
-web_fetch: {搜索结果中的URL}
+# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
 ```
 
 ## 数据源路由决策表
@@ -188,9 +188,9 @@ brief 中的 `competitors` 字段可能为空或遗漏（上游数据断裂的�
 
 如果以上源均为空，**自行搜索**：
 ```
-web_search: "{公司名}" 竞品 对标 竞争对手
-web_search: "{公司名}" competitors vs market share
-web_search: "{行业}" 龙头 上市公司 排名
+# search_deep(Bash) 查询词: "{公司名}" 竞品 对标 竞争对手
+# search_deep(Bash) 查询词: "{公司名}" competitors vs market share
+# search_deep(Bash) 查询词: "{行业}" 龙头 上市公司 排名
 ```
 
 将提取到的竞品名记录到 `comparable_companies` 列表中，后续 Step 2 做过滤。

@@ -41,9 +41,9 @@ BP 文档中提到的**每一个产品/产品线** + 公司官网展示的每一
 | 客户股东（判断战略投资方/关联交易） | TYC `call_tool`（先 `get_company_capabilities` 取「股东信息」真实 tool_name，再 `call_tool(tool_name="...", company_name="...", arguments={page: 1, page_size: 20})`） | 一层股东构成、持股比例 |
 | 客户招投标验证 | `search_bids(query="公司名 招投标")` 或 TYC `call_tool`（取「招投标」tool_name） | 招投标记录（验证合同/交付真实性） |
 | 客户资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期 |
-| 订单/合同/收入外部报道 | `web_search` + `web_fetch` | 搜新闻、行业媒体、客户公告 |
-| **产品/客户/订单新闻报道** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、产品报道、客户合作动态——比 web_search 更精准** |
-| 产品参数对比、竞品 datasheet | `web_search` | 搜竞品产品参数、第三方评测 |
+| 订单/合同/收入外部报道 | search_deep(Bash) | 搜新闻、行业媒体、客户公告 |
+| **产品/客户/订单新闻报道** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、产品报道、客户合作动态——比 search_deep(Bash) 更精准** |
+| 产品参数对比、竞品 datasheet | `search_deep(Bash)` | 搜竞品产品参数、第三方评测 |
 | 上市客户财务验证（市值/营收） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证客户体量和采购能力 |
 | **上市客户/合作方研报** | **NeoData (`neodata_search` data_type=doc)** | **客户深度研报、行业分析、采购能力评估** |
 
@@ -168,16 +168,16 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 ### WebSearch 搜索模板
 ```
 # 产品/客户/订单新闻
-web_search: "{公司名}" "{产品名}" 客户 合同 订单
-web_search: "{公司名}" "{客户名}" 合作 交付 签约
-web_search: "{公司名}" 商业化 量产 出货 营收
+# search_deep(Bash) 查询词: "{公司名}" "{产品名}" 客户 合同 订单
+# search_deep(Bash) 查询词: "{公司名}" "{客户名}" 合作 交付 签约
+# search_deep(Bash) 查询词: "{公司名}" 商业化 量产 出货 营收
 
 # 竞品产品参数
-web_search: "{竞品名}" "{产品型号}" 参数 规格 datasheet
-web_search: "{竞品名}" 产品 对比 评测 性能
+# search_deep(Bash) 查询词: "{竞品名}" "{产品型号}" 参数 规格 datasheet
+# search_deep(Bash) 查询词: "{竞品名}" 产品 对比 评测 性能
 
 # 搜到后深读
-web_fetch: {搜索结果中的URL}
+# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
 ```
 
 ## 数据源路由决策表
@@ -190,7 +190,7 @@ web_fetch: {搜索结果中的URL}
 | 客户资质许可 | TYC `call_tool` (企业资质) | 判断客户是否有能力采购 |
 | 客户经营异常/风险 | TYC `call_tool` (风险扫描) | 判断客户是否还能回款 |
 | 订单/合同/交付外部报道 | WebSearch → WebFetch 深读 | 搜新闻、行业媒体、客户公告 |
-| **产品/客户/合作新闻报道** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、产品报道、合作动态——比 web_search 更精准** |
+| **产品/客户/合作新闻报道** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、产品报道、合作动态——比 search_deep(Bash) 更精准** |
 | 产品参数/竞品 datasheet | WebSearch | 搜竞品产品参数、第三方评测 |
 | 上市客户财务体量 | NeoData (`neodata_search` data_type=api) | 营收/市值/利润结构化 |
 | **上市客户/合作方研报** | **NeoData (`neodata_search` data_type=doc)** | **客户深度研报、行业分析** |

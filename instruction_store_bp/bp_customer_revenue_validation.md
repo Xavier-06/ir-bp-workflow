@@ -30,8 +30,8 @@
 | 客户资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期 |
 | 客户风险全面扫描 | TYC `call_tool`（先 `get_company_capabilities` 取风险扫描类 tool_name，组合多个维度扫描） | 35 项风险因子前置预筛 |
 | 客户经营异常/行政处罚/失信 | `get_business_exception` / `get_administrative_penalty` / `get_dishonest_info` | 按扫描结果下钻（判断客户是否还能回款） |
-| 收入/订单外部报道 | `web_search` + `web_fetch` | 搜新闻、行业媒体、客户公告 |
-| **客户新闻/订单报道/合作动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、客户合作报道、行业媒体——比 web_search 更精准** |
+| 收入/订单外部报道 | search_deep(Bash) | 搜新闻、行业媒体、客户公告 |
+| **客户新闻/订单报道/合作动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、客户合作报道、行业媒体——比 search_deep(Bash) 更精准** |
 | 上市客户财务验证（市值/营收/利润） | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证客户体量和采购能力 |
 | **上市客户/行业研报** | **NeoData (`neodata_search` data_type=doc)** | **客户深度研报、行业采购趋势分析** |
 
@@ -46,7 +46,7 @@ print(neodata_search('{客户公司名} 营收 净利润 市值', data_type='all
 - `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
 - 用途：验证上市客户的营收体量和采购能力是否与 BP 声称的订单规模匹配
 
-⚠️ 客户验证是**本维度核心**——必须用 `get_company_basic_profile` 验证每个重要客户的存续状态，不能只用 `web_search`。
+⚠️ 客户验证是**本维度核心**——必须用 `get_company_basic_profile` 验证每个重要客户的存续状态，不能只用 `search_deep(Bash)`。
 ⚠️ 战略投资方作为客户供应可信度高，但仍需用 `call_tool` (股东信息) 确认股权关系和存续状态。
 
 ## ⚠️ 工具限制
@@ -177,19 +177,19 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 ### WebSearch 搜索模板（收入/订单/合同外部验证）
 ```
 # 收入/订单/合同报道
-web_search: "{公司名}" "{客户名}" 合同 订单 签约 合作
-web_search: "{公司名}" "{产品名}" 客户 交付 出货 营收
-web_search: "{公司名}" revenue contract order customer
+# search_deep(Bash) 查询词: "{公司名}" "{客户名}" 合同 订单 签约 合作
+# search_deep(Bash) 查询词: "{公司名}" "{产品名}" 客户 交付 出货 营收
+# search_deep(Bash) 查询词: "{公司名}" revenue contract order customer
 
 # 客户公告/采购信息
-web_search: "{客户名}" 采购 供应商 中标 招标
-web_search: "{客户名}" procurement supplier vendor
+# search_deep(Bash) 查询词: "{客户名}" 采购 供应商 中标 招标
+# search_deep(Bash) 查询词: "{客户名}" procurement supplier vendor
 
 # 回款/应收账款
-web_search: "{公司名}" 回款 应收 账期
+# search_deep(Bash) 查询词: "{公司名}" 回款 应收 账期
 
 # 搜到后深读
-web_fetch: {搜索结果中的URL}
+# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
 ```
 
 ## 数据源路由决策表
@@ -205,7 +205,7 @@ web_fetch: {搜索结果中的URL}
 | 客户资质许可 | TYC `call_tool` (企业资质) | 判断客户是否有能力采购 |
 | 收入/订单/合同外部报道 | WebSearch → WebFetch 深读 | 搜新闻、行业媒体、客户公告 |
 | 上市客户财务体量 | NeoData (`neodata_search` data_type=api) | 营收/市值/利润结构化 |
-| **客户新闻/订单报道/合作动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、客户合作报道——比 web_search 更精准** |
+| **客户新闻/订单报道/合作动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、客户合作报道——比 search_deep(Bash) 更精准** |
 | **客户投关记录/管理层表态** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{客户名} 投关 调研 纪要 供应商` | 上市客户投关记录原文中的供应商/采购表态 |
 | **机构对客户/收入的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{公司/客户名} 客户 订单 收入 验证` | 机构调研纪要中的收入/客户评价 |
 

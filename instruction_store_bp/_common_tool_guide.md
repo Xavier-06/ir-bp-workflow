@@ -1,5 +1,18 @@
 
 
+## 🚨 工具可用性硬约束（最高优先级，违反即崩溃）
+
+本环境子代理（general-purpose）**没有 `web_search` 和 `web_fetch` 工具**。调用它们会直接报错 `Tool web_search/web_fetch not found` 并中断任务。
+
+**唯一正确的做法：**
+- 通用网络搜索 → Bash 调 `search_deep`（见下方第 6 节）
+- 读网页正文 → 用 `search_deep(query, fetch_top_n=N)`，它会搜索并**自动抓取 top N 篇正文**，一步到位，无需手动 fetch
+- 结构化金融数据 → NeoData / westock-mcp
+- 企业工商/风险 → tyc-mcp
+- 机构研报/纪要 → ima-mcp
+
+下文任何出现 `web_search:` / `web_fetch:` 字样的示例块，都**只是查询词/URL 的示意写法**，实际执行时必须套进 `search_deep` 的 Bash 命令里，**绝不能直接当工具调用**。
+
 ## 📝 脚注引用规范（所有维度强制，最高优先级）
 
 你在撰写 Markdown 报告时，**必须**对每个关键定量数据添加 `[^N]` 脚注标记，脚注定义放在报告末尾的"来源与参考"章节。
@@ -287,15 +300,25 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 ### 6. 通用网络搜索（新闻、行业报告、通用信息）
 
-**search_deep（Bash 调用 search_gateway，替代 web_search）**
-- 直接用，不需要 Bash
-- 适合：搜新闻、行业趋势、媒体报道、通用信息
-- 不适合：结构化金融数据（用 search_gateway）、结构化企业数据（用 TYC 天眼查）
+**search_deep（Bash 调用 search_gateway，替代 search_deep(Bash)）**
+- **必须通过 Bash 调用**（不是内置工具，直接调会报错）
+- 设 `fetch_top_n≥2` 会搜索并自动抓取正文，相当于 search_deep(Bash) 一步完成
+- 适合：搜新闻、行业趋势、媒体报道、通用信息、读全文提取细节
+- 不适合：结构化金融数据（用 NeoData/westock）、结构化企业数据（用 TYC 天眼查）
 - 作为所有搜索的兜底手段
+
+```bash
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import search_deep
+import json
+r = search_deep('你的查询词', max_results=5, fetch_top_n=3)
+print(json.dumps(r, ensure_ascii=False, indent=2))
+"
+```
 
 ### 7. 网页正文深度阅读
 
-**web_fetch（WorkBuddy 内置工具）**
+**search_deep(Bash)（WorkBuddy 内置工具）**
 - 给一个 URL，返回正文内容
 - 适合：拿到搜索结果 URL 后，需要读全文提取细节
 - 不适合：需要 JS 渲染的页面、反爬严格的站点

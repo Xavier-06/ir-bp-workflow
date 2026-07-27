@@ -26,10 +26,10 @@
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
 | 上市公司财务 | westock-mcp: data_finance, data_profile | NeoData |
-| 行业研报（商业模式） | westock-mcp: data_report | web_search |
-| 企业工商/融资 | tyc-mcp: search_companies | web_search |
-| 定价/收费信息 | web_search + web_fetch | - |
-| 用户数据/留存 | web_search | - |
+| 行业研报（商业模式） | westock-mcp: data_report | search_deep(Bash) |
+| 企业工商/融资 | tyc-mcp: search_companies | search_deep(Bash) |
+| 定价/收费信息 | search_deep(Bash, fetch_top_n) | - |
+| 用户数据/留存 | search_deep(Bash) | - |
 
 ## 输出章节
 

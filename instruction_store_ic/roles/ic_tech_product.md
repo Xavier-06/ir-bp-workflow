@@ -25,10 +25,10 @@
 
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 技术论文/学术前沿 | web_search("arxiv ...") + web_fetch | - |
-| 专利检索 | tyc-mcp: search_patents | web_search |
-| 产品参数/性能对比 | web_search + web_fetch | - |
-| 技术突破新闻 | 腾讯新闻 CLI | web_search |
+| 技术论文/学术前沿 | search_deep(Bash, "arxiv ...", fetch_top_n) | - |
+| 专利检索 | tyc-mcp: search_patents | search_deep(Bash) |
+| 产品参数/性能对比 | search_deep(Bash, fetch_top_n) | - |
+| 技术突破新闻 | 腾讯新闻 CLI | search_deep(Bash) |
 | 公司研发投入 | westock-mcp: data_finance | tyc-mcp |
 
 ## 输出章节

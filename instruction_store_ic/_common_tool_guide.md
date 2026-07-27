@@ -57,10 +57,10 @@
 
 | 我要搜什么 | 首选 | 备用 | 兜底 |
 |---|---|---|---|
-| 技术论文/学术前沿/arxiv | search_deep(Bash, "arxiv {关键词} {YYYY}") | web_fetch 读论文正文 | — |
-| 技术参数/产品规格/性能对比 | search_deep(Bash) + web_fetch | — | — |
+| 技术论文/学术前沿/arxiv | search_deep(Bash, "arxiv {关键词} {YYYY}", fetch_top_n) | — | — |
+| 技术参数/产品规格/性能对比 | search_deep(Bash, fetch_top_n) | — | — |
 | 技术突破/产品发布新闻 | 腾讯新闻 CLI | search_deep(Bash) | — |
-| 技术路线成熟度/TRL评估 | search_deep(Bash, "{技术} technology readiness level") | web_fetch | — |
+| 技术路线成熟度/TRL评估 | search_deep(Bash, "{技术} technology readiness level", fetch_top_n) | — | — |
 | 专利检索(技术方向) | tyc-mcp: `search_patents` | search_deep(Bash, "patent {关键词}") | — |
 | 公司研发投入/研发费用率 | westock-mcp: `data_finance` | tyc-mcp: `get_company_capabilities` | search_deep(Bash) |
 
@@ -288,12 +288,21 @@ search_deep(Bash, "{行业} market size CAGR forecast 2030")         # 英文市
 search_deep(Bash, "{技术} TRL technology readiness level")         # 技术成熟度
 ```
 
-### 2.7 web_fetch (内置) — 读已知 URL
+### 2.7 search_deep(Bash, fetch_top_n) — 搜索 + 读已知 URL 正文
 
-**一句话**：你已经有一个 URL，需要读它的完整内容。不能搜索，只能读。
+**一句话**：本环境**无 web_fetch 工具**（直接调会报错崩溃）。读已知 URL 正文统一用 search_deep，把 URL 当查询词的一部分并设 `fetch_top_n`，它会自动抓取正文。
+
+```bash
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import search_deep
+import json
+r = search_deep('https://arxiv.org/abs/XXXX.XXXXX', max_results=3, fetch_top_n=1)
+print(json.dumps(r, ensure_ascii=False, indent=2))
+"
+```
 
 **最佳场景**：
-- 读 arxiv 论文正文（从 search_deep 找到 URL 后）
+- 读 arxiv 论文正文（search_deep 找到 URL 后，把 URL 再喂回去带 fetch_top_n）
 - 读政策文件原文
 - 读公司公告/新闻稿全文
 - 读研报 PDF（如果 URL 可达）
@@ -443,9 +452,9 @@ ima-mcp.search_knowledge:
 - **机构对竞争格局的评价** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
 
 ### ic_tech_product / ic_route_deep (技术产品 / 路线深度)
-- 技术论文 → search_deep(Bash, "arxiv ...") + web_fetch
+- 技术论文 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文
 - 专利检索 → tyc-mcp: search_patents
-- 产品参数 → search_deep(Bash) + web_fetch
+- 产品参数 → search_deep(Bash, fetch_top_n) 读全文
 - 技术突破新闻 → 腾讯新闻 CLI
 - 公司研发投入 → westock-mcp: data_finance
 - **技术路线横评** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
@@ -471,13 +480,13 @@ ima-mcp.search_knowledge:
 ### ic_unit_economics / ic_business_overview (单元经济 / 业务概览)
 - 公司财务 → westock-mcp: data_finance
 - 客户/供应商 → tyc-mcp: call_tool
-- 定价/收费模式 → search_deep(Bash) + web_fetch（产品官网）
+- 定价/收费模式 → search_deep(Bash, fetch_top_n)（产品官网，读全文）
 - 用户数据/留存 → search_deep(Bash)
 - **机构对商业模式的评价** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
 - **可比公司投关记录** → ima-mcp: search_knowledge(KB="7302533890465245")
 
 ### ic_feasibility (可行性评估 — early_theme 专用)
-- 学术论文 → search_deep(Bash, "arxiv ...") + web_fetch
+- 学术论文 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文
 - 实验进展/里程碑 → search_deep(Bash) + 腾讯新闻 CLI
 - 专利 → tyc-mcp: search_patents
 - 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)

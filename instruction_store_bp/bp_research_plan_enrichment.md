@@ -12,7 +12,7 @@
 
 ## Step 0: 结构化数据补搜（必须先执行）
 
-**Presearch 只做了 web_search + 腾讯新闻搜索，没有结构化数据。** 在读 presearch 之前，你必须用 MCP 工具补搜结构化数据：
+**Presearch 只做了 search_deep(Bash) + 腾讯新闻搜索，没有结构化数据。** 在读 presearch 之前，你必须用 MCP 工具补搜结构化数据：
 
 ### 补搜清单
 
@@ -33,7 +33,7 @@
   "company_profile": { /* tyc 返回的关键字段 */ },
   "industry_data": { /* westock sector 返回 */ },
   "analyst_views": [ /* westock report 摘要 */ ],
-  "data_quality_note": "结构化数据来源比 web_search 可信度更高，优先采信"
+  "data_quality_note": "结构化数据来源比 search_deep(Bash) 可信度更高，优先采信"
 }
 ```
 4. 如果某数据源无返回 → 在 supplement 中标注未获取

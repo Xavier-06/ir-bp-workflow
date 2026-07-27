@@ -105,13 +105,15 @@
     "web_search": {
       "type": "builtin",
       "connector": false,
-      "coverage": "通用搜索/arxiv论文/政策文件/技术文献",
+      "available": false,
+      "coverage": "本环境不可用，用 search_deep(Bash) 替代",
       "latency": "实时"
     },
     "web_fetch": {
       "type": "builtin",
       "connector": false,
-      "coverage": "网页全文抓取",
+      "available": false,
+      "coverage": "本环境不可用，用 search_deep(Bash, fetch_top_n) 替代",
       "latency": "实时"
     }
   }

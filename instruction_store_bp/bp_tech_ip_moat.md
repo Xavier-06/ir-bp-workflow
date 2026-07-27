@@ -67,10 +67,10 @@
 | 商标核验 | `search_trademarks(query="商标名", applicant="公司名")` 或 TYC `call_tool`（取「商标信息」tool_name） | 商标注册信息 |
 | 软著核验 | TYC `call_tool`（先 `get_company_capabilities` 取「软件著作权」真实 tool_name） | 软件著作权信息 |
 | 公司工商基础信息 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 注册资本、存续状态 |
-| 集成电路布图设计 | `web_search` → 国家知识产权局布图设计系统 | ⚠️ TYC 不覆盖，必须单独查 |
-| 技术路线/学术论文/行业方案 | `web_search` + `web_fetch` | 搜学术论文、第三方测试报告、行业标准 |
-| **技术趋势/行业研报/技术新闻** | **NeoData (`neodata_search` data_type=doc)** | **券商技术研报、行业深度报告、技术趋势分析——比 web_search 更专业** |
-| 竞品技术能力验证 | `web_search` | 否定性结论（"竞品没有X能力"）必须搜索验证 |
+| 集成电路布图设计 | `search_deep(Bash)` → 国家知识产权局布图设计系统 | ⚠️ TYC 不覆盖，必须单独查 |
+| 技术路线/学术论文/行业方案 | search_deep(Bash) | 搜学术论文、第三方测试报告、行业标准 |
+| **技术趋势/行业研报/技术新闻** | **NeoData (`neodata_search` data_type=doc)** | **券商技术研报、行业深度报告、技术趋势分析——比 search_deep(Bash) 更专业** |
+| 竞品技术能力验证 | `search_deep(Bash)` | 否定性结论（"竞品没有X能力"）必须搜索验证 |
 | **竞品技术新闻/产品发布** | **NeoData (`neodata_search` data_type=doc)** | **竞品新品发布、技术突破、研发动态新闻** |
 | 上市竞品研发投入/财务数据 | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，验证竞品研发费用和营收规模 |
 
@@ -85,7 +85,7 @@ print(neodata_search('{竞品公司名} 研发费用 营收 净利润', data_typ
 - `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
 - 用途：验证上市竞品的研发投入规模和营收体量，判断标的公司技术壁垒是否可持续
 
-⚠️ 专利验证是**本维度核心**——必须用 TYC `search_patents` / `search_trademarks` / `call_tool` 查结构化专利数据，不能只用 `web_search` 搜"XX公司 专利"。
+⚠️ 专利验证是**本维度核心**——必须用 TYC `search_patents` / `search_trademarks` / `call_tool` 查结构化专利数据，不能只用 `search_deep(Bash)` 搜"XX公司 专利"。
 ⚠️ 单一数据库有覆盖缺口，查不到某类 IP 不得直接判定"IP 不存在"。
 
 ## ⚠️ 工具限制
@@ -188,26 +188,26 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 ### WebSearch 搜索模板（技术路线/论文/标准/竞品技术）
 ```
 # 技术路线全景
-web_search: "{技术领域}" 技术路线 对比 主流方案 发展趋势
-web_search: "{技术A}" vs "{技术B}" comparison performance cost
+# search_deep(Bash) 查询词: "{技术领域}" 技术路线 对比 主流方案 发展趋势
+# search_deep(Bash) 查询词: "{技术A}" vs "{技术B}" comparison performance cost
 
 # 学术论文/第三方测试
-web_search: "{技术关键词}" site:arxiv.org OR site:scholar.google.com
-web_search: "{产品名}" 测试报告 第三方检测 性能评估
+# search_deep(Bash) 查询词: "{技术关键词}" site:arxiv.org OR site:scholar.google.com
+# search_deep(Bash) 查询词: "{产品名}" 测试报告 第三方检测 性能评估
 
 # 行业标准/认证
-web_search: "{行业}" 标准 认证 AEC-Q100 MIL-STD FDA 门槛
-web_search: "{公司名}" 认证 资质 检测报告
+# search_deep(Bash) 查询词: "{行业}" 标准 认证 AEC-Q100 MIL-STD FDA 门槛
+# search_deep(Bash) 查询词: "{公司名}" 认证 资质 检测报告
 
 # 竞品技术能力验证（否定结论必须有搜索证据）
-web_search: "{竞品名}" "{技术能力}" product capability
-web_search: "{竞品名}" 认证 certification 资质
+# search_deep(Bash) 查询词: "{竞品名}" "{技术能力}" product capability
+# search_deep(Bash) 查询词: "{竞品名}" 认证 certification 资质
 
 # 布图设计（TYC 不覆盖）
-web_search: "{公司名}" 集成电路布图设计 国家知识产权局
+# search_deep(Bash) 查询词: "{公司名}" 集成电路布图设计 国家知识产权局
 
 # 搜到后深读
-web_fetch: {搜索结果中的URL}
+# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
 ```
 
 ## 数据源路由决策表
@@ -219,7 +219,7 @@ web_fetch: {搜索结果中的URL}
 | 软件著作权 | TYC `call_tool` (软著 tool_name) | 结构化 |
 | 集成电路布图设计 | WebSearch → 国家知识产权局布图设计系统 | ⚠️ TYC 不覆盖，必须单独查 |
 | 技术路线全景/主流方案对比 | WebSearch (中英文) | 搜学术论文、行业分析 |
-| **技术趋势/行业研报/技术新闻** | **NeoData (`neodata_search` data_type=doc)** | **券商技术研报、行业深度报告——比 web_search 更专业** |
+| **技术趋势/行业研报/技术新闻** | **NeoData (`neodata_search` data_type=doc)** | **券商技术研报、行业深度报告——比 search_deep(Bash) 更专业** |
 | 第三方测试报告/性能评测 | WebSearch → WebFetch 深读 | 搜独立测试结果 |
 | 行业标准/认证门槛 | WebSearch | 搜 AEC-Q100/MIL-STD/FDA 等 |
 | 竞品技术能力验证 | WebSearch（否定结论必须搜索） | 不能凭印象说竞品没有某能力 |

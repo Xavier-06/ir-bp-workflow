@@ -44,11 +44,11 @@
 
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 技术参数/论文 | web_search("arxiv ...") + web_fetch | - |
-| 专利检索 | tyc-mcp: search_patents | web_search |
-| 公司工商/融资 | tyc-mcp: search_companies, get_company_capabilities | web_search |
+| 技术参数/论文 | search_deep(Bash, "arxiv ...", fetch_top_n) | - |
+| 专利检索 | tyc-mcp: search_patents | search_deep(Bash) |
+| 公司工商/融资 | tyc-mcp: search_companies, get_company_capabilities | search_deep(Bash) |
 | 公司财务/估值 | westock-mcp: data_finance, data_quote | NeoData |
-| 行业动态 | 腾讯新闻 CLI | web_search |
+| 行业动态 | 腾讯新闻 CLI | search_deep(Bash) |
 
 ## 输出章节
 

@@ -15,9 +15,9 @@
 | **突发新闻/实时动态（分钟级）** | **腾讯新闻 CLI** | `sh {SKILL_DIR}/scripts/run-cli.sh search "关键词" --limit 5` | web_search |
 | **产品发布/技术动态/新闻分析** | NeoData `doc` + 腾讯新闻补充 | NeoData doc 拿深度分析，腾讯新闻补实时动态 | web_search |
 | 企业工商/股东/司法/专利 | 天眼查 MCP | `mcp__tyc-mcp__search_companies` → `call_tool` | web_search |
-| 技术论文/arxiv | web_search | `web_search('arxiv {company} {technology} {YYYY}')` | web_fetch 读论文页 |
-| 开源项目/GitHub/HF | web_search | `web_search('github.com/{company} latest release {YYYY}')` | web_fetch 读 README |
-| 网页正文深度阅读 | web_fetch | 直接传 URL | search_deep |
+| 技术论文/arxiv | search_deep(Bash, "arxiv {company} {technology} {YYYY}", fetch_top_n) | 搜索+自动抓论文页正文 | — |
+| 开源项目/GitHub/HF | search_deep(Bash, "github.com/{company} latest release {YYYY}", fetch_top_n) | 搜索+自动抓 README | — |
+| 网页正文深度阅读 | search_deep(Bash, fetch_top_n) | 给关键词或 URL，自动抓 top N 正文 | — |
 
 > ⚠️ **westock-mcp（腾讯自选股）是已授权的 MCP connector，子代理可直接调用，无需 bash。行业数据、行情、财务、研报、板块、产业链、资金流、选股类查询必须优先走该结构化源，禁止只用 web_search 兜底。**
 
@@ -425,23 +425,31 @@ web_search("{product} release date changelog")
 ```
 
 **开源项目（GitHub/HuggingFace）：**
-```
-web_search("github.com/{company}/{repo} latest release {YYYY}")
-web_fetch("https://github.com/{company}/{repo}") — 读 README 和 release 信息
-web_search("huggingface.co/{company} models {YYYY}")
+```bash
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import search_deep
+import json
+r = search_deep('github.com/{company}/{repo} latest release {YYYY}', max_results=5, fetch_top_n=3)
+print(json.dumps(r, ensure_ascii=False, indent=2))
+"
+# fetch_top_n 会自动抓 README / release 正文，无需单独 fetch
 ```
 
 **论文和技术验证（arxiv）：**
-```
-web_search("arxiv {company} {technology} {YYYY}")
-web_search("{paper_title} latest follow-up {YYYY}")
-web_fetch("https://arxiv.org/abs/XXXX.XXXXX") — 读论文摘要
+```bash
+cd ~/.workbuddy/ir_runtime && python3 -c "
+from scripts.search_gateway import search_deep
+import json
+r = search_deep('arxiv {company} {technology} {YYYY}', max_results=5, fetch_top_n=3)
+print(json.dumps(r, ensure_ascii=False, indent=2))
+"
+# 论文摘要/正文由 fetch_top_n 自动抓取
 ```
 
 ### 7. 网页正文深度阅读
 
-- `web_fetch`（WorkBuddy 内置工具）— 传 URL 返回正文
-- `search_deep` — 搜索 + 自动抓 top N 正文，一步到位
+- ⚠️ 本环境**无 `web_fetch` 内置工具**，直接调用会报错崩溃
+- `search_deep(Bash, fetch_top_n=N)` — 搜索 + 自动抓 top N 正文，一步到位（读已知 URL 也用这个，把 URL 当查询词的一部分）
 
 ---
 

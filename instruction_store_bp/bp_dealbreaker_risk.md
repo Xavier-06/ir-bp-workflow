@@ -35,9 +35,9 @@
 | 历史失信/司法 | TYC `call_tool`（先 `get_company_capabilities` 取「历史失信」真实 tool_name） / `get_historical_judicial_docs` | 已移出失信名单、已结案司法文书 |
 | 客户/供应商工商存续 | `get_company_basic_profile(company_name="...")`（基础画像，含工商登记+简介+标签+规模） | 验证关键合作方是否存续正常 |
 | 客户/供应商股东（关联交易） | TYC `call_tool`（先 `get_company_capabilities` 取「股东信息」真实 tool_name，再 `call_tool(tool_name="...", company_name="...", arguments={page: 1, page_size: 20})`） | 一层股东构成、识别隐性关联 |
-| 负面新闻/舆情/举报 | `web_search` + `web_fetch` | 搜媒体报道、行业投诉、监管通报 |
-| **负面新闻/风险舆情/监管动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、风险报道、监管通报、行业投诉——比 web_search 更精准** |
-| 正向叙事中的事实链验证 | `web_search` + TYC 工具交叉验证 | 交叉验证前置维度引用的关键事实 |
+| 负面新闻/舆情/举报 | search_deep(Bash) | 搜媒体报道、行业投诉、监管通报 |
+| **负面新闻/风险舆情/监管动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、风险报道、监管通报、行业投诉——比 search_deep(Bash) 更精准** |
+| 正向叙事中的事实链验证 | `search_deep(Bash)` + TYC 工具交叉验证 | 交叉验证前置维度引用的关键事实 |
 | 前置维度引用的上市竞品财务数据验证 | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，交叉验证竞品营收/市值/PS 等关键数字 |
 | **前置维度引用的研报/新闻验证** | **NeoData (`neodata_search` data_type=doc)** | **交叉验证前置维度引用的行业研报、市场数据、新闻报道** |
 | **机构风险观点/外资看空/专家警示** | **IMA 长安投研 (7297585010204027)**: `search_knowledge` 搜 `{公司/行业} 风险 警示 看空 问题` | NeoData(doc) |
@@ -54,7 +54,7 @@ print(neodata_search('{公司名} 市值 营收 净利润', data_type='all'))
 - `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
 - 用途：红队交叉验证前置维度（竞争定位、估值、市场供应链）引用的上市竞品财务数据是否准确
 
-⚠️ 红队分析必须**主动用天眼查风险工具做全面扫描**——不能只靠 `web_search` 搜新闻。天眼查能发现尚未被报道的诉讼、行政处罚和股权冻结。
+⚠️ 红队分析必须**主动用天眼查风险工具做全面扫描**——不能只靠 `search_deep(Bash)` 搜新闻。天眼查能发现尚未被报道的诉讼、行政处罚和股权冻结。
 ⚠️ 不能把"未验证"自动写成负面事实；未验证是 data gap，除非有反证。
 
 ## ⚠️ 工具限制
@@ -218,21 +218,21 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 ### WebSearch 搜索模板（负面新闻/舆情/事实链验证）
 ```
 # 负面新闻/舆情
-web_search: "{公司名}" 诉讼 纠纷 投诉 处罚 监管
-web_search: "{公司名}" lawsuit dispute complaint investigation
-web_search: "{公司名}" 造假 欺诈 违规 举报
-web_search: "{创始人/CEO名}" 争议 丑闻 离职
+# search_deep(Bash) 查询词: "{公司名}" 诉讼 纠纷 投诉 处罚 监管
+# search_deep(Bash) 查询词: "{公司名}" lawsuit dispute complaint investigation
+# search_deep(Bash) 查询词: "{公司名}" 造假 欺诈 违规 举报
+# search_deep(Bash) 查询词: "{创始人/CEO名}" 争议 丑闻 离职
 
 # 监管通报
-web_search: "{公司名}" 证监会 银保监 市场监管 通报
-web_search: "{行业名}" 监管 合规 整改 处罚 2024 2025
+# search_deep(Bash) 查询词: "{公司名}" 证监会 银保监 市场监管 通报
+# search_deep(Bash) 查询词: "{行业名}" 监管 合规 整改 处罚 2024 2025
 
 # 前置维度事实链验证
-web_search: "{前置维度引用的关键事实}" 验证 核实
-web_search: "{前置维度引用的客户名}" "{公司名}" 合作 真实
+# search_deep(Bash) 查询词: "{前置维度引用的关键事实}" 验证 核实
+# search_deep(Bash) 查询词: "{前置维度引用的客户名}" "{公司名}" 合作 真实
 
 # 搜到后深读
-web_fetch: {搜索结果中的URL}
+# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
 ```
 
 ## 数据源路由决策表
@@ -250,7 +250,7 @@ web_fetch: {搜索结果中的URL}
 | 历史失信/司法 | TYC `call_tool` (历史失信/司法) | 已移出/已结案记录 |
 | 客户/供应商存续验证 | TYC `get_company_basic_profile` + `call_tool` (股东) | 验证合作方真实性 |
 | 负面新闻/舆情/举报 | WebSearch → WebFetch 深读 | 搜媒体报道/投诉/监管通报 |
-| **负面新闻/风险舆情/监管通报** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、风险报道——比 web_search 更精准** |
+| **负面新闻/风险舆情/监管通报** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、风险报道——比 search_deep(Bash) 更精准** |
 | 前置维度事实链验证 | WebSearch + TYC 交叉验证 | 验证前置维度引用的关键事实 |
 | **前置维度引用的研报/新闻验证** | **NeoData (`neodata_search` data_type=doc)** | **交叉验证行业研报、市场数据、新闻报道** |
 | 前置维度引用的竞品财务数据 | NeoData (`neodata_search` data_type=api) | 交叉验证数字准确性 |

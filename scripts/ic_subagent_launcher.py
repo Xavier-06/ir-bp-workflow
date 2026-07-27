@@ -1038,9 +1038,9 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     elif role in ('ic_tech_product', 'ic_route_deep'):
         return (
             '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- 技术论文/arxiv → search_deep(Bash, "arxiv {关键词}") + web_fetch 读全文\n'
+            '- 技术论文/arxiv → search_deep(Bash, "arxiv {关键词}", fetch_top_n) 读全文\n'
             '- 专利检索 → tyc-mcp: search_patents\n'
-            '- 产品参数/性能对比 → search_deep(Bash) + web_fetch\n'
+            '- 产品参数/性能对比 → search_deep(Bash, fetch_top_n) 读全文\n'
             '- 技术突破新闻 → 腾讯新闻 CLI(Bash)\n'
             '- 公司研发投入/研发费用率 → westock-mcp: data_finance\n'
             '- **技术路线横评/行业深度** → ima-mcp: search_knowledge(KB="7311568991699459", query="{技术/行业} 技术路线 对比 横评 壁垒") → fetch_media_content 读全文\n'
@@ -1075,7 +1075,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
             '- 公司财务 → westock-mcp: data_finance\n'
             '- 客户/供应商关系 → tyc-mcp: call_tool\n'
-            '- 定价/收费模式 → search_deep(Bash) + web_fetch（产品官网）\n'
+            '- 定价/收费模式 → search_deep(Bash, fetch_top_n)（产品官网，读全文）\n'
             '- 用户数据/留存/渗透率 → search_deep(Bash)\n'
             '- **机构对商业模式/客户的评价** → ima-mcp: search_knowledge(KB="7297585010204027", query="{公司/行业} 商业模式 客户 订单 收入", filters=TXT) → 用 introduction 摘要\n'
             '- **可比公司投关记录** → ima-mcp: search_knowledge(KB="7302533890465245", query="{公司名} 投关 调研 纪要") → 用 introduction 摘要\n\n'
@@ -1083,7 +1083,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     elif role == 'ic_feasibility':
         return (
             '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- 学术论文/前沿研究 → search_deep(Bash, "arxiv ...") + web_fetch\n'
+            '- 学术论文/前沿研究 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文\n'
             '- 实验进展/里程碑 → search_deep(Bash) + 腾讯新闻 CLI(Bash)\n'
             '- 专利 → tyc-mcp: search_patents\n'
             '- 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)\n'

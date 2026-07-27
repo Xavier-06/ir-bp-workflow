@@ -46,8 +46,8 @@ Professional research report chapter on market sizing, industry landscape, and s
 | 供应商/客户对外投资 | TYC `call_tool`（先 `get_company_capabilities` 取「对外投资」真实 tool_name） | 被投资企业、持股比例（判断产业链延伸） |
 | 供应链招投标 | `search_bids(query="公司名 招投标")` 或 TYC `call_tool`（取「招投标」tool_name） | 招投标记录 |
 | 供应商资质许可 | TYC `call_tool`（先 `get_company_capabilities` 取「企业资质」真实 tool_name） | 资质证书类型、等级、有效期 |
-| 市场规模/行业报告/政策 | `web_search` | 中英文行业报告、政府/协会统计数据 |
-| **行业深度研报/新闻/政策分析** | **NeoData (`neodata_search` data_type=doc)** | **券商行业研报、产业分析、政策解读、供应链新闻——比 web_search 更专业** |
+| 市场规模/行业报告/政策 | `search_deep(Bash)` | 中英文行业报告、政府/协会统计数据 |
+| **行业深度研报/新闻/政策分析** | **NeoData (`neodata_search` data_type=doc)** | **券商行业研报、产业分析、政策解读、供应链新闻——比 search_deep(Bash) 更专业** |
 | 美股竞对财务数据 | `yfinance` | 美股行情、财报、估值交叉验证 |
 
 **NeoData 调用**（A/HK 股行情/财报/板块，本维度查上市竞对必用）：
@@ -75,7 +75,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - 美股直接写 ticker（如 `NVDA`）
 - 返回：price / market_cap / pe_trailing / pe_forward / ps / pb / ev_ebitda / revenue / profit_margin / sector / industry
 
-⚠️ 市场规模推算必须多源交叉验证——不能只用 `web_search` 搜一个报告就采信。
+⚠️ 市场规模推算必须多源交叉验证——不能只用 `search_deep(Bash)` 搜一个报告就采信。
 ⚠️ 供应链实体和关键供应商当前经营状态必须用 TYC `get_company_basic_profile` / `call_tool` 验证存续状态。
 
 ## ⚠️ 工具限制
@@ -194,24 +194,24 @@ print(json.dumps(bids, ensure_ascii=False, indent=2))
 ### WebSearch 搜索模板（行业/政策/市场规模）
 ```
 # 市场规模
-web_search: "{行业名}" 市场规模 TAM SAM 2024 2025
-web_search: "{行业名}" market size forecast 2025 2030
-web_search: "{产品名}" 市场规模 渗透率 增速
+# search_deep(Bash) 查询词: "{行业名}" 市场规模 TAM SAM 2024 2025
+# search_deep(Bash) 查询词: "{行业名}" market size forecast 2025 2030
+# search_deep(Bash) 查询词: "{产品名}" 市场规模 渗透率 增速
 
 # 行业报告/白皮书
-web_search: "{行业名}" 行业报告 深度分析 白皮书
-web_search: "{行业名}" industry report market analysis
+# search_deep(Bash) 查询词: "{行业名}" 行业报告 深度分析 白皮书
+# search_deep(Bash) 查询词: "{行业名}" industry report market analysis
 
 # 政策/标准
-web_search: "{行业名}" 政策 补贴 扶持 国家标准
-web_search: "{行业名}" policy regulation subsidy
+# search_deep(Bash) 查询词: "{行业名}" 政策 补贴 扶持 国家标准
+# search_deep(Bash) 查询词: "{行业名}" policy regulation subsidy
 
 # 供应链/产能
-web_search: "{上游材料/设备}" 产能 供应 价格 格局
-web_search: "{供应商名}" 产能 扩产 市占率
+# search_deep(Bash) 查询词: "{上游材料/设备}" 产能 供应 价格 格局
+# search_deep(Bash) 查询词: "{供应商名}" 产能 扩产 市占率
 
 # 搜到后深读
-web_fetch: {搜索结果中的URL}
+# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
 ```
 
 ## 数据源路由决策表

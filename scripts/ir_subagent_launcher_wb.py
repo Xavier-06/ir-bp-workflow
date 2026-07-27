@@ -449,12 +449,11 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'⚠️ 本环境无 web_search 内置工具！用 Bash 调 search_gateway 替代：',
         f'→ `search_deep`（Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import search_deep; import json,sys; r=search_deep(\'关键词\',max_results=5,fetch_top_n=2); print(json.dumps(r,ensure_ascii=False,indent=2))"`）— 搜索+自动抓正文',
         f'→ `tencent_news_search`（Bash: `from scripts.search_gateway import tencent_news_search; r=tencent_news_search(\'关键词\',max_results=5)`）— 财经新闻',
-        f'→ `web_fetch`（内置工具，给已知 URL 读正文）',
+        f'- ⚠️ 本环境无 web_fetch 工具，读已知 URL 正文统一用 search_deep(Bash, fetch_top_n)',
         f'- 作为所有搜索的兜底手段',
         f'',
         f'**5. 网页正文深度阅读**',
-        f'→ `web_fetch`（WorkBuddy 内置工具）— 给 URL 返回正文',
-        f'→ `search_deep`（Bash: `from scripts.search_gateway import search_deep`）— 搜索 + 自动抓 top N 正文，一步到位',
+        f'→ ⚠️ 本环境无 `web_fetch` 工具。用 `search_deep`（Bash: `from scripts.search_gateway import search_deep`，设 fetch_top_n）— 搜索 + 自动抓 top N 正文，读已知 URL 也用这个（把 URL 当查询词喂进去）',
         f'',
         f'**6. 腾讯自选股 MCP (westock-mcp)（结构化金融数据源，已授权）**',
         f'- 这是 IR 最核心的结构化金融源，子代理**直接调用 MCP 工具**即可，无需 bash，也无需通用搜索兜底。',
@@ -473,9 +472,9 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'| **突发新闻/实时动态(分钟级)** | 腾讯新闻 CLI (Bash) | search_deep(Bash) |',
         f'| **产品发布/技术动态/新闻分析** | NeoData doc + 腾讯新闻补充 | search_deep(Bash) |',
         f'| 企业工商/司法/专利 | 天眼查 MCP (已配置) | search_deep(Bash) |',
-        f'| 技术论文/arxiv | search_deep(Bash) + 年份 | web_fetch 读论文 |',
-        f'| 开源项目/GitHub/HF | search_deep(Bash) + 年份 | web_fetch 读 README |',
-        f'| 读某个 URL 正文 | web_fetch | — |',
+        f'| 技术论文/arxiv | search_deep(Bash, "arxiv ... 年份", fetch_top_n) 读全文 | — |',
+        f'| 开源项目/GitHub/HF | search_deep(Bash, "github.com/... 年份", fetch_top_n) 读 README | — |',
+        f'| 读某个 URL 正文 | search_deep(Bash, fetch_top_n)（URL 当查询词） | — |',
         f'',
         f'### ⏰ 数据时效性硬要求（最高优先级，违反即任务失败）',
         f'',
@@ -510,7 +509,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'',
         f'**最低搜索量（质量门禁会校验，不达标 = 任务失败）：**',
         f'- ≥ 8 个独立搜索 query（不同角度：公司名+财务、公司名+行业、公司名+竞品、公司名+风险 等）',
-        f'- ≥ 3 个实际深读过的 URL（web_fetch 抓到的正文，不是只看 snippet）',
+        f'- ≥ 3 个实际深读过的 URL（search_deep(fetch_top_n) 抓到的正文，不是只看 snippet）',
         f'- ≥ 3 个独立来源域名（不能全是同一个站点的页面）',
         f'',
         f'**搜索策略（必须按顺序执行）：**',
@@ -538,7 +537,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'   - 目的: 先知道"最新"是什么，后续分析才不会引用过期信息',
         f'   - 三层组合: 腾讯新闻(分钟级) → NeoData doc(深度) → search_deep(兜底)',
         f'1. **第一轮：广度扫描** — NeoData doc 拿研报/分析 + Bash 调 search_gateway prefer=multi 多关键词并行',
-        f'2. **第二轮：深度验证** — 对第一轮发现的关键 claim，用 web_fetch 读全文验证',
+        f'2. **第二轮：深度验证** — 对第一轮发现的关键 claim，用 search_deep(Bash, fetch_top_n) 读全文验证',
         f'3. **第三轮：交叉验证/反证** — 搜竞品对比、负面信息、行业报告、分析师观点',
         f'4. **TYC 天眼查必查项**（如标的涉及中国大陆企业）：工商信息、司法诉讼、专利、资质',
         f'5. **金融数据必查**：NeoData api（Bash） → yfinance（Bash） 交叉验证',
@@ -555,7 +554,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'- 仍搜不到的标注"经 X 次搜索未找到独立来源"',
         f'- 禁止只用通用搜索做所有搜索——它没有 NeoData 金融数据和 TYC（天眼查）结构化数据',
         f'- 禁止只搜一轮就结束——泛搜一轮不够，必须多角度验证',
-        f'- 禁止只搜不读——搜到 URL 后必须 web_fetch 读正文提取事实',
+        f'- 禁止只搜不读——搜到 URL 后必须用 search_deep(Bash, fetch_top_n) 读正文提取事实',
         f'',
         f'## Pre-search Results（输入参考，只读）',
         f'',
@@ -1540,7 +1539,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'| 突发新闻/实时动态（分钟级，中文） | **腾讯新闻** | Bash: `sh /Users/xavier/.workbuddy/skills/skill_2053082907836022784/scripts/run-cli.sh search "{{关键词}}" --limit 5` | search_deep(Bash) |\n'
             f'| 美股估值/财务 | **yfinance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "import yfinance as yf; print(yf.Ticker(\\"AAPL\\").info)"` | westock-mcp → search_deep(Bash) |\n'
             f'| **美股英文新闻/earnings/分析师动态** | **Yahoo Finance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import _yahoo_search; import json; print(json.dumps(_yahoo_search(\\"NVDA earnings\\", max_results=5), ensure_ascii=False))"` | search_deep(Bash) |\n'
-            f'| 学术论文/政策文件/英文技术文档 | **search_deep(Bash)** | Bash 调用 | web_fetch 读全文 |\n\n'
+            f'| 学术论文/政策文件/英文技术文档 | **search_deep(Bash, fetch_top_n)** | Bash 调用，自动抓全文 | — |\n\n'
             f'⚠️ IMA 知识库使用提示（ima-mcp，已授权，直接调用）：\n'
             f'- KB ID 速查：长安投研=7297585010204027 | 公司调研报告=7302533890465245 | 机构调研纪要=7300811407257275 | 行研智库=7311568991699459 | 精选报告=7302509206984644\n'
             f'- 行业深度/TAM/竞争格局 → 优先搜「行研智库」+「长安投研」\n'
