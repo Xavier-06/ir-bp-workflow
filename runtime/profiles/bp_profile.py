@@ -1076,6 +1076,11 @@ def _validate_bp_section_package(package: dict[str, Any], fact_ids: set[str], cl
         "bp_company_section.v1": "bp_section_package.v1",
         "bp_valuation_section.v1": "bp_section_package.v1",
         "bp_dealbreaker_section.v1": "bp_section_package.v1",
+        # 2026-07-27: 子代理实测还会产出以下变体，统一映射
+        "bp_section.v1": "bp_section_package.v1",
+        "bp_section_output.v1": "bp_section_package.v1",
+        "bp_phase2_section.v1": "bp_section_package.v1",
+        "bp_section.v2": "bp_section_package.v2",
     }
     if schema_version in schema_aliases:
         package["schema_version"] = schema_aliases[schema_version]

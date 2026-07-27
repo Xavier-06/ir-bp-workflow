@@ -56,6 +56,47 @@ MD 报告末尾必须包含"来源与参考"章节，列出所有 `[^N]` 定义�
 ...
 ```
 
+### 三件套输出规范（2026-07-27 新增 — 所有维度子代理必读）
+
+每个维度子代理必须输出**三个文件**（管线 collect 阶段逐一校验）：
+
+| 文件 | 最低要求 | 说明 |
+|------|---------|------|
+| `bp_phase2_{slug}.md` | >100 bytes | 维度分析正文（markdown） |
+| `bp_phase2_{slug}-facts.json` | >10 bytes，合法 JSON | 该维度的事实 sidecar |
+| `bp_phase2_{slug}-section.json` | >10 bytes，合法 JSON | 结构化 section package（**schema 见下**） |
+
+**`-section.json` 必须遵循以下 schema（管线 phase26 validator 只认这个）：**
+
+```json
+{
+  "schema_version": "bp_section_package.v2",
+  "section_id": "bp_{slug}",
+  "section_title": "中文章节标题",
+  "key_messages": ["核心发现1", "核心发现2", "核心发现3"],
+  "claims": [
+    {
+      "claim": "一句话结论",
+      "fact_ids": ["F-XXX-001", "F-XXX-002"],
+      "reasoning": "推理过程",
+      "confidence": "high/medium/low",
+      "source_quality": "third_party/bp_self_reported/inferred"
+    }
+  ],
+  "facts_used": ["F-XXX-001", "F-XXX-002"],
+  "counter_evidence": ["反面证据或不确定性"],
+  "data_gaps": ["未能验证的缺口"],
+  "markdown_draft": "（可直接复用 .md 全文，或精简版 ≥100 字符）"
+}
+```
+
+**规则**：
+- `schema_version` 必须写 `"bp_section_package.v2"`（写 `"bp_section_package.v1"` 也可，管线会自动升级）
+- `fact_ids` 里的 ID 必须与同目录 `-facts.json` 中 `facts[].fact_id` 一致
+- `claims` 至少 1 条，每条必须有 `fact_ids`（不能为空数组）
+- `markdown_draft` 不能为空（≥100 字符）
+- 禁止用自造 schema（如 `"bp_section.v1"`、`"bp_section_output.v1"`、`"bp_phase2_section.v1"`）——管线不认，会触发 phase26 FAIL
+
 ---
 
 ## 🔧 搜索与数据工具使用指南（所有维度通用）
