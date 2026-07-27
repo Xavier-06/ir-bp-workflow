@@ -13,6 +13,7 @@
 | **美股英文新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** | `_yahoo_search('NVDA earnings AI chip', max_results=5)` | web_search |
 | **券商研报/行业深度/产业链** | **NeoData `doc` + 腾讯自选股 `data_report`/`data_sector`/`data_industry_chain`** | `neodata_search('公司名 最新动态', data_type='doc')`；行业/产业链数据优先 `mcp__westock-mcp__data_sector` / `data_industry_chain` / `data_report` | web_search |
 | **突发新闻/实时动态（中文）** | **中文实时新闻 `tencent_news_search`**（CLI 积分耗尽自动降级 NeoData doc） | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import tencent_news_search; ..."` | search_deep |
+| **上市公司公告/新闻/研报动态** | **腾讯自选股 `data_news`**（需 symbol，type: 0公告 1研报 2新闻 3全部） | `mcp__westock-mcp__data_news(symbol="sh600519", type=3, limit=10)` | tencent_news_search → search_deep |
 | **产品发布/技术动态/新闻分析** | NeoData `doc` + tencent_news_search 补充 | NeoData doc 拿深度分析，tencent_news_search 补实时动态 | search_deep |
 | 企业工商/股东/司法/专利 | 天眼查 MCP | `mcp__tyc-mcp__search_companies` → `call_tool` | web_search |
 | 技术论文/arxiv | search_deep(Bash, "arxiv {company} {technology} {YYYY}", fetch_top_n) | 搜索+自动抓论文页正文 | — |

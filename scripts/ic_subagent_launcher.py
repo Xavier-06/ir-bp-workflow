@@ -1028,7 +1028,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 企业工商/股东/融资 → tyc-mcp: search_companies → call_tool\n'
             '- 上市公司财务对比 → westock-mcp: data_finance + data_quote\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
-            '- 竞品最新动态 → 中文实时新闻 tencent_news_search(Bash)\n'
+            '- 竞品最新动态 → 中文实时新闻 tencent_news_search(Bash)；竞品为上市公司时叠加 westock-mcp data_news(symbol="代码", type=3)\n'
             '- 专利布局/研发能力 → tyc-mcp: call_tool(search_patents)\n'
             '- 市场份额/CR3/CR5 → westock-mcp + search_deep(Bash) 交叉验证\n'
             '- **竞品投关记录/管理层表态** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{竞品名} 投关 调研 纪要 竞争 份额") → search 后取 media_id 调 fetch_media_content 读全文\n'
@@ -1077,6 +1077,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 客户/供应商关系 → tyc-mcp: call_tool\n'
             '- 定价/收费模式 → search_deep(Bash, fetch_top_n)（产品官网，读全文）\n'
             '- 用户数据/留存/渗透率 → search_deep(Bash)\n'
+            '- **公司最新公告/新闻/研报动态（上市公司）** → westock-mcp: data_news(symbol="代码", type=3)（比通用新闻更聚焦该公司）\n'
             '- **机构对商业模式/客户的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司/行业} 商业模式 客户 订单 收入") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
             '- **可比公司投关记录** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司名} 投关 调研 纪要") → search 后取 media_id 调 fetch_media_content 读全文\n\n'
         )

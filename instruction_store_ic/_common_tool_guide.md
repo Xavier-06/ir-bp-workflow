@@ -48,6 +48,7 @@
 | 资金流向/主力/散户/北向资金 | westock-mcp: `data_fund_flow` | — | search_deep(Bash) |
 | 北向持仓/外资动向 | westock-mcp: `data_north_holding` | — | search_deep(Bash) |
 | 重大事件(业绩会/产品发布/并购) | westock-mcp: `data_events` | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
+| **上市公司公告/新闻/研报动态** | **westock-mcp: `data_news(symbol="sh600519", type=3)`** | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
 | 美股公司估值/财务 | yfinance (Python) | westock-mcp: `data_quote` | search_deep(Bash) |
 | **美股公司新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** (Bash) | 中文实时新闻(tencent_news_search)(中文) | search_deep(Bash) |
 | A/HK 股估值快照(PE/PB/PS/换手率) | valuation_enricher (Bash) | westock-mcp: `data_quote` | — |
@@ -97,12 +98,13 @@
 | `data_fund_flow` | 资金流向(主力/散户/北向) | 资金流入流出 |
 | `data_north_holding` | 北向资金持仓 | 持仓变动 |
 | `data_events` | 重大事件(业绩会/发布/并购) | 事件列表 |
+| `data_news` | 上市公司公告/新闻/研报动态（需 symbol，type: 0公告 1研报 2新闻 3全部） | 新闻列表(title/time/url) |
 | `data_search` | 标的检索(不确定代码时) | 搜索结果 |
 
 **⚠️ 局限**：
 - 只覆盖已上市公司（A/HK/美股），非上市公司查不到
 - 没有工商信息、专利、司法数据
-- 没有新闻内容
+- `data_news` 是个股级新闻（需 symbol），行业/通用新闻走 `tencent_news_search`
 
 ### 2.2 tyc-mcp (天眼查) — 企业工商数据网关
 

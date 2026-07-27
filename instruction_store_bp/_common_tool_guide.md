@@ -241,6 +241,7 @@ westock-mcp 提供 NeoData/yfinance 之外**独有**的结构化维度，是做�
 | 北向持仓 | `data_north_holding` | 北向资金持股变动、外资偏好 |
 | 机构评级 | `data_rating` | 券商评级、目标价、评级变动 |
 | 券商研报 | `data_report` | 个股研报、盈利预测、催化剂 |
+| **个股新闻/公告** | **`data_news`**（需 symbol，如 `sh600519`） | 上市公司公告/研报/新闻列表（type: 0公告 1研报 2新闻 3全部），返回 title/time/url |
 | 行情/财务 | `data_quote` / `data_finance` | 实时行情、财报、估值指标 |
 | 个股筛选 | `tool_filter` / `tool_ranking` / `tool_strategy` | 按条件/策略/排行筛标的 |
 
@@ -248,8 +249,9 @@ westock-mcp 提供 NeoData/yfinance 之外**独有**的结构化维度，是做�
 - 做可比公司分析时，先拿竞品的**板块归属、产业链位置、北向资金动向、机构评级共识**——这些是 NeoData 不强的
 - 需要**券商最新评级/目标价/研报催化**时走 `data_rating` / `data_report`
 - 需要**实时资金面/筹码面**时走 `data_fund_flow` / `data_north_holding`
+- 需要**某只上市公司的最新公告/新闻/研报动态**时走 `data_news(symbol="sh600519", type=3)`——比通用新闻更聚焦该公司，与 `tencent_news_search`（通用中文新闻）互补
 
-**与 NeoData 的关系**：NeoData 仍是 A/HK 行情/财报/研报主力；westock-mcp 补充板块/产业链/资金流/北向/评级这些 NeoData 覆盖弱的维度，二者交叉验证。**非上市标的没有 westock 数据，直接走 NeoData + WebSearch。**
+**与 NeoData 的关系**：NeoData 仍是 A/HK 行情/财报/研报主力；westock-mcp 补充板块/产业链/资金流/北向/评级/个股新闻这些 NeoData 覆盖弱的维度，二者交叉验证。**非上市标的没有 westock 数据，直接走 NeoData + WebSearch。**
 
 
 ### 4. 中文实时新闻搜索（tencent_news_search，BP 管线专用）
@@ -350,6 +352,7 @@ print(json.dumps(r, ensure_ascii=False, indent=2))
 | 通用网络搜索 | WebSearch → WebFetch 深读 | — |
 | 读某个 URL 的正文 | WebFetch | — |
 | **可比公司板块/产业链/资金流/北向/机构评级** | **westock-mcp（`data_sector`/`data_industry_chain`/`data_fund_flow`/`data_north_holding`/`data_rating`）** | NeoData(doc) → WebSearch |
+| **某只上市公司的公告/新闻/研报动态** | **westock-mcp `data_news(symbol="sh600519", type=3)`** | `tencent_news_search` → WebSearch |
 
 ### 3.6 IMA 知识库（ima-mcp，自建研报库为主力源，全文可 fetch）
 

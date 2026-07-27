@@ -469,7 +469,8 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'| 美股行情/估值/分红 | yfinance | NeoData → search_deep(Bash) |',
         f'| **券商研报/行业深度/产业链** | **NeoData doc + 腾讯自选股 data_report/data_sector/data_industry_chain** | search_deep(Bash) |',
         f'| **突发新闻/实时动态(中文)** | 中文实时新闻 tencent_news_search (Bash, 自动降级NeoData doc) | search_deep(Bash) |',
-        f'| **产品发布/技术动态/新闻分析** | NeoData doc + 腾讯新闻补充 | search_deep(Bash) |',
+        f'| **上市公司公告/新闻/研报动态** | 腾讯自选股 data_news(symbol="sh600519", type=3, limit=10) | tencent_news_search → search_deep(Bash) |',
+        f'| **产品发布/技术动态/新闻分析** | NeoData doc + 中文实时新闻补充 | search_deep(Bash) |',
         f'| 企业工商/司法/专利 | 天眼查 MCP (已配置) | search_deep(Bash) |',
         f'| 技术论文/arxiv | search_deep(Bash, "arxiv ... 年份", fetch_top_n) 读全文 | — |',
         f'| 开源项目/GitHub/HF | search_deep(Bash, "github.com/... 年份", fetch_top_n) 读 README | — |',
@@ -1535,6 +1536,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'| **券商研报/行业深度/财经新闻/政策分析** | **NeoData doc** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search(\\"查询词\\", data_type=\\"doc\\"), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| **机构调研纪要/专家交流/外资研报/行业深度报告** | **ima-mcp** | MCP 直接调用 `mcp__ima-mcp__search_knowledge(knowledge_base_id="KB_ID", query="查询词")` | search_deep(Bash) |\n'
             f'| 突发新闻/实时动态（中文） | **中文实时新闻** | Bash: `cd {ROOT} && python3 -c "from scripts.search_gateway import tencent_news_search; import json; print(json.dumps(tencent_news_search(\\"{{关键词}}\\", max_results=5), ensure_ascii=False))"`（CLI积分耗尽自动降级NeoData doc） | search_deep(Bash) |\n'
+            f'| 上市公司公告/新闻/研报动态 | **腾讯自选股 `data_news`** | MCP: `mcp__westock-mcp__data_news(symbol="sh600519", type=3, limit=10)`（需股票代码，type: 0公告 1研报 2新闻 3全部） | tencent_news_search → search_deep(Bash) |\n'
             f'| 美股估值/财务 | **yfinance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "import yfinance as yf; print(yf.Ticker(\\"AAPL\\").info)"` | westock-mcp → search_deep(Bash) |\n'
             f'| **美股英文新闻/earnings/分析师动态** | **Yahoo Finance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import _yahoo_search; import json; print(json.dumps(_yahoo_search(\\"NVDA earnings\\", max_results=5), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| 学术论文/政策文件/英文技术文档 | **search_deep(Bash, fetch_top_n)** | Bash 调用，自动抓全文 | — |\n\n'

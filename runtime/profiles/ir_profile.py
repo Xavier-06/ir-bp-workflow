@@ -287,6 +287,9 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
 
+**如果 {entity} 是上市公司**，额外用 westock-mcp `data_news` 拿个股级公告/新闻/研报动态（比通用新闻更聚焦该公司）：
+`mcp__westock-mcp__data_news(symbol="sh600519", type=3, limit=10)`（type: 0公告 1研报 2新闻 3全部；symbol 不确定时先用 `data_search` 检索代码）
+
 ### Step 6: IMA 知识库预扫描（自建研报库为主力源 — 增量信息层）
 
 用 ima-mcp 的 search_knowledge 搜索知识库，提取机构级增量信息。**自建研报库是主力源（投行/券商研报全文可 fetch），所有搜索第一优先。**
