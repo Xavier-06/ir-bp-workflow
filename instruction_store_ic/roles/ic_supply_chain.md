@@ -25,10 +25,10 @@
 
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 产业链数据 | westock-mcp: data_industry_chain | web_search |
-| 企业画像 | tyc-mcp: search_companies, get_company_capabilities | web_search |
-| 招投标信息 | tyc-mcp: search_bids | web_search |
-| 产能/订单动态 | 中文实时新闻(tencent_news_search) | web_search |
+| 产业链数据 | westock-mcp: data_industry_chain | search_deep(Bash) |
+| 企业画像 | tyc-mcp: search_companies, get_company_capabilities | search_deep(Bash) |
+| 招投标信息 | tyc-mcp: search_bids | search_deep(Bash) |
+| 产能/订单动态 | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
 
 ## 输出章节
 

@@ -224,7 +224,7 @@ IC EVIDENCE GATE REPAIR — 修复步骤: {failed_step}
 
 ## 数据源
 - 优先搜索 "企业{task_id} 行业研究报告 市场规模" 等相关关键词
-- 使用 web_search 补充公开行业数据
+- 使用 search_deep 补充公开行业数据
 - 引用具体的报告名称、发布机构、日期
 
 ## 输出

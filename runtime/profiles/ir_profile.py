@@ -266,7 +266,7 @@ Agent tool 参数：
 - `data_fund_flow` 查 {entity} → 主力资金净流入
 
 ### Step 4: Web 补搜（中英双语，结构化源优先）
-优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（web_search 仅作兜底，最多 8 轮）:
+优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（search_deep 仅作兜底，最多 8 轮）:
 - `"{{entity}}" 竞争格局 市场份额 2025 2026`
 - `"{{entity}}" 风险 挑战 负面 2025`  
 - `"{{entity}}" 商业模式 护城河`
@@ -341,7 +341,7 @@ step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, st
   "schema_version": "ir_research_plan.v3",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}", "market": "{market}",
   "query": "{query}", "ticker": "{ticker}", "english_name": "{english_name}",
-  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "ima-mcp:机构研报/纪要", "web_search:公开信息", "tencent_news:实时动态"],
+  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "ima-mcp:机构研报/纪要", "search_deep:公开信息", "tencent_news:实时动态"],
   "core_questions": [...], "strategic_questions": [...],
   "fact_requirements": [...], "section_requirements": {{}},
   "coverage_matrix": {{}}, "plan_status": "ready",
@@ -467,7 +467,7 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     """Phase 03: presearch — 已废弃（v5.3 路径B），搜索全部交给 phase04 子代理。
 
     v5.3 改动: 与 IC 管线对齐，砍掉 presearch。IR 子代理全权搜索:
-    westock-mcp(行情/财务/研报/行业/资金流) + tyc-mcp(工商) + web_search + tencent_news。
+    westock-mcp(行情/财务/研报/行业/资金流) + tyc-mcp(工商) + search_deep + tencent_news。
     """
     print(f"  ⏭️  [ir] phase03 presearch 已跳过（搜索由 phase04 子代理全权执行）", flush=True)
     return {

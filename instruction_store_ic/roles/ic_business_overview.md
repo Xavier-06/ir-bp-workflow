@@ -18,11 +18,11 @@
 
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 企业工商/股东 | tyc-mcp: get_company_profile, get_shareholder_info | web_search |
-| 企业能力/专利 | tyc-mcp: get_company_capabilities, search_patents | web_search |
+| 企业工商/股东 | tyc-mcp: get_company_profile, get_shareholder_info | search_deep(Bash) |
+| 企业能力/专利 | tyc-mcp: get_company_capabilities, search_patents | search_deep(Bash) |
 | 上市公司财务 | westock-mcp: data_finance, data_profile | NeoData |
-| 关键高管 | tyc-mcp: get_key_personnel | web_search |
-| 客户/供应商 | tyc-mcp: call_tool（供应链关系） | web_search |
+| 关键高管 | tyc-mcp: get_key_personnel | search_deep(Bash) |
+| 客户/供应商 | tyc-mcp: call_tool（供应链关系） | search_deep(Bash) |
 
 ## 输出章节
 

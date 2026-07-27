@@ -701,7 +701,7 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
       - 新增 westock_report + westock_sector + neodata 数据源
       - 查询预算提升到 20+
 
-    数据源: web_search + tencent_news + tyc + westock_report + westock_sector + neodata
+    数据源: search_deep + tencent_news + tyc + westock_report + westock_sector + neodata
     """
     if os.environ.get("IRBP_BG_CHILD") == "1":
         return _run_presearch_inner(runtime_root, job_ctx)

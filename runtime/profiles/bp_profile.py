@@ -228,7 +228,7 @@ def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     """Phase 03: presearch — 已废弃（v5.3 路径B），搜索全部交给 phase04 子代理。
 
     v5.3 改动: 与 IR/IC 管线对齐，砍掉 presearch。BP 子代理全权搜索:
-    tyc-mcp(工商/法律/融资) + westock-mcp(行业/研报) + web_search + tencent_news。
+    tyc-mcp(工商/法律/融资) + westock-mcp(行业/研报) + search_deep + tencent_news。
     """
     print(f"  ⏭️  [bp] phase03 presearch 已跳过（搜索由 phase04 子代理全权执行）", flush=True)
     return {
@@ -2186,7 +2186,7 @@ def _dispatch_completion_instruction(roles: list[str], role_slugs: dict[str, str
         "\n"
         "## ⚠️ CRITICAL: 子代理必须使用 NeoData 查上市公司金融数据\n"
         "manifest system_prompt 中已包含 NeoData 和 search_gateway 的调用示例。\n"
-        "如果子代理只用 web_search 查上市公司行情/财报/估值而不用 NeoData，说明 prompt 被截断或简化了。\n"
+        "如果子代理只用 search_deep 查上市公司行情/财报/估值而不用 NeoData，说明 prompt 被截断或简化了。\n"
         "确保子代理收到完整的 system_prompt（含 🔧 搜索与数据工具使用指南 章节）。\n"
         "\n"
         "## ⚠️ CRITICAL: 恢复前必须验证三文件（缺一不可）\n"
@@ -3288,7 +3288,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                         f"**当前状态：** 正文 {footnote_refs} 处引用，最低要求 {min_footnote_refs} 处，"
                         f"缺少至少 {min_footnote_refs - footnote_refs} 处。\n"
                         f"**铁律：** 脚注来源优先从维度报告和 facts JSON 中提取已有 URL，"
-                        f"不要跳过它们直接 web_search。"
+                        f"不要跳过它们直接 search_deep。"
                     ),
                     "input_file": str(synthesis_path),
                     "output_file": str(synthesis_path),

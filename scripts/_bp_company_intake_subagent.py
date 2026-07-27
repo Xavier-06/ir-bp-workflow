@@ -161,7 +161,7 @@ def bp_build_company_intake_instruction(
         "\n"
         "### Step 7: 模糊名称搜索（公司名变体）\n"
         "Many companies use abbreviations, brand names, or English names publicly.\n"
-        "Try these web_search queries to find alternate names:\n"
+        "Try these search_deep(Bash) queries to find alternate names:\n"
         f'- "{entity}" 简称 OR 又名 OR 品牌名\n'
         f'- "{entity}" company OR inc OR ltd OR corp\n'
         f'- "{entity}" 公司 简介 关于我们\n'
@@ -169,9 +169,9 @@ def bp_build_company_intake_instruction(
         "\n"
         "### Step 8: Try to Find BP PDF (HIGH PRIORITY — found PDF triggers full OCR pipeline)\n"
         "Search for a public BP PDF:\n"
-        f'- web_search: "{entity}" 商业计划书 filetype:pdf\n'
-        f'- web_search: "{entity}" BP 融资 路演 下载\n'
-        f'- web_search: "{entity}" pitch deck pdf\n'
+        f'- search_deep(Bash): "{entity}" 商业计划书 filetype:pdf\n'
+        f'- search_deep(Bash): "{entity}" BP 融资 路演 下载\n'
+        f'- search_deep(Bash): "{entity}" pitch deck pdf\n'
         "\n"
         "If you find a promising PDF URL:\n"
         f'1. Download it using Bash:\n'
@@ -273,7 +273,7 @@ def bp_build_company_intake_instruction(
         '  "tyc_company_found": true,\n'
         '  "tyc_company_id": "",\n'
         '  "westock_sector_found": false,\n'
-        '  "web_search_count": 8,\n'
+        '  "search_deep_count": 8,\n'
         '  "bp_pdf_found": false,\n'
         '  "bp_pdf_url": "",\n'
         '  "key_findings": ["finding1", "finding2"]\n'

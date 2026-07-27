@@ -27,11 +27,11 @@
 
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 学术论文/实验进展 | web_search("arxiv/paper ...") | - |
-| 专利检索 | tyc-mcp: search_patents | web_search |
-| 公司/项目融资 | tyc-mcp: search_companies | web_search |
-| 行业研报 | westock-mcp: data_report | web_search |
-| 新闻动态 | 中文实时新闻(tencent_news_search) | web_search |
+| 学术论文/实验进展 | search_deep(Bash)("arxiv/paper ...") | - |
+| 专利检索 | tyc-mcp: search_patents | search_deep(Bash) |
+| 公司/项目融资 | tyc-mcp: search_companies | search_deep(Bash) |
+| 行业研报 | westock-mcp: data_report | search_deep(Bash) |
+| 新闻动态 | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
 
 ## 输出章节
 

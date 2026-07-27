@@ -55,10 +55,10 @@
 |---------|------|------|
 | 行业/板块数据 | westock-mcp: data_sector, data_industry_chain | NeoData |
 | 公司财务/估值 | westock-mcp: data_finance, data_quote | NeoData |
-| 企业工商/股东 | tyc-mcp: search_companies, call_tool | web_search |
-| 产业链上下游 | westock-mcp: data_industry_chain | web_search |
-| 专利检索 | tyc-mcp: search_patents | web_search |
-| 最新动态/新闻 | 中文实时新闻(tencent_news_search) | web_search |
+| 企业工商/股东 | tyc-mcp: search_companies, call_tool | search_deep(Bash) |
+| 产业链上下游 | westock-mcp: data_industry_chain | search_deep(Bash) |
+| 专利检索 | tyc-mcp: search_patents | search_deep(Bash) |
+| 最新动态/新闻 | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
 
 ## 输出章节
 

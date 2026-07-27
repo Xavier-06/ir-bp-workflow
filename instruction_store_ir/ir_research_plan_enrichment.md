@@ -12,7 +12,7 @@
 
 ## Step 0: 结构化数据补搜（必须先执行）
 
-**Presearch 只做了 web_search + 腾讯新闻搜索，没有结构化财务/行情数据。** 在读 presearch 之前，你必须用 MCP 工具补搜：
+**Presearch 只做了 search_deep + 中文实时新闻搜索，没有结构化财务/行情数据。** 在读 presearch 之前，你必须用 MCP 工具补搜：
 
 ### 补搜清单
 
@@ -36,7 +36,7 @@
   "financials": { /* revenue, net_profit, roe, gross_margin trends */ },
   "analyst_views": [ /* 研报摘要，最多5条 */ ],
   "sector_benchmarks": { /* 行业 PE 分位等 */ },
-  "data_quality_note": "结构化数据来源比 web_search 可信度更高，优先采信"
+  "data_quality_note": "结构化数据来源比 search_deep 可信度更高，优先采信"
 }
 ```
 5. 如果某数据源无返回（如未上市标的）→ 在 supplement 中标注"未获取"

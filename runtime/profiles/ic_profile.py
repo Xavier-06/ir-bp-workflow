@@ -1286,38 +1286,38 @@ Agent tool 参数：
 - 对每个公司: tyc-mcp.search_companies -> get_company_basic_profile
 - 记录: 注册资本、成立日期、经营范围、股东、融资历史、与课题的相关性
 
-### Step 3: Web 全量搜索（结构化源优先，web_search 兜底，中英双语）
+### Step 3: Web 全量搜索（结构化源优先，search_deep 兜底，中英双语）
 
 你是唯一的搜索者（没有上游 presearch 预搜索），请系统性地完成以下搜索:
 - 结构化源优先: westock-mcp / 天眼查 已有数据优先使用
-- web_search 作为兜底和补充，最多 10 轮:
+- search_deep(Bash) 作为兜底和补充，最多 10 轮:
 
 **A. 行业宏观搜索（必做）:**
-- web_search: "{entity} 行业 市场规模 TAM SAM SOM {year}"
-- web_search: "{entity} industry market size growth forecast {year}"
-- web_search: "{entity} 产业政策 监管 补贴 {year}"
-- web_search: "{entity} industry policy regulation subsidy {year}"
+- search_deep(Bash): "{entity} 行业 市场规模 TAM SAM SOM {year}"
+- search_deep(Bash): "{entity} industry market size growth forecast {year}"
+- search_deep(Bash): "{entity} 产业政策 监管 补贴 {year}"
+- search_deep(Bash): "{entity} industry policy regulation subsidy {year}"
 
 **B. 竞争格局搜索（必做）:**
-- web_search: "{entity} 竞争格局 CR3 CR5 市场份额 TOP"
-- web_search: "{entity} competitive landscape market share ranking"
-- web_search: "{entity} 龙头 排名 对比 优劣势"
+- search_deep(Bash): "{entity} 竞争格局 CR3 CR5 市场份额 TOP"
+- search_deep(Bash): "{entity} competitive landscape market share ranking"
+- search_deep(Bash): "{entity} 龙头 排名 对比 优劣势"
 
 **C. 产业链搜索（必做）:**
-- web_search: "{entity} 产业链 上游 中游 下游 环节"
-- web_search: "{entity} supply chain value chain segments"
-- web_search: "{entity} 国产替代 自主可控 卡脖子"
+- search_deep(Bash): "{entity} 产业链 上游 中游 下游 环节"
+- search_deep(Bash): "{entity} supply chain value chain segments"
+- search_deep(Bash): "{entity} 国产替代 自主可控 卡脖子"
 
 **D. 研究内容定向搜索（必做）:**
 - 对 brief 中 `research_content` 的每一项，生成 1-2 条搜索词:
-  - 例: "GPU/ASIC/NPU/FPGA各品类定位" → web_search: "AI芯片 GPU ASIC NPU 品类 定位 用途"
-  - 例: "各环节全球市场份额与龙头公司" → web_search: "AI芯片产业链 各环节 市场份额 龙头公司"
+  - 例: "GPU/ASIC/NPU/FPGA各品类定位" → search_deep(Bash): "AI芯片 GPU ASIC NPU 品类 定位 用途"
+  - 例: "各环节全球市场份额与龙头公司" → search_deep(Bash): "AI芯片产业链 各环节 市场份额 龙头公司"
 
 **E. 子问题搜索（必做）:**
 - 对 brief 中每个 `sub_question` 转化为 1-2 条搜索词（去掉问号, 保留核心名词）
 
 **F. 关键公司搜索（必做）:**
-- 对 brief 中每个 `key_company` → web_search: "{{company}} {entity} 业务 市场 融资 {year}"
+- 对 brief 中每个 `key_company` → search_deep(Bash): "{{company}} {entity} 业务 市场 融资 {year}"
 
 **G. 新闻搜索（必做，Bash 调用 tencent_news_search）:**
 ```bash
@@ -1359,7 +1359,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
   "task_id": "{job_ctx.job_id}", "entity": "{entity}",
   "archetype": "chain_scan|tech_compare|company_deep|early_theme|commercial_mode",
   "archetype_reasoning": "一句话说明为什么选这个原型",
-  "data_sources_used": ["westock-mcp:行业数据/研报", "tyc-mcp:公司验证", "web_search:公开信息", "tencent_news:实时动态"],
+  "data_sources_used": ["westock-mcp:行业数据/研报", "tyc-mcp:公司验证", "search_deep:公开信息", "tencent_news:实时动态"],
   "research_dimensions": [
     {{"dimension": "行业规模与增长", "key_questions": [...], "data_sources": [...], "priority": "high"}}
   ],

@@ -25,12 +25,12 @@
 
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 企业工商/股东 | tyc-mcp: search_companies + call_tool | web_search |
+| 企业工商/股东 | tyc-mcp: search_companies + call_tool | search_deep(Bash) |
 | 上市公司财务对比 | westock-mcp: data_finance, data_quote | NeoData |
-| 机构评级/一致预期 | westock-mcp: data_rating | web_search |
+| 机构评级/一致预期 | westock-mcp: data_rating | search_deep(Bash) |
 | 资金流向/北向持仓 | westock-mcp: data_fund_flow, data_north_holding | - |
-| 竞品最新动态 | 中文实时新闻(tencent_news_search) | web_search |
-| 专利布局对比 | tyc-mcp: search_patents | web_search |
+| 竞品最新动态 | 中文实时新闻(tencent_news_search) | search_deep(Bash) |
+| 专利布局对比 | tyc-mcp: search_patents | search_deep(Bash) |
 
 ## 输出章节
 

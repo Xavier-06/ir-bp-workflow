@@ -7,28 +7,28 @@
 
 | 查什么 | 首选数据源 | 调用方式 | 兜底 |
 |--------|-----------|---------|------|
-| **A/HK/美股实时行情/财务/券商研报/板块·产业链/资金流/北向/评级/新闻** | **腾讯自选股 MCP (westock-mcp)** | `mcp__westock-mcp__data_quote` / `data_finance` / `data_report` / `data_sector` / `data_industry_chain` / `data_fund_flow` / `data_north_holding` / `data_rating` / `data_news` | NeoData → web_search |
-| A/HK 股行情/财报/估值 | NeoData `api` | `neodata_search('公司名 营收 净利润 市值', data_type='api')` | yfinance → web_search |
-| 美股行情/估值/分红 | yfinance | `yf.Ticker('AAPL').info` | NeoData → web_search |
-| **美股英文新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** | `_yahoo_search('NVDA earnings AI chip', max_results=5)` | web_search |
-| **券商研报/行业深度/产业链** | **NeoData `doc` + 腾讯自选股 `data_report`/`data_sector`/`data_industry_chain`** | `neodata_search('公司名 最新动态', data_type='doc')`；行业/产业链数据优先 `mcp__westock-mcp__data_sector` / `data_industry_chain` / `data_report` | web_search |
+| **A/HK/美股实时行情/财务/券商研报/板块·产业链/资金流/北向/评级/新闻** | **腾讯自选股 MCP (westock-mcp)** | `mcp__westock-mcp__data_quote` / `data_finance` / `data_report` / `data_sector` / `data_industry_chain` / `data_fund_flow` / `data_north_holding` / `data_rating` / `data_news` | NeoData → search_deep |
+| A/HK 股行情/财报/估值 | NeoData `api` | `neodata_search('公司名 营收 净利润 市值', data_type='api')` | yfinance → search_deep |
+| 美股行情/估值/分红 | yfinance | `yf.Ticker('AAPL').info` | NeoData → search_deep |
+| **美股英文新闻/earnings/分析师** | **Yahoo Finance `_yahoo_search`** | `_yahoo_search('NVDA earnings AI chip', max_results=5)` | search_deep |
+| **券商研报/行业深度/产业链** | **NeoData `doc` + 腾讯自选股 `data_report`/`data_sector`/`data_industry_chain`** | `neodata_search('公司名 最新动态', data_type='doc')`；行业/产业链数据优先 `mcp__westock-mcp__data_sector` / `data_industry_chain` / `data_report` | search_deep |
 | **突发新闻/实时动态（中文）** | **中文实时新闻 `tencent_news_search`**（CLI 积分耗尽自动降级 NeoData doc） | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import tencent_news_search; ..."` | search_deep |
 | **上市公司公告/新闻/研报动态** | **腾讯自选股 `data_news`**（需 symbol，type: 0公告 1研报 2新闻 3全部） | `mcp__westock-mcp__data_news(symbol="sh600519", type=3, limit=10)` | tencent_news_search → search_deep |
 | **产品发布/技术动态/新闻分析** | NeoData `doc` + tencent_news_search 补充 | NeoData doc 拿深度分析，tencent_news_search 补实时动态 | search_deep |
-| 企业工商/股东/司法/专利 | 天眼查 MCP | `mcp__tyc-mcp__search_companies` → `call_tool` | web_search |
+| 企业工商/股东/司法/专利 | 天眼查 MCP | `mcp__tyc-mcp__search_companies` → `call_tool` | search_deep |
 | 技术论文/arxiv | search_deep(Bash, "arxiv {company} {technology} {YYYY}", fetch_top_n) | 搜索+自动抓论文页正文 | — |
 | 开源项目/GitHub/HF | search_deep(Bash, "github.com/{company} latest release {YYYY}", fetch_top_n) | 搜索+自动抓 README | — |
 | 网页正文深度阅读 | search_deep(Bash, fetch_top_n) | 给关键词或 URL，自动抓 top N 正文 | — |
 
-> ⚠️ **westock-mcp（腾讯自选股）是已授权的 MCP connector，子代理可直接调用，无需 bash。行业数据、行情、财务、研报、板块、产业链、资金流、选股类查询必须优先走该结构化源，禁止只用 web_search 兜底。**
+> ⚠️ **westock-mcp（腾讯自选股）是已授权的 MCP connector，子代理可直接调用，无需 bash。行业数据、行情、财务、研报、板块、产业链、资金流、选股类查询必须优先走该结构化源，禁止只用 search_deep(Bash) 兜底。**
 
 ### NeoData 能力细分
 
 - `data_type='api'` → 行情/财报/估值等**结构化数字**（市值、PE、营收、利润等精确数字）
-- `data_type='doc'` → **券商研报 + 行业新闻分析 + 产品动态报道**（内容深度高，平均 200-500 字/条，来源经过过滤，质量远优于 web_search snippet）
+- `data_type='doc'` → **券商研报 + 行业新闻分析 + 产品动态报道**（内容深度高，平均 200-500 字/条，来源经过过滤，质量远优于 search_deep snippet）
   - ✅ 能搜到：产品发布（如混元HY3）、行业动态、券商深度、公司战略分析、管理层变动报道
   - ⚠️ `publishedDate` 字段经常为空 → 必须从 content 中提取时间线索（"4月23日"、"2026年Q1"等）
-  - **作为新闻/分析的首选数据源**，web_search 用于补充 NeoData 未覆盖的突发新闻和昨日动态
+  - **作为新闻/分析的首选数据源**，search_deep(Bash) 用于补充 NeoData 未覆盖的突发新闻和昨日动态
 - `data_type='all'` → 两者都取（搜索量更大但混合返回）
 
 ### yfinance + Yahoo Finance 能力边界
@@ -53,7 +53,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 - **能拿**: 工商注册、股东结构、董监高、司法风险、专利、招投标
 - **不能拿**: 实时行情、财报、新闻
-- **注意**: 工商数据可能滞后 1-3 个月，重大变更需 web_search 交叉验证
+- **注意**: 工商数据可能滞后 1-3 个月，重大变更需 search_deep(Bash) 交叉验证
 - 已在 manifest 中配置天眼查 MCP，可直接调用
 
 ### 腾讯自选股 MCP (westock-mcp) 能力边界
@@ -63,7 +63,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - **工具前缀**: `mcp__westock-mcp__*`
   - 行情: `data_quote`；财务: `data_finance`；研报: `data_report`；板块: `data_sector`；产业链: `data_industry_chain`；资金流: `data_fund_flow`；北向持仓: `data_north_holding`；评级: `data_rating`；评分: `data_score`；新闻: `data_news`；K线: `data_kline`；宏观: `data_macro`；股东: `data_shareholder`
   - 选股/筛选: `tool_filter` / `tool_ranking` / `tool_strategy`
-- **用法**: 直接在子代理会话里调用 MCP 工具，无需 bash。行业规模/竞争格局/产业链/资金面/北向/机构评级等数据优先用对应工具，不要只靠 web_search。
+- **用法**: 直接在子代理会话里调用 MCP 工具，无需 bash。行业规模/竞争格局/产业链/资金面/北向/机构评级等数据优先用对应工具，不要只靠 search_deep(Bash)。
 - 已在 manifest 中配置腾讯自选股 MCP，可直接调用
 
 ### IMA 知识库 MCP (ima-mcp) — 机构级研报/纪要/外资研报
@@ -168,9 +168,9 @@ search_deep / 腾讯新闻（web 兜底）
 **第零轮搜索 — 必须在所有广度搜索之前执行：**
 
 ```
-1. web_search("{entity} {YYYY}年{M}月 最新动态")
-2. web_search("{entity} latest news {YYYY}")
-3. web_search("{product} 最新版本 发布 {YYYY}") — 如果涉及具体产品/技术
+1. search_deep(Bash, "{entity} {YYYY}年{M}月 最新动态")
+2. search_deep(Bash, "{entity} latest news {YYYY}")
+3. search_deep(Bash, "{product} 最新版本 发布 {YYYY}") — 如果涉及具体产品/技术
 ```
 
 **目的：在任何分析之前，先知道"最新"是什么，避免引用过期信息。**
@@ -197,8 +197,8 @@ search_deep / 腾讯新闻（web 兜底）
 ### 产品/技术版本验证（AI/科技/制造业公司必查）
 
 当分析涉及具体产品、模型、技术版本时：
-1. **搜索**: `web_search("{product} latest version release date {YYYY}")`
-2. **搜索**: `web_search("{company} {product} {YYYY}年{M}月 发布")`
+1. **搜索**: `search_deep(Bash, "{product} latest version release date {YYYY}")`
+2. **搜索**: `search_deep(Bash, "{company} {product} {YYYY}年{M}月 发布")`
 3. **确认引用的是最新版本**，如有更新版本必须用最新数据
 4. **禁止引用已淘汰/被替代的旧版本而不标注**
 
@@ -206,7 +206,7 @@ search_deep / 腾讯新闻（web 兜底）
 
 ### 新闻/动态类搜索的时效控制
 
-- web_search 查询关键词**必须包含当前年月**（如 `2026年7月`）
+- search_deep(Bash) 查询关键词**必须包含当前年月**（如 `2026年7月`）
 - 搜索结果**优先引用最近 30 天**的信息
 - 超过 3 个月的新闻需验证是否有更新报道
 - **禁止引用 1 年前的新闻作为"最新动态"**
@@ -237,7 +237,7 @@ search_deep / 腾讯新闻（web 兜底）
 ```
 
 ### 脚注来源优先级
-1. **外部 URL**（web_search / search_gateway 返回的 URL）→ 写完整 URL + 发布日期
+1. **外部 URL**（search_deep / search_gateway 返回的 URL）→ 写完整 URL + 发布日期
 2. **NeoData 金融数据** → 写 `NeoData 金融数据 — neodata_search (查询日期)`
 3. **公司年报/公告** → 写 `公司年报/公告 — URL (发布日期)`
 4. **yfinance** → 写 `yfinance — yfinance.Ticker() (查询日期)`
@@ -278,7 +278,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 
 ```bash
 # data_type='doc' — 券商研报 + 行业新闻分析 + 产品动态报道
-# ⚠️ 这是新闻/分析的首选数据源（内容深度远超 web_search snippet）
+# ⚠️ 这是新闻/分析的首选数据源（内容深度远超 search_deep snippet）
 cd {RUNTIME_ROOT} && python3 -c "
 import json, sys; sys.path.insert(0, '.')
 from scripts.search_gateway import neodata_search
@@ -293,7 +293,7 @@ for r in (result + result2):
 ```
 
 **⚠️ publishedDate 经常为空** → 必须从 content 文本中提取时间线索（如"4月23日"、"2026年Q1"），据此判断信息新旧。
-**NeoData doc + web_search 组合拳**：NeoData doc 拿深度分析 → web_search 补昨日突发新闻和实时动态。
+**NeoData doc + search_deep 组合拳**：NeoData doc 拿深度分析 → search_deep 补昨日突发新闻和实时动态。
 
 ### 2. 中文实时新闻（tencent_news_search — 突发新闻/实时动态）
 
@@ -324,7 +324,7 @@ print(json.dumps(tencent_news_search('腾讯 混元 大模型', max_results=5), 
 
 ### 3. 通用网络搜索（新闻、产品发布、技术动态 — 兜底）
 
-**web_search（WorkBuddy 内置工具，直接用）：**
+**search_deep(Bash)（Bash 脚本调用，见下方示例）：**
 - 用于新闻/产品发布/技术动态等**时效敏感**查询
 - **查询必须含当前年月**（如 `腾讯 混元 HY3 2026年7月 发布`）
 - 作为所有搜索的兜底手段
@@ -354,7 +354,7 @@ for r in results[:5]:
 - `mcp__tyc-mcp__search_patents(query="...", applicant="公司名")` → 专利搜索
 - `mcp__tyc-mcp__search_bids(query="公司名 招投标")` → 招投标搜索
 
-**⚠️ 天眼查查中国大陆注册企业；境外企业（港股/美股）用 web_search 兜底。**
+**⚠️ 天眼查查中国大陆注册企业；境外企业（港股/美股）用 search_deep(Bash) 兜底。**
 
 ### 4. yfinance（美股估值精确数据）
 
@@ -400,9 +400,9 @@ cat {TASK_DIR}/{JOB_ID}_precompute_sector_benchmarks.json | python3 -m json.tool
 
 **产品版本和发布动态（时效性最高）：**
 ```
-web_search("{company} {product} 最新版本 发布 {YYYY}年{M}月")
-web_search("{company} product roadmap {YYYY}")
-web_search("{product} release date changelog")
+search_deep(Bash, "{company} {product} 最新版本 发布 {YYYY}年{M}月")
+search_deep(Bash, "{company} product roadmap {YYYY}")
+search_deep(Bash, "{product} release date changelog")
 ```
 
 **开源项目（GitHub/HuggingFace）：**

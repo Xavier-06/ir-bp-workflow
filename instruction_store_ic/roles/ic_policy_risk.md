@@ -18,9 +18,9 @@
 
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 政策文件/法规 | web_search（限定 .gov.cn/.gov） | - |
-| 企业司法/风险 | tyc-mcp: call_tool（风险扫描） | web_search |
-| 出口管制/制裁清单 | web_search（限定 BIS/EU/OFAC） | - |
+| 政策文件/法规 | search_deep(Bash, "site:gov.cn 关键词") | - |
+| 企业司法/风险 | tyc-mcp: call_tool（风险扫描） | search_deep(Bash) |
+| 出口管制/制裁清单 | search_deep(Bash)（限定 BIS/EU/OFAC） | - |
 
 ## 输出章节
 

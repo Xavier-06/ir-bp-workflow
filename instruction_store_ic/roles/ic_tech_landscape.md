@@ -55,10 +55,10 @@
 
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 技术论文 | web_search("arxiv ...") | - |
-| 专利检索 | tyc-mcp: search_patents | web_search |
-| 公司工商信息 | tyc-mcp: search_companies | web_search |
-| 行业研报 | westock-mcp: data_report | web_search |
+| 技术论文 | search_deep(Bash)("arxiv ...") | - |
+| 专利检索 | tyc-mcp: search_patents | search_deep(Bash) |
+| 公司工商信息 | tyc-mcp: search_companies | search_deep(Bash) |
+| 行业研报 | westock-mcp: data_report | search_deep(Bash) |
 
 ## 输出要求
 - 字数 ≥ 2000 字符
