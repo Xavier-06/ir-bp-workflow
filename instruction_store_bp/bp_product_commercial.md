@@ -196,10 +196,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | **上市客户/合作方研报** | **NeoData (`neodata_search` data_type=doc)** | **客户深度研报、行业分析** |
 | **可比上市公司客户所在 板块/产业链/资金流** | **westock-mcp（`data_sector`/`data_industry_chain`/`data_fund_flow`）** | **客户行业格局、产业链位置、资金动向——结构化，比 WebSearch 精准** |
 | 产品官网/产品页 | WebFetch | 直接抓取 |
-| **机构对产品/客户的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{公司/产品名} 产品 客户 订单 反馈` | 机构调研纪要中的产品/客户评价 |
-| **客户投关记录/管理层表态** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{客户名} 投关 调研 纪要` | 上市客户的投关记录原文 |
+| **投行对产品/客户的研报** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{公司/产品名} 产品 客户 订单 商业化` → fetch 全文 | 投行研报中的产品/客户评价 |
+| **客户行业研报** | **IMA 行研智库 `7311568991699459`**: `search_knowledge` 搜 `{客户名} 行业 供应链 采购` → fetch 全文 | 券商行业深度中的客户表态 |
 
-**IMA 调用（长安投研/公司调研报告无法 fetch 全文，用搜索摘要）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要，含关键数据+机构观点）。若返回 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。来源标注：`[^N]: IMA 搜索摘要 —《标题》(日期)`
+**IMA 调用（自建研报库/行研智库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -219,10 +219,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - 搜到后 WebFetch 深读关键页面
 - 中英文各搜一次
 
-**Step 4: IMA 机构视角搜索（与 Step 2-3 并行，不是兜底）**
-- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/产品名} 产品 客户 订单 反馈 商业化`（加 TXT 过滤）
-- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{客户名} 投关 调研 纪要 供应商 采购`
-- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
+**Step 4: IMA 投行研报搜索（与 Step 2-3 并行，不是兜底）**
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{公司/产品名} 产品 客户 订单 商业化 量产` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 行研智库 `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{客户名} 行业 供应链 采购` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
 - 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
 - 搜不到直接跳过，不硬凑
 

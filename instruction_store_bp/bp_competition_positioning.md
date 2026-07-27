@@ -234,10 +234,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 竞品产品参数/价格 | WebSearch | 搜 datasheet/评测 |
 | 行业排名/市场份额 | WebSearch | 搜行业分析 |
 | 竞品官网/产品页 | WebFetch | 直接抓取 |
-| **竞品投关记录/管理层表态** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{竞品名} 投关 调研 纪要 竞争` | 上市竞品投关记录中的竞争表态 |
-| **机构对竞品的评价** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化` | 机构调研纪要中的竞争分析 |
+| **投行竞品研报/竞争分析** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{竞品名} 竞争 格局 份额 研报` → fetch 全文 | 投行研报中的竞争分析 |
+| **机构对竞品的评价** | **IMA 机构调研纪要 `7300811407257275`**: `search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化` → fetch 全文 | 专家交流中的竞争分析 |
 
-**IMA 调用（长安投研/公司调研报告无法 fetch 全文，用搜索摘要）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要，含关键数据+机构观点）。若返回 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。来源标注：`[^N]: IMA 搜索摘要 —《标题》(日期)`
+**IMA 调用（自建研报库/机构调研纪要全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -252,11 +252,11 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - `call_tool` 查股东/融资/资质/招投标
 - 结果写入 facts sidecar
 
-**Step 3: IMA 竞品机构视角搜索（与 Step 2 并行，不是兜底）**
-- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{竞品名} 投关 调研 纪要 竞争 份额`
-- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化`（加 TXT 过滤）
-- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+**Step 3: IMA 竞品投行研报搜索（与 Step 2 并行，不是兜底）**
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{竞品名} 竞争 格局 份额 研报` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 上市竞品财务对比（NeoData + yfinance）**

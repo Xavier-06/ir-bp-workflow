@@ -206,10 +206,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 收入/订单/合同外部报道 | WebSearch → WebFetch 深读 | 搜新闻、行业媒体、客户公告 |
 | 上市客户财务体量 | NeoData (`neodata_search` data_type=api) | 营收/市值/利润结构化 |
 | **客户新闻/订单报道/合作动态** | **NeoData (`neodata_search` data_type=doc)** | **财经新闻、客户合作报道——比 search_deep(Bash) 更精准** |
-| **客户投关记录/管理层表态** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{客户名} 投关 调研 纪要 供应商` | 上市客户投关记录原文中的供应商/采购表态 |
-| **机构对客户/收入的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{公司/客户名} 客户 订单 收入 验证` | 机构调研纪要中的收入/客户评价 |
+| **投行客户研报/行业验证** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{客户名} 研报 收入 订单 供应链` → fetch 全文 | 投行研报中的客户/收入验证 |
+| **机构对客户/收入的点评** | **IMA 行研智库 `7311568991699459`**: `search_knowledge` 搜 `{公司/客户名} 客户 订单 收入 验证` → fetch 全文 | 券商行业深度中的客户评价 |
 
-**IMA 调用（长安投研/公司调研报告无法 fetch 全文，用搜索摘要）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要，含关键数据+机构观点）。若返回 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。来源标注：`[^N]: IMA 搜索摘要 —《标题》(日期)`
+**IMA 调用（自建研报库/行研智库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -227,11 +227,11 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
   - `search_bids` 验证招投标记录
 - 结果写入 facts sidecar
 
-**Step 3: IMA 客户机构视角搜索（与 Step 2 并行，不是兜底）**
-- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{客户名} 投关 调研 纪要 供应商 采购`
-- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/客户名} 客户 订单 收入 验证`（加 TXT 过滤）
-- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+**Step 3: IMA 客户投行研报搜索（与 Step 2 并行，不是兜底）**
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{客户名} 研报 收入 订单 供应链` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 行研智库 `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{公司/客户名} 客户 订单 收入 验证` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 收入/订单外部搜索**

@@ -51,11 +51,11 @@
 
 | 数据需求 | 首选 | 补充 |
 |---------|------|------|
-| 行业/公司机构共识 | **IMA 长安投研 (7297585010204027)**: `search_knowledge` 搜 `{行业/公司} 机构观点 共识 预期` | NeoData(doc) |
+| 行业/公司投行研报 | **IMA 自建研报库 (001a89fa4b807b92)**: `search_knowledge` 搜 `{行业/公司} 投行研报 目标价 估值` → fetch 全文 | NeoData(doc) |
 | 市场分歧/非共识 | **IMA 机构调研纪要 (7300811407257275)**: `search_knowledge` 搜 `{行业/公司} 分歧 非共识 超预期` | WebSearch |
-| 可比公司最新调研 | **IMA 公司调研报告 (7302533890465245)**: `search_knowledge` 搜 `{竞品名} 调研 纪要` | westock-mcp data_report |
+| 可比公司机构共识 | **IMA 自建研报库 (001a89fa4b807b92)**: `search_knowledge` 搜 `{竞品名} 研报 竞争 份额` → fetch 全文 | westock-mcp data_report |
 
-**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要）。若 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="001a89fa4b807b92", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（自建研报库全文可 fetch）。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`。
 先行者阶段搜索要快而广，每个库最多搜 1-2 次、取 top 3 结果即可（先行者要快而广，但也不要只看 1 条）。
 
 ## 禁区

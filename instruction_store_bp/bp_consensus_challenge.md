@@ -25,21 +25,21 @@
 
 | 数据需求 | 首选 | 补充 |
 |---------|------|------|
-| 卖方共识/市场主流观点 | **IMA 长安投研 (7297585010204027)**: `search_knowledge` 搜 `{行业/公司} 卖方共识 一致预期` | NeoData(doc) 研报摘要 |
-| 外资/专家非共识观点 | **IMA 机构调研纪要 (7300811407257275)**: `search_knowledge` 搜 `{行业/公司} 外资 非共识 分歧` | WebSearch 外资研报 |
-| 机构最新调研反馈 | **IMA 长安投研**: `search_knowledge` 搜 `{公司/竞品} 调研 纪要 观点` | 腾讯新闻 |
-| 催化剂事件时间线 | 腾讯新闻 + **IMA 长安投研**: 搜 `{行业} 政策 催化 落地` | NeoData(doc) |
-| 预期差案例/历史教训 | **IMA 机构调研纪要**: 搜 `{行业} 预期差 超预期 不及预期` | WebSearch |
+| 投行共识/目标价/评级 | **IMA 自建研报库 (001a89fa4b807b92)**: `search_knowledge` 搜 `{行业/公司} 研报 目标价 评级 共识` → fetch 全文 | NeoData(doc) 研报摘要 |
+| 外资/专家非共识观点 | **IMA 机构调研纪要 (7300811407257275)**: `search_knowledge` 搜 `{行业/公司} 外资 非共识 分歧` → fetch 全文 | WebSearch 外资研报 |
+| 投行最新研报反馈 | **IMA 自建研报库**: `search_knowledge` 搜 `{公司/竞品} 研报 观点 评级变动` → fetch 全文 | 腾讯新闻 |
+| 催化剂事件时间线 | 腾讯新闻 + **IMA 自建研报库**: 搜 `{行业} 政策 催化 落地 研报` | NeoData(doc) |
+| 预期差案例/历史教训 | **IMA 机构调研纪要**: 搜 `{行业} 预期差 超预期 不及预期` → fetch 全文 | WebSearch |
 
-**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要）。若 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="001a89fa4b807b92", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（自建研报库全文可 fetch）。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
 **Step 1: IMA 共识与非共识搜索（首选，不是补充）**
-- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{行业/公司} 卖方共识 一致预期 调研 纪要`（加 TXT 过滤）
-- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业/公司} 外资 非共识 分歧 预期差 超预期`
-- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{行业/公司} 研报 目标价 评级 共识 预期` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业/公司} 外资 非共识 分歧 预期差 超预期` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 **Step 2: NeoData + 腾讯新闻补充（与 Step 1 并行）**
 - NeoData(doc): `{行业/公司} 研报 共识 一致预期`

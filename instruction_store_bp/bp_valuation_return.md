@@ -170,10 +170,10 @@ print(json.dumps(v, ensure_ascii=False, indent=2))
 | 可比公司板块/产业链 | westock-mcp | 板块归属和产业链位置 |
 | 可比交易（融资/估值/轮次） | WebSearch → WebFetch 深读 | 非上市公司交易数据 |
 | 行业估值水平（PS/PE 均值） | WebSearch + NeoData (doc) | 行业基准 |
-| **可比公司投关记录/估值纪要** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{可比公司名} 估值 投关 调研 纪要` | 上市可比公司投关记录原文 |
-| **机构对标的/行业的估值观点** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易` | 机构调研纪要中的估值判断 |
+| **投行估值研报/目标价方法论** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{可比公司名} 估值 目标价 研报` → fetch 全文 | 投行研报中的估值方法论 |
+| **机构对标的/行业的估值观点** | **IMA 机构调研纪要 `7300811407257275`**: `search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易` → fetch 全文 | 专家交流中的估值判断 |
 
-**IMA 调用（长安投研/公司调研报告无法 fetch 全文，用搜索摘要）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要，含关键数据+机构观点）。若返回 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。来源标注：`[^N]: IMA 搜索摘要 —《标题》(日期)`
+**IMA 调用（自建研报库/机构调研纪要全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -206,11 +206,11 @@ brief 中的 `competitors` 字段可能为空或遗漏（上游数据断裂的�
 - 每家可比公司必须说明：标的主营什么、可比主营什么、重合度判断依据
 - 不匹配必须标注原因并剔除
 
-**Step 3: IMA 估值机构视角搜索（与 Step 2 并行，不是兜底）**
-- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{可比公司名} 估值 投关 调研 纪要`
-- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易`（加 TXT 过滤）
-- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+**Step 3: IMA 估值投行研报搜索（与 Step 2 并行，不是兜底）**
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{可比公司名} 估值 目标价 研报` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 可比公司实时估值**

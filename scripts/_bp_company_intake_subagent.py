@@ -54,7 +54,7 @@ def bp_build_company_intake_instruction(
         f"- name = 'bp-company-intake'\n"
         f"- team_name = 'bp-{job_id}'\n"
         "- mode = 'bypassPermissions'\n"
-        "- connectorIds = ['tyc-mcp', 'westock-mcp']\n"
+        "- connectorIds = ['tyc-mcp', 'westock-mcp', 'ima-mcp']\n"
         "- prompt = the FULL prompt below (do not truncate)\n"
         "\n"
         "### Subagent Prompt (copy ALL to the Agent):\n"

@@ -132,11 +132,12 @@ WebSearch → WebFetch 爬取
 | NeoData | `python3 scripts/search/neodata_search.py "关键词" --json` | A股/港股券商行业研报 |
 | WeStock | westock-data MCP | 个股研报+分析师评级 |
 | SEC EDGAR | WebFetch | 美股上市公司 10-K/S-1 |
+| **IMA 自建研报库** | `ima-mcp.search_knowledge(KB="001a89fa4b807b92", query="关键词")` → `fetch_media_content` | ★主力源：投行/券商研报（GS/MS/JPM/BofA/Citi/UBS 等），全文可 fetch，所有搜索第一优先 |
 | **IMA 行研智库** | `ima-mcp.search_knowledge(KB="7311568991699459", query="关键词")` → `fetch_media_content` | 券商行业深度报告（可 fetch 全文） |
 | **IMA 精选行业报告** | `ima-mcp.search_knowledge(KB="7302509206984644", query="关键词")` → `fetch_media_content` | 第三方白皮书：艾瑞/头豹/奥纬（可 fetch 全文） |
-| **IMA 长安投研** | `ima-mcp.search_knowledge(KB="7297585010204027", query="关键词", filters=TXT)` | 机构点评/电话会议纪要（仅 introduction 摘要） |
-| **IMA 公司调研报告** | `ima-mcp.search_knowledge(KB="7302533890465245", query="关键词")` | 上市公司投关记录（仅 introduction 摘要） |
 | **IMA 机构调研纪要** | `ima-mcp.search_knowledge(KB="7300811407257275", query="关键词")` | 外资研报/专家交流（NOTE 可 fetch） |
+
+> v4.8 已删除：长安投研 `7297585010204027` + 公司调研报告 `7302533890465245`（库主禁止导出，仅 200 字摘要，不再路由）。
 
 ### D. 企业情报
 
@@ -242,11 +243,10 @@ ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
 filters: [{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media_type": ["TXT"]}}]
 ```
 
-**知识库 ID 速查：**
+**知识库 ID 速查（v4.8）：**
+- ★ 自建研报库: `001a89fa4b807b92`（主力源，投行/券商研报全文可取，所有搜索第一优先）
 - 行研智库: `7311568991699459`（券商行业深度，可 fetch）
 - 机构调研纪要: `7300811407257275`（外资/专家交流，NOTE 可 fetch）
-- 长安投研: `7297585010204027`（机构点评/电话会，仅 intro，加 TXT 过滤）
-- 公司调研报告: `7302533890465245`（投关记录，仅 intro）
 - 精选行业报告: `7302509206984644`（第三方白皮书，可 fetch）
 
 **来源标注：** `[^N]: IMA {库名} —《{标题}》({日期})`

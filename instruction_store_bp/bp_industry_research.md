@@ -48,16 +48,16 @@
 ## 工具路由
 | 数据需求 | 首选 | 备用 |
 |---------|------|------|
-| 券商行业研报 | westock-mcp: data_report | **IMA 行研智库 (7311568991699459)** → search_deep(Bash) |
-| 市场规模/TAM/SAM | **IMA 精选行业报告 (7302509206984644)**: `search_knowledge` 搜 `{行业} 市场规模 TAM` | NeoData(doc) → search_deep(Bash) |
-| 技术路线横评 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 技术路线 对比 横评` | search_deep(Bash) |
-| 产业链成本结构 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 产业链 成本结构 拆解` | search_deep(Bash) |
-| 头部公司财务 | westock-mcp: data_finance/data_quote | **IMA 公司调研报告 (7302533890465245)** → NeoData |
-| 法规标准清单 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 法规 标准 国标 认证` | search_deep(Bash) |
-| 行业动态 | 腾讯新闻 CLI | **IMA 长安投研 (7297585010204027)** |
+| 投行行业研报 | **IMA 自建研报库 (001a89fa4b807b92)**: `search_knowledge` 搜 `{行业} 研报 深度 产业链` → fetch 全文 | westock-mcp: data_report → search_deep(Bash) |
+| 市场规模/TAM/SAM | **IMA 精选行业报告 (7302509206984644)**: `search_knowledge` 搜 `{行业} 市场规模 TAM` → fetch 全文 | NeoData(doc) → search_deep(Bash) |
+| 技术路线横评 | **IMA 行研智库 (7311568991699459)**: `search_knowledge` 搜 `{行业} 技术路线 对比 横评` → fetch 全文 | search_deep(Bash) |
+| 产业链成本结构 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 产业链 成本结构 拆解` → fetch 全文 | search_deep(Bash) |
+| 头部公司财务 | westock-mcp: data_finance/data_quote | **IMA 自建研报库 (001a89fa4b807b92)** → NeoData |
+| 法规标准清单 | **IMA 行研智库**: `search_knowledge` 搜 `{行业} 法规 标准 国标 认证` → fetch 全文 | search_deep(Bash) |
+| 行业动态 | 腾讯新闻 CLI | **IMA 自建研报库 (001a89fa4b807b92)** |
 
-**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（行研智库/精选报告/机构调研纪要均可 fetch）。
-行业研报角色是 IMA 命中率最高的角色——行研智库 + 精选报告两个库直接对口。每个库搜 2-3 次不同关键词，取最相关 1-3 篇全文提取（多源交叉验证，不要只看 1 篇）。
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（自建研报库/行研智库/精选报告/机构调研纪要均可 fetch）。
+行业研报角色是 IMA 命中率最高的角色——自建研报库 + 行研智库 + 精选报告三个库直接对口。每个库搜 2-3 次不同关键词，取最相关 1-3 篇全文提取（多源交叉验证，不要只看 1 篇）。
 
 ## 搜索策略（分步流程）
 

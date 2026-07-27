@@ -13,36 +13,35 @@ BP_TYC_CONNECTOR_IDS = ['tyc-mcp']
 # 面向上市公司的结构化金融数据：板块/产业链/资金流/北向/机构评级/券商研报（data_report）
 BP_WESTOCK_CONNECTOR_IDS = ['westock-mcp']
 
-# IMA 知识库 MCP connector ID 列表 —— 投研纪要/行业研报/专家交流/公司调研
-# 5 个订阅知识库合计 12 万+ 篇研报纪要，语义搜索 + 全文提取
-# KB IDs: 行研智库(7311568991699459) / 机构调研纪要(7300811407257275) /
-#         长安投研(7297585010204027) / 公司调研报告(7302533890465245) /
-#         精选行业数据报告(7302509206984644)
+# IMA 知识库 MCP connector ID 列表 —— 投研研报全文提取
+# v4.8（2026-07-27）：主力源升级为用户自建研报库（投行/券商研报全文可 fetch），
+# 删除长安投研(7297585010204027) + 公司调研报告(7302533890465245)（仅摘要，库主禁止导出）
+# KB IDs: 自建研报库(001a89fa4b807b92) / 行研智库(7311568991699459) /
+#         机构调研纪要(7300811407257275) / 精选行业数据报告(7302509206984644)
 BP_IMA_CONNECTOR_IDS = ['ima-mcp']
 
-# IMA 知识库 ID 映射 —— 按管线角色选库搜索
+# IMA 知识库 ID 映射 —— v4.8：自建研报库为主力源（全文可 fetch），3 个订阅库为补充
 IMA_KB_IDS = {
-    "industry_reports": "7311568991699459",      # 行研智库 3786篇（券商行业深度，分年份/行业）
-    "institutional_notes": "7300811407257275",    # 机构调研纪要 33331篇（外资研报/专家交流/券商点评，日更）
-    "expert_insights": "7297585010204027",        # 长安投研 46493篇（投资内参/电话会议/机构点评，日更）
-    "company_research": "7302533890465245",       # 公司调研报告 35458篇（上市公司投关记录PDF，日更）
-    "curated_reports": "7302509206984644",        # 精选行业数据报告 1442篇（第三方白皮书：艾瑞/头豹/奥纬等）
+    "self_built_research": "001a89fa4b807b92",    # ★主力源：用户自建研报库（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报，全文可 fetch，按周分文件夹，03_投行报告=大行研报）
+    "industry_reports": "7311568991699459",       # 行研智库 3786篇（券商行业深度，全文可 fetch）
+    "institutional_notes": "7300811407257275",    # 机构调研纪要 33331篇（NOTE 类型可 fetch）
+    "curated_reports": "7302509206984644",        # 精选行业数据报告 1442篇（第三方白皮书，全文可 fetch）
 }
 
-# 角色 → IMA 知识库路由 —— 每个角色搜哪些库（控制在 2-3 个，避免全搜浪费 token）
+# 角色 → IMA 知识库路由 —— v4.8：所有角色第一优先搜自建研报库，辅以 1-2 个订阅库
 IMA_ROLE_KB_MAP = {
-    "bp_investment_hypothesis":    ["expert_insights", "institutional_notes"],
-    "bp_company_team_compliance":  ["expert_insights", "company_research"],
-    "bp_product_commercial":       ["expert_insights", "company_research"],
-    "bp_tech_ip_moat":             ["industry_reports", "expert_insights"],
-    "bp_market_supply_chain":      ["industry_reports", "curated_reports", "expert_insights"],
-    "bp_competition_positioning":  ["company_research", "expert_insights"],
-    "bp_valuation_return":         ["company_research", "expert_insights"],
-    "bp_customer_revenue_validation": ["company_research", "expert_insights"],
-    "bp_dealbreaker_risk":         ["expert_insights", "institutional_notes"],
-    "bp_consensus_challenge":      ["expert_insights", "institutional_notes"],
-    "bp_catalyst":                 ["expert_insights", "institutional_notes"],
-    "bp_industry_research":        ["industry_reports", "curated_reports", "institutional_notes"],
+    "bp_investment_hypothesis":    ["self_built_research", "institutional_notes"],
+    "bp_company_team_compliance":  ["self_built_research", "institutional_notes"],
+    "bp_product_commercial":       ["self_built_research", "industry_reports"],
+    "bp_tech_ip_moat":             ["self_built_research", "industry_reports"],
+    "bp_market_supply_chain":      ["self_built_research", "industry_reports", "curated_reports"],
+    "bp_competition_positioning":  ["self_built_research", "institutional_notes"],
+    "bp_valuation_return":         ["self_built_research", "institutional_notes"],
+    "bp_customer_revenue_validation": ["self_built_research", "industry_reports"],
+    "bp_dealbreaker_risk":         ["self_built_research", "institutional_notes"],
+    "bp_consensus_challenge":      ["self_built_research", "institutional_notes"],
+    "bp_catalyst":                 ["self_built_research", "institutional_notes"],
+    "bp_industry_research":        ["self_built_research", "industry_reports", "curated_reports"],
 }
 
 # ── Connector IDs 按角色分配 ──

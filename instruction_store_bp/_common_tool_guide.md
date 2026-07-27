@@ -338,11 +338,10 @@ print(json.dumps(r, ensure_ascii=False, indent=2))
 | 司法诉讼/风险/处罚 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
 | 专利/商标/软著 | TYC `search_patents` / `search_trademarks` / `call_tool` | WebSearch |
 | 企业资质/招投标 | TYC `call_tool`（先 `get_company_capabilities` 取 tool_name） | WebSearch |
-| **券商研报/行业深度报告** | **NeoData (`neodata_search` data_type=doc)** | IMA行研智库 → WebSearch → WebFetch 深读 |
-| **机构调研纪要/专家交流** | **IMA 长安投研/机构调研纪要库 (`ima-mcp.search_knowledge`)** | NeoData(doc) → WebSearch |
-| **外资研报/非共识观点** | **IMA 机构调研纪要库 (`ima-mcp.search_knowledge`)** | WebSearch → WebFetch 深读 |
-| **上市公司投关记录/管理层表态** | **IMA 公司调研报告库 (`ima-mcp.search_knowledge`)** | westock-mcp data_report → WebSearch |
-| **第三方白皮书/市场规模** | **IMA 精选行业报告库 (`ima-mcp.search_knowledge`)** | NeoData(doc) → WebSearch |
+| **投行/券商研报（GS/MS/JPM/BofA/Citi/UBS 等）** | **IMA 自建研报库 (`001a89fa4b807b92`) — 全文可 fetch，所有角色第一优先** | NeoData(doc) → WebSearch → WebFetch 深读 |
+| **券商行业深度/技术路线横评** | **IMA 行研智库 (`7311568991699459`) — 全文可 fetch** | IMA 自建研报库 → NeoData(doc) → WebSearch |
+| **专家交流/外资研报/机构纪要** | **IMA 机构调研纪要 (`7300811407257275`) — NOTE 可 fetch** | IMA 自建研报库 → NeoData(doc) → WebSearch |
+| **第三方白皮书/市场规模** | **IMA 精选行业报告 (`7302509206984644`) — 全文可 fetch** | NeoData(doc) → WebSearch |
 | **中文公司新闻（融资/产品/人事）** | **腾讯新闻 (`tencent_news_search`) — 0.7s最快** | NeoData(doc) → WebSearch |
 | **财经新闻/行业动态/政策** | **腾讯新闻 (`tencent_news_search`)** | NeoData(doc) → WebSearch |
 | **负面新闻/风险舆情** | **腾讯新闻 (`tencent_news_search`)** | NeoData(doc) → WebSearch |
@@ -351,90 +350,67 @@ print(json.dumps(r, ensure_ascii=False, indent=2))
 | 读某个 URL 的正文 | WebFetch | — |
 | **可比公司板块/产业链/资金流/北向/机构评级** | **westock-mcp（`data_sector`/`data_industry_chain`/`data_fund_flow`/`data_north_holding`/`data_rating`）** | NeoData(doc) → WebSearch |
 
-### 3.6 IMA 知识库（ima-mcp，12万+篇投研纪要/行业研报/专家交流，全部12维度可用）
+### 3.6 IMA 知识库（ima-mcp，自建研报库为主力源，全文可 fetch）
 
-**✅ 已对全部 12 个角色开放授权（connector `ima-mcp`）。5 个订阅知识库合计 120,000+ 篇专业投研内容，语义搜索 + 全文提取，是传统 web 搜索无法触达的机构级数据源。**
+**✅ 已对全部 12 个角色开放授权（connector `ima-mcp`）。v4.8（2026-07-27）起主力源升级为「用户自建研报库」——投行/券商研报（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等）全文可 fetch（实测 ✅），按周分文件夹（每周含 `03_投行报告`=大行研报）。所有角色第一优先搜自建库。**
 
-**IMA 提供的是 web 搜索找不到的机构内部视角**——券商电话会议速记、专家交流纪要、外资内部研报、上市公司投关记录原文、第三方行业白皮书。
+**为什么自建库是主力源**：用户实测自建库可拉 GS 人形机器人研报全文（含 BOM 成本/ASP/量产指引/目标价方法论），是真正的正文源。旧版主力「长安投研/公司调研报告」两个订阅库**库主禁止导出，0% 可 fetch，只能拿 200 字摘要**——已于 v4.8 彻底删除，不再路由。
 
-| 知识库 | 总量 | 特色 | 何时用 |
-|--------|------|------|--------|
-| **长安投研** | 46,493篇 | 机构点评/投资内参/电话会议，日更 | 搜机构观点、业绩预测、行业分歧、催化剂事件 |
-| **机构调研纪要库** | 33,331篇 | 外资研报/专家交流/券商点评，日更 | 搜专家观点、外资视角、共识挑战、风险信号 |
-| **公司调研报告库** | 35,458篇 | 上市公司投关记录PDF/Word，日更 | 搜竞品财务数据、客户验证、管理层表态 |
-| **行研智库** | 3,786篇 | 券商行业深度（分年份/行业） | 搜行业研报、技术路线横评、TAM/SAM、产业链 |
-| **精选行业数据报告** | 1,442篇 | 第三方白皮书（艾瑞/头豹/奥纬等） | 搜市场规模、用户画像、竞争格局、趋势预测 |
+| 知识库 | KB ID | 定位 | fetch | 何时用 |
+|--------|-------|------|-------|--------|
+| **★ 自建研报库** | `001a89fa4b807b92` | 投行/券商研报（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等），按周分文件夹 | ✅ **全文** | **所有角色第一优先**：估值方法论/目标价/BOM 成本/量产指引/行业深度 |
+| 行研智库 | `7311568991699459` | 券商行业深度（分年份/行业）3786篇 | ✅ 全文 | 行业研报、技术路线横评、TAM/SAM、产业链 |
+| 机构调研纪要 | `7300811407257275` | 专家交流/外资研报/券商点评 33331篇 | ✅ NOTE 可 | 专家观点、外资视角、共识挑战、风险信号 |
+| 精选行业数据报告 | `7302509206984644` | 第三方白皮书（艾瑞/头豹/奥纬等）1442篇 | ✅ 全文 | 市场规模、用户画像、竞争格局、趋势预测 |
 
-**ima-mcp 工具调用方式（两种模式，按库权限区分 — 2026-07-21 实测）：**
-
-**模式 A：可 fetch 全文库（精选行业报告 / 行研智库 / 机构调研纪要 NOTE 类型）**
+**ima-mcp 工具调用方式（4 个库全部可 fetch 全文，统一用模式 A）：**
 ```
 # Step 1: 语义搜索 → 拿到 media_id + introduction 摘要
 ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
 # Step 2: 全文提取 → 取最相关 1-3 篇结果的 media_id（多源交叉验证）
 ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 ```
+> 机构调研纪要库若某条返回 `can_fetch_content=false`（非 NOTE 类型），退而用 introduction 摘要；其余 3 库直接 fetch 全文。
 
-**模式 B：仅搜索摘要库（长安投研 / 公司调研报告 — 库主禁止导出，API 无法 fetch 全文）**
-```
-# 只做 Step 1: 语义搜索
-ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
-# introduction 字段已含 200-500 字结构化摘要（关键数据+机构观点+核心结论），直接引用
-# 如果返回 can_fetch_content=true 的结果，可尝试 fetch；fetch 失败则用 introduction
-```
-
-**⚠️ 长安投研特殊搜索技巧（重要！）：**
-长安投研库里有两种文件：`_导读.docx`（音频转写开头300字，信息密度低）和 `.txt`（机构短评正文，信息密度极高）。
-**搜索时必须加 TXT 类型过滤**，否则会被 `_导读.docx` 淹没：
-```
-ima-mcp.search_knowledge:
-  knowledge_base_id: "7297585010204027"
-  query: "{公司/行业} 关键词"
-  filters: [{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media_type": ["TXT"]}}]
-```
-TXT 文件的 `introduction` 字段就是完整正文（200-300字机构短评），含具体数据、投资观点、标的推荐。
-
-**⚠️ 各库 fetch 权限实测（2026-07-21）：**
-| 库 | fetch | 原因 | 子代理策略 |
-|---|---|---|---|
-| 精选行业报告 | ✅ 100% | 库主允许导出 | search → fetch 全文 |
-| 行研智库 | ✅ 100% | 库主允许导出 | search → fetch 全文 |
-| 机构调研纪要 | ✅ NOTE 可 | NOTE 类型可导出 | search → 尝试 fetch，失败用 intro |
-| **长安投研** | ❌ 0% | **库主禁止导出（visible_export=2）** | **search 加 TXT 过滤 → intro 即正文** |
-| 公司调研报告 | ❌ 0% | 库主禁止导出 | search 直接用 introduction |
+**⚠️ 时间过滤纪律（自建研报库重要）：**
+- 优先取**最近 30 天内**的投行研报——超过 1 个月的研报参考价值显著下降
+- 研报标题常含日期（如 `GS-人形机器人-260703.pdf` = 2026-07-03），据此判断时效
+- 大行研报优先（GS/MS/JPM/BofA/Citi/UBS/Bernstein），中小行作补充
+- 自建库按周分文件夹，搜不到近期内容时可按文件夹时间范围收窄
 
 **来源标注格式：**
-- 全文提取成功：`[^N]: IMA {库名} —《{标题}》({日期})`
+- 全文提取成功：`[^N]: IMA 自建研报库 —《{标题}》({日期}, {投行名})`
+- 订阅库全文：`[^N]: IMA {库名} —《{标题}》({日期})`
 - 仅用摘要：`[^N]: IMA {库名} 搜索摘要 —《{标题}》({日期})`
 
-**角色 → IMA 知识库路由（从 bp_constants.IMA_ROLE_KB_MAP 读取）：**
+**角色 → IMA 知识库路由（从 bp_constants.IMA_ROLE_KB_MAP 读取，v4.8 自建库优先）：**
 
-| 角色 | 首选库 | 补充库 |
+| 角色 | 主力库 | 补充库 |
 |------|--------|--------|
-| company_team_compliance | 长安投研、公司调研报告 | — |
-| product_commercial | 长安投研、公司调研报告 | — |
-| tech_ip_moat | 行研智库、长安投研 | — |
-| market_supply_chain | 行研智库、精选行业报告、长安投研 | — |
-| competition_positioning | 公司调研报告、长安投研 | — |
-| valuation_return | 公司调研报告、长安投研 | — |
-| customer_revenue_validation | 公司调研报告、长安投研 | — |
-| dealbreaker_risk | 长安投研、机构调研纪要 | — |
-| investment_hypothesis | 长安投研、机构调研纪要 | — |
-| consensus_challenge | 长安投研、机构调研纪要 | — |
-| catalyst | 长安投研、机构调研纪要 | — |
-| industry_research | 行研智库、精选行业报告、机构调研纪要 | — |
+| investment_hypothesis | 自建研报库 | 机构调研纪要 |
+| company_team_compliance | 自建研报库 | 机构调研纪要 |
+| product_commercial | 自建研报库 | 行研智库 |
+| tech_ip_moat | 自建研报库 | 行研智库 |
+| market_supply_chain | 自建研报库 | 行研智库、精选行业报告 |
+| competition_positioning | 自建研报库 | 机构调研纪要 |
+| valuation_return | 自建研报库 | 机构调研纪要 |
+| customer_revenue_validation | 自建研报库 | 行研智库 |
+| dealbreaker_risk | 自建研报库 | 机构调研纪要 |
+| consensus_challenge | 自建研报库 | 机构调研纪要 |
+| catalyst | 自建研报库 | 机构调研纪要 |
+| industry_research | 自建研报库 | 行研智库、精选行业报告 |
 
-**知识库 ID 速查：**
+**知识库 ID 速查（v4.8，已删除长安投研/公司调研报告）：**
+- ★ 自建研报库: `001a89fa4b807b92`（主力源，所有角色第一优先）
 - 行研智库: `7311568991699459`
 - 机构调研纪要: `7300811407257275`
-- 长安投研: `7297585010204027`
-- 公司调研报告: `7302533890465245`
 - 精选行业报告: `7302509206984644`
 
 **搜索纪律：**
 - IMA 搜索与结构化源（TYC/NeoData/westock）**并行执行**，不是 web 搜索之后的兜底——每个角色的搜索策略分步流程中必须有显式 IMA Step
-- 每次搜索最多取 top 5 结果（浏览标题+摘要选最相关的），全文提取最多 3 篇/库（可 fetch 的库：行研智库/精选报告/机构纪要 NOTE）；仅摘要库（长安投研/公司调研报告）top 5 的 introduction 全部可用
-- IMA 搜索结果标注来源时必须写清库名+标题，如 `[^N]: 长安投研 —《xxx》(2026-07)`
+- 每次搜索最多取 top 5 结果（浏览标题+摘要选最相关的），全文提取最多 3 篇/库
+- **自建研报库优先于订阅库**——先用 `001a89fa4b807b92` 搜投行研报，命中不足再补订阅库
+- IMA 搜索结果标注来源时必须写清库名+标题+投行名，如 `[^N]: IMA 自建研报库 —《xxx》(2026-07, GS)`
 - 如果 IMA 搜不到相关内容（返回空或无关），直接跳过，不要硬凑
 
 ### ⚠️ 不可用工具清单
@@ -467,7 +443,7 @@ TXT 文件的 `introduction` 字段就是完整正文（200-300字机构短评�
 | 公司财务数据 | NeoData api / westock-mcp | "公司名 营收 利润" | N 条 |
 | 股东信息 | TYC call_tool | "公司名 股东" | N 条 |
 | 行业新闻 | 腾讯新闻 | "关键词" | N 条 |
-| 机构调研/专家观点 | IMA 长安投研/机构纪要 | "关键词" | N 条 |
+| 机构调研/专家观点 | IMA 自建研报库/机构调研纪要 | "关键词" | N 条 |
 | 行业研报/白皮书 | IMA 行研智库/精选报告 | "关键词" | N 条 |
 | ... | ... | ... | ... |
 
@@ -481,14 +457,14 @@ IMA 来源: [列出引用的 IMA 知识库名 + 标题]
 
 | 角色 | 可以做 | 禁止做 |
 |------|--------|--------|
-| company_team_compliance | TYC 工商/股东/高管/实控人/风险/资质 + WebSearch 人物履历 + NeoData(api)上市股东 + **NeoData(doc)行业新闻/人物报道** + **westock-mcp 上市关联方板块/产业链/资金流** + **IMA 长安投研/公司调研报告（机构点评/人物报道）** | 估值分析/市场规模推算/技术路线/论文 |
-| product_commercial | TYC 客户验证/招投标 + WebSearch 产品/客户/合同 + NeoData(api)上市客户 + **NeoData(doc)行业新闻/产品报道** + **westock-mcp 可比上市公司客户所在板块/产业链/资金流** + **IMA 长安投研/公司调研报告（产品/客户/订单纪要）** | 估值分析/技术路线/市场规模 |
-| tech_ip_moat | TYC 专利/商标/软著 + WebSearch 技术路线/论文/标准 + NeoData(api)竞品研发 + **NeoData(doc)技术趋势/行业研报** + **westock-mcp 上市可比技术公司板块/产业链/机构评级** + **IMA 行研智库/长安投研（技术路线横评/专家交流）** | 估值分析/市场规模/客户收入 |
-| market_supply_chain | NeoData(api+doc)行业研报/竞对/新闻 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 + **westock-mcp 上市竞对板块/产业链/资金流/北向/机构评级** + **IMA 行研智库/精选报告/长安投研（行业深度/白皮书/TAM）** | 估值建模/技术路线/团队分析 |
-| competition_positioning | TYC 竞品验证 + NeoData(api+doc)/yfinance 竞品财务/新闻/研报 + **westock-mcp 板块/产业链/资金流/北向/机构评级** + WebSearch 竞品情报 + **IMA 公司调研报告/长安投研（竞品投关记录/机构点评）** | 估值主模型/客户收入主结论/泛化风险 |
-| valuation_return | NeoData(api+doc)/yfinance/enrich_valuation 三源估值+研报 + **westock-mcp 板块/产业链/机构评级/资金流** + WebSearch 可比交易 + **IMA 公司调研报告/长安投研（可比公司估值/机构观点）** | 客户验证/技术判断/竞品主分析/市场规模 |
-| customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData(api)上市客户 + **NeoData(doc)客户新闻/订单报道** + **westock-mcp 上市客户板块/产业链/资金流** + **IMA 公司调研报告/长安投研（客户投关记录/机构点评）** | 估值分析/技术判断/市场规模/竞品主分析 |
-| dealbreaker_risk | TYC 风险全扫(35项) + **NeoData(doc)负面新闻/风险舆情/监管动态** + WebSearch 负面/舆情/监管 + NeoData(api)前置验证 + **westock-mcp 上市主体板块/产业链/资金流/北向/机构评级（风险佐证）** + **IMA 长安投研/机构调研纪要（风险信号/外资观点）** | 估值建模/客户主验证/技术判断/市场规模 |
+| company_team_compliance | TYC 工商/股东/高管/实控人/风险/资质 + WebSearch 人物履历 + NeoData(api)上市股东 + **NeoData(doc)行业新闻/人物报道** + **westock-mcp 上市关联方板块/产业链/资金流** + **IMA 自建研报库/机构调研纪要（投行研报/人物报道）** | 估值分析/市场规模推算/技术路线/论文 |
+| product_commercial | TYC 客户验证/招投标 + WebSearch 产品/客户/合同 + NeoData(api)上市客户 + **NeoData(doc)行业新闻/产品报道** + **westock-mcp 可比上市公司客户所在板块/产业链/资金流** + **IMA 自建研报库/行研智库（产品/客户/订单研报）** | 估值分析/技术路线/市场规模 |
+| tech_ip_moat | TYC 专利/商标/软著 + WebSearch 技术路线/论文/标准 + NeoData(api)竞品研发 + **NeoData(doc)技术趋势/行业研报** + **westock-mcp 上市可比技术公司板块/产业链/机构评级** + **IMA 自建研报库/行研智库（技术路线横评/投行研报）** | 估值分析/市场规模/客户收入 |
+| market_supply_chain | NeoData(api+doc)行业研报/竞对/新闻 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 + **westock-mcp 上市竞对板块/产业链/资金流/北向/机构评级** + **IMA 自建研报库/行研智库/精选报告（行业深度/白皮书/TAM）** | 估值建模/技术路线/团队分析 |
+| competition_positioning | TYC 竞品验证 + NeoData(api+doc)/yfinance 竞品财务/新闻/研报 + **westock-mcp 板块/产业链/资金流/北向/机构评级** + WebSearch 竞品情报 + **IMA 自建研报库/机构调研纪要（竞品投行研报/机构点评）** | 估值主模型/客户收入主结论/泛化风险 |
+| valuation_return | NeoData(api+doc)/yfinance/enrich_valuation 三源估值+研报 + **westock-mcp 板块/产业链/机构评级/资金流** + WebSearch 可比交易 + **IMA 自建研报库/机构调研纪要（可比公司估值/目标价方法论）** | 客户验证/技术判断/竞品主分析/市场规模 |
+| customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData(api)上市客户 + **NeoData(doc)客户新闻/订单报道** + **westock-mcp 上市客户板块/产业链/资金流** + **IMA 自建研报库/行研智库（客户投行研报/机构点评）** | 估值分析/技术判断/市场规模/竞品主分析 |
+| dealbreaker_risk | TYC 风险全扫(35项) + **NeoData(doc)负面新闻/风险舆情/监管动态** + WebSearch 负面/舆情/监管 + NeoData(api)前置验证 + **westock-mcp 上市主体板块/产业链/资金流/北向/机构评级（风险佐证）** + **IMA 自建研报库/机构调研纪要（风险信号/外资观点）** | 估值建模/客户主验证/技术判断/市场规模 |
 | 统稿 | Read 所有维度输出 + Write 完整报告 | 搜任何外部数据 |
 
 ## 搜索规范

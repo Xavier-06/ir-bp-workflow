@@ -32,7 +32,7 @@
 | 产业链上下游图谱/环节梳理 | westock-mcp: `data_industry_chain` | search_deep(Bash) | — |
 | 行业市场规模/TAM/SAM/CAGR | NeoData | search_deep(Bash, "{行业} 市场规模 CAGR 2025") | — |
 | 券商行业研报/深度报告 | westock-mcp: `data_report` | **NeoData `data_type='doc'`** | search_deep(Bash) |
-| **机构研报/专家纪要/外资观点** | **ima-mcp: `search_knowledge`**（长安投研/机构调研纪要/公司调研报告） | NeoData `data_type='doc'` | search_deep(Bash) |
+| **机构研报/专家纪要/外资观点** | **ima-mcp: `search_knowledge`**（★自建研报库/行研智库/机构调研纪要/精选报告，全文可取） | NeoData `data_type='doc'` | search_deep(Bash) |
 | **行业深度研报/TAM/白皮书** | **ima-mcp: `search_knowledge`**（行研智库/精选行业报告 → fetch 全文） | NeoData `data_type='doc'` | search_deep(Bash) |
 | 行业竞争格局/市占率/CR3/CR5 | **NeoData `data_type='doc'`** + westock-mcp 交叉验证 | search_deep(Bash) | — |
 | 行业政策/法规/准入标准 | search_deep(Bash, "site:gov.cn {关键词}") | **NeoData `data_type='doc'`** | 腾讯新闻 CLI |
@@ -355,70 +355,57 @@ cd ~/.workbuddy/ir_runtime && python3 tasks/valuation_enricher.py --entity "{公
 
 ### 3.5 IMA 知识库（ima-mcp，12万+篇投研纪要/行业研报/专家交流，全部角色可用）
 
-**✅ 已对全部 IC 角色开放授权（connector `ima-mcp`）。5 个订阅知识库合计 120,000+ 篇专业投研内容，语义搜索 + 全文提取，是传统 web 搜索无法触达的机构级数据源。**
+**✅ 已对全部 IC 角色开放授权（connector `ima-mcp`）。v4.8（2026-07-27）起主力源升级为「用户自建研报库」——投行/券商研报（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等）全文可 fetch（实测 ✅），按周分文件夹。所有角色第一优先搜自建库。**
 
-**IMA 提供的是 web 搜索找不到的机构内部视角**——券商电话会议速记、专家交流纪要、外资内部研报、上市公司投关记录原文、第三方行业白皮书。
+**为什么自建库是主力源**：用户实测自建库可拉 GS 人形机器人研报全文（含 BOM 成本/ASP/量产指引/目标价方法论），是真正的正文源。旧版主力「长安投研/公司调研报告」两个订阅库**库主禁止导出，0% 可 fetch，只能拿 200 字摘要**——已于 v4.8 彻底删除，不再路由。
 
-| 知识库 | 总量 | 特色 | 何时用 |
-|--------|------|------|--------|
-| **长安投研** | 46,493篇 | 机构点评/投资内参/电话会议，日更 | 搜机构观点、业绩预测、行业分歧、催化剂事件 |
-| **机构调研纪要库** | 33,331篇 | 外资研报/专家交流/券商点评，日更 | 搜专家观点、外资视角、共识挑战、风险信号 |
-| **公司调研报告库** | 35,458篇 | 上市公司投关记录PDF/Word，日更 | 搜竞品财务数据、客户验证、管理层表态 |
-| **行研智库** | 3,786篇 | 券商行业深度（分年份/行业） | 搜行业研报、技术路线横评、TAM/SAM、产业链 |
-| **精选行业数据报告** | 1,442篇 | 第三方白皮书（艾瑞/头豹/奥纬等） | 搜市场规模、用户画像、竞争格局、趋势预测 |
+| 知识库 | KB ID | 定位 | fetch | 何时用 |
+|--------|-------|------|-------|--------|
+| **★ 自建研报库** | `001a89fa4b807b92` | 投行/券商研报（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等） | ✅ **全文** | **所有角色第一优先**：估值方法论/目标价/BOM 成本/行业深度 |
+| 行研智库 | `7311568991699459` | 券商行业深度（分年份/行业）3786篇 | ✅ 全文 | 行业研报、技术路线横评、TAM/SAM、产业链 |
+| 机构调研纪要 | `7300811407257275` | 专家交流/外资研报/券商点评 33331篇 | ✅ NOTE 可 | 专家观点、外资视角、共识挑战、风险信号 |
+| 精选行业数据报告 | `7302509206984644` | 第三方白皮书（艾瑞/头豹/奥纬等）1442篇 | ✅ 全文 | 市场规模、用户画像、竞争格局、趋势预测 |
 
-**ima-mcp 工具调用方式（两种模式，按库权限区分）：**
+> v4.8 已删除：长安投研 `7297585010204027` + 公司调研报告 `7302533890465245`（库主禁止导出，仅 200 字摘要，不再路由）。
 
-**模式 A：可 fetch 全文库（精选行业报告 / 行研智库 / 机构调研纪要 NOTE 类型）**
+**ima-mcp 工具调用方式（4 个库全文均可 fetch，统一模式 A）：**
 ```
 # Step 1: 语义搜索 → 拿到 media_id + introduction 摘要
 ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
 # Step 2: 全文提取 → 取最相关 1-3 篇结果的 media_id（多源交叉验证）
 ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 ```
+> 机构调研纪要库若某条返回 `can_fetch_content=false`（非 NOTE 类型），退而用 introduction 摘要；其余 3 库直接 fetch 全文。
 
-**模式 B：仅搜索摘要库（长安投研 / 公司调研报告 — 库主禁止导出，API 无法 fetch 全文）**
-```
-# 只做 Step 1: 语义搜索
-ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")
-# introduction 字段已含 200-500 字结构化摘要（关键数据+机构观点+核心结论），直接引用
-# 如果返回 can_fetch_content=true 的结果，可尝试 fetch；fetch 失败则用 introduction
-```
+**⚠️ 时间过滤纪律（自建研报库重要）：**
+- 优先最近 30 天内的投行研报（超 1 个月参考价值显著下降）
+- 标题常含日期（如 `GS-人形机器人-260703.pdf`=2026-07-03），据此判断时效
+- 大行研报优先（GS/MS/JPM/BofA/Citi/UBS/Bernstein）
 
-**⚠️ 长安投研特殊搜索技巧（重要！）：**
-长安投研库里有两种文件：`_导读.docx`（音频转写开头300字，信息密度低）和 `.txt`（机构短评正文，信息密度极高）。
-**搜索时必须加 TXT 类型过滤**，否则会被 `_导读.docx` 淹没：
-```
-ima-mcp.search_knowledge:
-  knowledge_base_id: "7297585010204027"
-  query: "{公司/行业} 关键词"
-  filters: [{"filter_type": "MEDIA_TYPE_FILTER_TYPE", "media_type_filter": {"media_type": ["TXT"]}}]
-```
-
-**⚠️ 各库 fetch 权限实测：**
+**⚠️ 各库 fetch 权限（v4.8）：**
 | 库 | fetch | 子代理策略 |
 |---|---|---|
+| 自建研报库 | ✅ 100% | search → fetch 全文（主力源，第一优先） |
 | 精选行业报告 | ✅ 100% | search → fetch 全文 |
 | 行研智库 | ✅ 100% | search → fetch 全文 |
 | 机构调研纪要 | ✅ NOTE 可 | search → 尝试 fetch，失败用 intro |
-| **长安投研** | ❌ 0% | **search 加 TXT 过滤 → intro 即正文** |
-| 公司调研报告 | ❌ 0% | search 直接用 introduction |
 
 **来源标注格式：**
-- 全文提取成功：`[^N]: IMA {库名} —《{标题}》({日期})`
+- 全文提取成功：`[^N]: IMA 自建研报库 —《{标题}》({日期}, {投行名})`
+- 订阅库全文：`[^N]: IMA {库名} —《{标题}》({日期})`
 - 仅用摘要：`[^N]: IMA {库名} 搜索摘要 —《{标题}》({日期})`
 
-**知识库 ID 速查：**
+**知识库 ID 速查（v4.8）：**
+- ★ 自建研报库: `001a89fa4b807b92`（主力源，所有角色第一优先）
 - 行研智库: `7311568991699459`
 - 机构调研纪要: `7300811407257275`
-- 长安投研: `7297585010204027`
-- 公司调研报告: `7302533890465245`
 - 精选行业报告: `7302509206984644`
 
 **搜索纪律：**
+- **自建研报库优先**：所有搜索第一优先搜 `001a89fa4b807b92`（投行研报全文可取），命中不足再补订阅库
 - **IMA 与结构化源（westock/tyc/NeoData）并行执行，不是兜底**——每个角色的数据源路由中已有显式 IMA 行，必须执行
-- 每次搜索最多取 top 5 结果（浏览标题+摘要选最相关的），全文提取最多 3 篇/库（可 fetch 的库：行研智库/精选报告/机构纪要 NOTE）；仅摘要库（长安投研/公司调研报告）top 5 的 introduction 全部可用
-- IMA 搜索结果标注来源时必须写清库名+标题
+- 每次搜索最多取 top 5 结果（浏览标题+摘要选最相关的），全文提取最多 3 篇/库
+- IMA 搜索结果标注来源时必须写清库名+标题+投行名
 - 如果 IMA 搜不到相关内容（返回空或无关），直接跳过，不要硬凑
 
 ---
@@ -430,7 +417,7 @@ ima-mcp.search_knowledge:
 - 行业概况 → westock-mcp: data_sector
 - 最新动态 → 腾讯新闻 CLI
 - 快速估值锚 → westock-mcp: data_quote
-- **机构观点/行业共识** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
+- **机构观点/行业共识** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 - **行业深度研报** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
 
 ### ic_market_overview (市场全景)
@@ -448,8 +435,8 @@ ima-mcp.search_knowledge:
 - 机构评级 → westock-mcp: data_rating
 - 竞品最新动态 → 腾讯新闻 CLI
 - 专利布局 → tyc-mcp: search_patents
-- **竞品投关记录/管理层表态** → ima-mcp: search_knowledge(KB="7302533890465245")
-- **机构对竞争格局的评价** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
+- **竞品投关记录/管理层表态** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
+- **机构对竞争格局的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 
 ### ic_tech_product / ic_route_deep (技术产品 / 路线深度)
 - 技术论文 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文
@@ -458,7 +445,7 @@ ima-mcp.search_knowledge:
 - 技术突破新闻 → 腾讯新闻 CLI
 - 公司研发投入 → westock-mcp: data_finance
 - **技术路线横评** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
-- **机构对技术壁垒的点评** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
+- **机构对技术壁垒的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 
 ### ic_supply_chain (产业链)
 - 产业链图谱 → westock-mcp: data_industry_chain
@@ -467,14 +454,14 @@ ima-mcp.search_knowledge:
 - 产能/订单动态 → 腾讯新闻 CLI
 - 行业数据 → NeoData
 - **产业链成本结构/供应格局** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
-- **机构对供应链的点评** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
+- **机构对供应链的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 
 ### ic_policy_risk (政策风险)
 - 政策文件 → search_deep(Bash, "site:gov.cn {关键词}")
 - 企业司法/风险 → tyc-mcp: call_tool（风险扫描）
 - 出口管制 → search_deep(Bash, "BIS entity list {关键词}")
 - 政策动态 → 腾讯新闻 CLI
-- **机构对政策影响的研判** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
+- **机构对政策影响的研判** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 - **外资/专家对风险的观点** → ima-mcp: search_knowledge(KB="7300811407257275")
 
 ### ic_unit_economics / ic_business_overview (单元经济 / 业务概览)
@@ -482,15 +469,15 @@ ima-mcp.search_knowledge:
 - 客户/供应商 → tyc-mcp: call_tool
 - 定价/收费模式 → search_deep(Bash, fetch_top_n)（产品官网，读全文）
 - 用户数据/留存 → search_deep(Bash)
-- **机构对商业模式的评价** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
-- **可比公司投关记录** → ima-mcp: search_knowledge(KB="7302533890465245")
+- **机构对商业模式的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
+- **可比公司投关记录** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 
 ### ic_feasibility (可行性评估 — early_theme 专用)
 - 学术论文 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文
 - 实验进展/里程碑 → search_deep(Bash) + 腾讯新闻 CLI
 - 专利 → tyc-mcp: search_patents
 - 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)
-- **机构对技术可行性的判断** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
+- **机构对技术可行性的判断** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 - **行业研报/技术路线横评** → ima-mcp: search_knowledge(KB="7311568991699459") → fetch 全文
 
 ### ic_catalyst / ic_consensus (催化剂 / 共识挑战)
@@ -498,7 +485,7 @@ ima-mcp.search_knowledge:
 - 机构评级/一致预期 → westock-mcp: data_rating
 - 资金流向/北向 → westock-mcp: data_fund_flow + data_north_holding
 - 最新动态 → 腾讯新闻 CLI
-- **卖方共识/机构预期** → ima-mcp: search_knowledge(KB="7297585010204027", filters=TXT)
+- **卖方共识/机构预期** → ima-mcp: search_knowledge(KB="001a89fa4b807b92") → fetch 全文
 - **外资/专家非共识观点** → ima-mcp: search_knowledge(KB="7300811407257275")
 
 ### ic_report_synthesizer (统稿)

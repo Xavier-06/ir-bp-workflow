@@ -112,8 +112,8 @@ FOR each company in target_companies:
   14. WebSearch: 公司名 + CEO/CTO → 管理层背景
   
   ── IMA 机构视角（与 Step 2-14 并行，不是兜底） ──
-  15. ima-mcp: search_knowledge(KB="7302533890465245", query="{公司名} 投关 调研 纪要") → 用 introduction 摘要（不可 fetch）
-  16. ima-mcp: search_knowledge(KB="7297585010204027", query="{公司名} 点评 投资 风险", filters=TXT) → 用 introduction 摘要（不可 fetch，必须加 TXT 过滤）
+  15. ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司名} 研报 投关 调研 纪要") → 取最相关 1-3 篇 fetch_media_content 读全文（自建研报库全文可取）
+  16. ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司名} 点评 投资 风险 研报") → 取最相关 1-3 篇 fetch_media_content 读全文
   
   ── 交叉验证 ──
   17. TYC 融资数据 vs NeoData 研报估值 vs WebSearch 新闻 vs IMA 机构观点 → 四方交叉验证

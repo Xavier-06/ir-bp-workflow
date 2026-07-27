@@ -287,33 +287,32 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
 
-### Step 6: IMA 知识库预扫描（机构研报/纪要 — 增量信息层）
+### Step 6: IMA 知识库预扫描（自建研报库为主力源 — 增量信息层）
 
-用 ima-mcp 的 search_knowledge 搜索 5 个订阅知识库，提取机构级增量信息。
+用 ima-mcp 的 search_knowledge 搜索知识库，提取机构级增量信息。**自建研报库是主力源（投行/券商研报全文可 fetch），所有搜索第一优先。**
 **必须搜 2-3 个最相关的 KB，每个 KB 用不同关键词搜 1-2 次。**
 
-KB ID 速查：
-- 长安投研(专家调研纪要): `7297585010204027`
-- 公司调研报告(券商研报): `7302533890465245`
-- 机构调研纪要(电话会/专家/外资): `7300811407257275`
+KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不可取正文）：
+- ★自建研报库(投行/券商研报, GS/MS/JPM/BofA/Citi/UBS/Bernstein 等): `001a89fa4b807b92`
 - 行研智库(行业报告): `7311568991699459`
+- 机构调研纪要(电话会/专家/外资): `7300811407257275`
 - 精选行业数据报告: `7302509206984644`
 
 搜索策略：
 > **占位符说明**：`{{行业关键词如半导体}}` 是模板示例。子代理应根据 entity 实际所属行业替换。
 > 行业识别方法：用 westock-mcp `data_sector` 查 entity 的申万行业分类 → 用 tyc-mcp 经营范围推断 → 取交集即得行业关键词。
 
-**⚠️ fetch 权限实测（2026-07-21）：精选行业报告/行研智库 100%可fetch全文；机构调研纪要仅NOTE可fetch；长安投研/公司调研报告0%可fetch（库主禁止导出），但introduction摘要200-500字质量极高。**
+**⚠️ fetch 权限（v4.8）：4 个库全文均可 fetch。自建研报库/行研智库/精选报告 100% 可 fetch；机构调研纪要仅 NOTE 类型可 fetch。**
+**⚠️ 时间过滤纪律：优先最近 30 天内的投行研报（超 1 个月参考价值显著下降）；标题常含日期（如 -260703.pdf=2026-07-03）；大行优先。**
 
-1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7297585010204027", query="{entity} {{行业关键词如半导体集成电路}}", filters=[{{"filter_type":"MEDIA_TYPE_FILTER_TYPE","media_type_filter":{{"media_type":["TXT"]}}}}])` — 专家调研视角（**TXT过滤！intro即正文**）
-2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302533890465245", query="{entity}")` — 券商深度研报（intro摘要，不可fetch）
-3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} {{行业关键词如半导体集成电路}}")` — 机构观点/外资视角（NOTE可fetch全文：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
-4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业名如半导体}} 市场规模 竞争格局")` — 行业深度报告（**可fetch全文**：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
-5. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302509206984644", query="{{行业名如半导体}} 市场规模 TAM")` — 精选报告（**可fetch全文**）
+1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{entity} {{行业关键词如半导体集成电路}} 研报 目标价 估值")` — ★主力源：投行研报（**全文可fetch**：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
+2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业名如半导体}} 市场规模 竞争格局")` — 行业深度报告（**全文可fetch**）
+3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} {{行业关键词如半导体集成电路}}")` — 机构观点/外资视角（NOTE 可 fetch 全文：取 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
+4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302509206984644", query="{{行业名如半导体}} 市场规模 TAM")` — 精选报告（**全文可fetch**）
 
 从 IMA 搜索中提取：
+- 投行观点（GS/MS/JPM 等大行的目标价方法论/评级/BOM 成本分析）
 - 机构共识观点（多家券商一致看法）
-- 独特洞察（专家交流中的非公开信息）
 - 外资视角（外资券商的独立分析）
 - 关键数据点（行业 TAM/增速/市占率等 IMA 独有数据）
 

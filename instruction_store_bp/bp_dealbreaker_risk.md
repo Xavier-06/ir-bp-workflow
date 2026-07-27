@@ -40,8 +40,8 @@
 | 正向叙事中的事实链验证 | `search_deep(Bash)` + TYC 工具交叉验证 | 交叉验证前置维度引用的关键事实 |
 | 前置维度引用的上市竞品财务数据验证 | `search_gateway` (prefer=auto) | A/HK 股自动走 NeoData，交叉验证竞品营收/市值/PS 等关键数字 |
 | **前置维度引用的研报/新闻验证** | **NeoData (`neodata_search` data_type=doc)** | **交叉验证前置维度引用的行业研报、市场数据、新闻报道** |
-| **机构风险观点/外资看空/专家警示** | **IMA 长安投研 (7297585010204027)**: `search_knowledge` 搜 `{公司/行业} 风险 警示 看空 问题` | NeoData(doc) |
-| **竞品/同行风险传导** | **IMA 机构调研纪要 (7300811407257275)**: `search_knowledge` 搜 `{行业} 风险 暴雷 违约 诉讼` | WebSearch |
+| **机构风险观点/外资看空/专家警示** | **IMA 自建研报库 (001a89fa4b807b92)**: `search_knowledge` 搜 `{公司/行业} 风险 警示 看空 研报` → fetch 全文 | NeoData(doc) |
+| **竞品/同行风险传导** | **IMA 机构调研纪要 (7300811407257275)**: `search_knowledge` 搜 `{行业} 风险 暴雷 违约 诉讼` → fetch 全文 | WebSearch |
 
 **NeoData 调用**（验证前置维度引用的上市竞品财务数据，A/HK 股首选）：
 ```bash
@@ -254,7 +254,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 前置维度事实链验证 | WebSearch + TYC 交叉验证 | 验证前置维度引用的关键事实 |
 | **前置维度引用的研报/新闻验证** | **NeoData (`neodata_search` data_type=doc)** | **交叉验证行业研报、市场数据、新闻报道** |
 | 前置维度引用的竞品财务数据 | NeoData (`neodata_search` data_type=api) | 交叉验证数字准确性 |
-| **机构风险观点/外资看空** | **IMA 长安投研/机构调研纪要 (`ima-mcp.search_knowledge`)** | **机构内部风险判断、外资看空逻辑——web 搜不到的 alpha** |
+| **机构风险观点/外资看空** | **IMA 自建研报库/机构调研纪要 (`ima-mcp.search_knowledge`)** | **投行风险研报、外资看空逻辑——web 搜不到的 alpha** |
 | **竞品/同行暴雷传导** | **IMA 机构调研纪要 (`ima-mcp.search_knowledge`)** | **同行暴雷、供应链风险传导信号** |
 
 ## 搜索策略（分步流程）
@@ -269,11 +269,11 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - 特别关注：大额诉讼、未执行判决、行政处罚金额、股权冻结比例
 - 同时查历史维度（历史股东、历史失信、历史司法）
 
-**Step 3: IMA 风险信号搜索（与 Step 2 并行，不是兜底）**
-- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 风险 暴雷 诉讼 监管 看空`（加 TXT 过滤）
-- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 风险 传导 供应链 暴雷 外资`
-- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+**Step 3: IMA 风险研报搜索（与 Step 2 并行，不是兜底）**
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 风险 暴雷 诉讼 监管 看空 研报` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 风险 传导 供应链 暴雷 外资` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 负面新闻搜索（WebSearch）**

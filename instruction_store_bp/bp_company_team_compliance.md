@@ -280,10 +280,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | **创始人/高管财经报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻——比 search_deep(Bash) 更精准** |
 | 上市战略股东财务体量 | NeoData (`neodata_search` data_type=api) | 行情/财报结构化 |
 | **战略股东/关联方研报新闻** | **NeoData (`neodata_search` data_type=doc)** | **上市股东深度研报、投资分析、新闻动态** |
-| **机构对创始人/管理层的点评** | **IMA 长安投研 `7297585010204027`**: `search_knowledge` 搜 `{创始人/CEO名} 点评 履历 评价` | 机构内部人物评价，web 搜不到 |
-| **上市关联方投关记录** | **IMA 公司调研报告 `7302533890465245`**: `search_knowledge` 搜 `{上市股东/战略方名} 投关 调研` | 机构调研纪要中的关联方表态 |
+| **投行对管理层/团队的研报** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{创始人/CEO名} 管理层 团队 评价` → fetch 全文 | 投行研报中的团队评价 |
+| **上市关联方研报** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{上市股东/战略方名} 研报 投资` → fetch 全文 | 投行研报中的关联方表态 |
 
-**IMA 调用（长安投研/公司调研报告无法 fetch 全文，用搜索摘要）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要，含关键数据+机构观点）。若返回 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。来源标注：`[^N]: IMA 搜索摘要 —《标题》(日期)`
+**IMA 调用（自建研报库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="001a89fa4b807b92", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -299,11 +299,11 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - TYC `get_person_profile` + `get_person_risk_profile` 验证任职和风险
 - ⚠️ 搜不到必须标注 "该人员信息经搜索未找到独立来源验证"
 
-**Step 3: IMA 机构视角搜索（与 Step 1-2 并行，不是兜底）**
-- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{创始人/CEO名} 点评 履历 评价 管理`（加 TXT 过滤）
-- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{上市股东/战略方名} 投关 调研 纪要`
-- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+**Step 3: IMA 投行研报搜索（与 Step 1-2 并行，不是兜底）**
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{创始人/CEO名} 管理层 团队 评价 履历` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{上市股东/战略方名} 研报 投资 关联方` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 交叉验证**

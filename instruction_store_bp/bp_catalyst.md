@@ -39,21 +39,21 @@
 
 | 数据需求 | 首选 | 补充 |
 |---------|------|------|
-| 即将发生的催化剂事件 | 腾讯新闻: `{公司名} 发布 上市 获批 合作` | **IMA 长安投研 (7297585010204027)**: 搜 `{公司/行业} 催化剂 事件 时间窗口` |
-| 行业政策/监管催化 | **IMA 长安投研**: `search_knowledge` 搜 `{行业} 政策 催化 落地 时间表` | NeoData(doc) |
-| 机构预期催化时间 | **IMA 机构调研纪要 (7300811407257275)**: 搜 `{行业} 催化 时间 预期 落地` | 腾讯新闻 |
-| 竞品催化对标 | **IMA 公司调研报告 (7302533890465245)**: 搜 `{竞品名} 产品发布 上市 融资` | westock-mcp data_report |
+| 即将发生的催化剂事件 | 腾讯新闻: `{公司名} 发布 上市 获批 合作` | **IMA 自建研报库 (001a89fa4b807b92)**: 搜 `{公司/行业} 催化剂 事件 时间窗口 研报` |
+| 行业政策/监管催化 | **IMA 自建研报库**: `search_knowledge` 搜 `{行业} 政策 催化 落地 时间表 研报` → fetch 全文 | NeoData(doc) |
+| 机构预期催化时间 | **IMA 机构调研纪要 (7300811407257275)**: 搜 `{行业} 催化 时间 预期 落地` → fetch 全文 | 腾讯新闻 |
+| 竞品催化对标 | **IMA 自建研报库 (001a89fa4b807b92)**: 搜 `{竞品名} 产品发布 上市 融资 研报` → fetch 全文 | westock-mcp data_report |
 
-**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 直接使用 `introduction` 字段（200-500字结构化摘要）。若 `can_fetch_content=true` 可尝试 `fetch_media_content`，失败则用 introduction。
+**IMA 调用方式**：`ima-mcp.search_knowledge(knowledge_base_id="001a89fa4b807b92", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文（自建研报库全文可 fetch）。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
-**Step 1: IMA 催化剂信号搜索（首选，不是补充）**
-- 长安投研 `7297585010204027`: `ima-mcp.search_knowledge` 搜 `{公司/行业} 催化剂 事件 时间窗口 政策 落地`（加 TXT 过滤）
-- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业} 催化 时间 预期 落地`
-- 公司调研报告 `7302533890465245`: `ima-mcp.search_knowledge` 搜 `{竞品名} 产品发布 上市 融资`
-- 每库最多取 top 5 结果，直接使用 `introduction` 字段（top 5 摘要全部可用，多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA {库名} —《标题》(日期)`
+**Step 1: IMA 催化剂研报搜索（首选，不是补充）**
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{公司/行业} 催化剂 事件 时间窗口 政策 落地 研报` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{行业} 催化 时间 预期 落地` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{竞品名} 产品发布 上市 融资` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
 
 **Step 2: 腾讯新闻 + NeoData 补充（与 Step 1 并行）**
 - 腾讯新闻: `{公司名} 发布 上市 获批 合作`（0.7s 最快）
