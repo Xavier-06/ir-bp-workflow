@@ -36,6 +36,23 @@ Professional research report chapter on market sizing, industry landscape, and s
 2. **目标产品 vs 门槛对比**：
    - 哪些门槛已达到？哪些仍有差距？差距多大？
 
+## ⚠️ 上游材料/前驱体路线经济学（2026-07-27 新增 — 研报级密度，缺失 = 输出不合格）
+
+当标的属于材料/原料环节（如多孔炭、负极、电解质、前驱体等），供应链分析不能只列供应商，必须落到材料经济学：
+
+1. **前驱体/工艺路线对比表**（≥3 条路线，如生物质/树脂/煤基）：
+   - 每条路线：优点、缺点、成本量级、技术成熟度、标的采用/潜在采用标注
+   - 行业共识定位（如"树脂走高端、生物质走低端，两线并行"）
+   - 各路线后续降本/提性方向（分条列出）
+
+2. **关键材料吨价 + 降本时间线**：
+   - 各路线/各档材料的单吨成本（如树脂基多孔炭 50 万/吨、生物质 15 万/吨、煤基原料 2000 元/吨）
+   - 与基准/液态替代品的价格差距倍数
+   - 降本时间线（量产初期→规模化→成熟期，带年份节点）
+   - 标的自述成本锚（标注"BP自述、待核验"）
+
+3. **材料级工程门槛**：客户对上游材料选型的硬指标（如孔容/比表面积/电导率/压实密度的实用区间），让读者知道材料环节的卡点在哪
+
 ## 角色专属工具映射
 
 | 调查问题 | 首选工具 | 说明 |
@@ -321,6 +338,14 @@ print(json.dumps(bids, ensure_ascii=False, indent=2))
       "source": "NeoData/yfinance"
     }
   ],
+  "precursor_route_economics": [
+    {"route": "前驱体/工艺路线名", "pros": "优点", "cons": "缺点", "cost_level": "成本量级", "target_adoption": "标的采用/潜在采用/未采用", "industry_consensus": "行业共识定位", "cost_down_direction": "后续降本/提性方向"}
+  ],
+  "material_cost": {
+    "ton_price": [{"material": "材料名", "price": "数值", "unit": "万元/吨 或 元/吨", "gap_multiple": "与基准/液态差距倍数", "source": "来源"}],
+    "cost_reduction_timeline": [{"phase": "量产初期/规模化/成熟期", "year": "年份节点", "price": "数值", "unit": "万元/吨", "source": "来源"}],
+    "target_cost_anchor": {"claim": "标的自述单位成本", "note": "BP自述、待核验"}
+  },
   "data_gaps": ["列出未找到的字段及原因"]
 }
 ```
@@ -330,6 +355,8 @@ print(json.dumps(bids, ensure_ascii=False, indent=2))
 - `industry_landscape.mainstream_routes`: 至少 3 条路线，**每条必须有 `plain_explanation`（通俗解释）**
 - `supply_chain`: 每个关键供应商必须有 `tyc_verified` 字段
 - `competitor_financials`: 每个上市竞对必须有 `source` 字段
+- `precursor_route_economics`: 材料/原料类标的必须列 ≥3 条前驱体/工艺路线（优缺点+成本量级+标的采用标注+行业共识），**缺失 = 输出不合格**
+- `material_cost.ton_price`: 必须有材料吨价 + 降本时间线，不能只有"成本高/低"定性
 - `data_gaps`: 搜不到的字段必须列出
 
 ## 输出结构
