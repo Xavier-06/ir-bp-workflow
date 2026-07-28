@@ -164,18 +164,41 @@ def _build_job_ctx(job_id: str, entity: str, market: str, input_file: str,
     return job_ctx
 
 
+# pipeline 名称 → (模块路径, Profile 类名) 路由表
+# 新增管线时在此登记即可，run_phase 自动支持。
+_PROFILE_ROUTES: dict[str, tuple[str, str]] = {
+    "bp": ("runtime.profiles.bp_profile", "BPProfile"),
+    "ir": ("runtime.profiles.ir_profile", "IRProfile"),
+    "ic": ("runtime.profiles.ic_profile", "ICProfile"),
+    "ic_topic": ("runtime.profiles.ic_topic_profile", "ICTopicProfile"),
+    "lit": ("runtime.profiles.lit_review_profile", "LitReviewProfile"),
+}
+
+
+def _resolve_profile(pipeline: str) -> "PipelineProfile":
+    """按 pipeline 名称实例化对应 Profile。未知 pipeline 直接抛 ValueError，
+    不再静默回退到 BPProfile（旧 bug：ic/ic_topic/lit 全被当成 BP，报 Unknown phase）。"""
+    import importlib
+
+    route = _PROFILE_ROUTES.get(pipeline)
+    if route is None:
+        valid = ", ".join(sorted(_PROFILE_ROUTES))
+        raise ValueError(f"Unknown pipeline: {pipeline}. Valid: {valid}")
+    module_name, class_name = route
+    profile_cls = getattr(importlib.import_module(module_name), class_name)
+    return profile_cls(runtime_root=ROOT)
+
+
 def run_phase(job_id: str, phase: str, entity: str = "", market: str = "cn",
               input_file: str = "", query: str = "", session_id: str = "",
               pipeline: str = "bp") -> dict:
     """执行单个 phase，返回结果 dict"""
     job_ctx = _build_job_ctx(job_id, entity, market, input_file, query, session_id)
 
-    if pipeline == "ir":
-        from runtime.profiles.ir_profile import IRProfile
-        profile = IRProfile(runtime_root=ROOT)
-    else:
-        from runtime.profiles.bp_profile import BPProfile
-        profile = BPProfile(runtime_root=ROOT)
+    try:
+        profile = _resolve_profile(pipeline)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
 
     phases = profile.phases()
     if phase not in phases:
@@ -239,7 +262,8 @@ def main():
     ap.add_argument("--input-file", default="", help="输入文件路径")
     ap.add_argument("--query", default="", help="查询关键词")
     ap.add_argument("--session-id", default="", help="会话 ID")
-    ap.add_argument("--pipeline", default="bp", choices=["bp", "ir"], help="管线类型 (bp=尽调, ir=研报)")
+    ap.add_argument("--pipeline", default="bp", choices=list(_PROFILE_ROUTES.keys()),
+                    help="管线类型 (bp=尽调, ir=研报, ic=行业研究, ic_topic=课题研究, lit=文献综述)")
 
     # 模式选择
     mode = ap.add_mutually_exclusive_group()
