@@ -26,16 +26,15 @@ BP Pipeline — 后台分步执行版
 Heavy phases（后台运行）：
     phase02_company_verify   — 主体核验（大量搜索，2-5 分钟）
     phase04_presearch         — 预搜索（30-42 次搜索，3-10 分钟）
-    phase33_delivery          — 交付（含对抗验证 + DOCX 生成，2-5 分钟）
+    phase30_delivery          — 交付（含对抗验证 + DOCX 生成，2-5 分钟）
 
 Light phases（前台运行）：
     phase01_document_intake   — OCR（30 秒内）
     phase08_dispatch_prepare  — 准备 manifest（秒级）
     phase09_dispatch_collect  — 检查输出（秒级）
-    phase13_wave2_prepare/collect  — Wave 2 客户收入
-    phase16_wave3_prepare/collect  — Wave 3 竞争+估值
-    phase20_wave4_prepare/collect — Wave 4 Deal Breaker
-    phase27_synthesis_prepare/collect    — 同上
+    phase13_wave3_prepare/collect  — Wave 3 竞争+估值
+    phase17_wave4_prepare/collect — Wave 4 Deal Breaker
+    phase24_synthesis_prepare/collect    — 同上
 """
 from __future__ import annotations
 
@@ -55,7 +54,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 # Heavy phases — 走 launch_heavy_phase 路径
-HEAVY_PHASES = {"phase01_document_intake", "phase02_company_verify", "phase04_presearch", "phase33_delivery"}
+HEAVY_PHASES = {"phase01_document_intake", "phase02_company_verify", "phase04_presearch", "phase30_delivery"}
 
 # phase01 OCR 和 phase04 预搜索无超时，其他 phase 保留超时
 _NO_TIMEOUT_PHASES = {"phase01_document_intake", "phase04_presearch"}
@@ -65,15 +64,13 @@ PHASE_TIMEOUTS = {
     "phase02_company_verify": 600,    # 10 分钟
     "phase08_dispatch_prepare": 120,
     "phase09_dispatch_collect": 120,
-    "phase16_wave3_prepare": 120,
-    "phase17_wave3_collect": 120,
-    "phase13_wave2_prepare": 120,
-    "phase14_wave2_collect": 120,
-    "phase20_wave4_prepare": 120,
-    "phase21_wave4_collect": 120,
-    "phase27_synthesis_prepare": 120,
-    "phase28_synthesis_collect": 120,
-    "phase33_delivery": 600,            # 10 分钟
+    "phase13_wave3_prepare": 120,
+    "phase14_wave3_collect": 120,
+    "phase17_wave4_prepare": 120,
+    "phase18_wave4_collect": 120,
+    "phase24_synthesis_prepare": 120,
+    "phase25_synthesis_collect": 120,
+    "phase30_delivery": 600,            # 10 分钟
 }
 
 

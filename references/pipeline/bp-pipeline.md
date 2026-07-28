@@ -1,12 +1,12 @@
 # BP 管线详细流程（v4.5+双入口 — 2026-07-20 更新）
 
-## 管线阶段（35 phases，含 phase01b 双入口）
+## 管线阶段（30 phases，含 phase01b 双入口）
 
 ⚠️ **v4.5+双入口变更（2026-07-20）**：
 - 新增 Phase 01b 公司名搜索入库（双入口：PDF 模式 + 公司名模式）
 - Phase 01 无 input_file 时自动跳过（ok: True），交给 Phase 01b
 - Phase 01b 无 input_file 时派子代理搜索（tyc-mcp + westock-mcp + web）
-- 两条路径产出相同格式文件（bp_ocr_text.txt + bp_step0_profile.json），Phase 02-33 零改动
+- 两条路径产出相同格式文件（bp_ocr_text.txt + bp_step0_profile.json），Phase 02-30 零改动
 - v4.5 新增 Wave 0 投资假说先行者 + Wave 4 扩展（详见 codegraph-gate skill 速查）
 
 ## 双入口路由
@@ -28,7 +28,7 @@ Phase 01b 子代理在搜索过程中会尝试发现公开的 BP PDF：
 3. coordinator 用 `start_phase=phase01_document_intake` 恢复管线
 4. Phase 01 handler 自动检测 `bp_discovered_pdf.pdf` → 执行完整 OCR + 结构化抽取
 5. Phase 01b 第二次经过时检测到 input_file → 自动跳过
-6. Phase 02-33 正常执行（此时有完整 OCR 数据）
+6. Phase 02-30 正常执行（此时有完整 OCR 数据）
 
 ```
 01 phase01_document_intake                    — VL OCR + Step0 结构化抽取（无 input_file 时跳过）
@@ -46,30 +46,27 @@ Phase 01b 子代理在搜索过程中会尝试发现公开的 BP PDF：
 10 phase10_wave1_evidence_gate                — Wave 1 证据门禁（FAIL → repair 子代理 → 重跑）
 11 phase11_bp_fact_store_merge                — Wave 1 后 Fact store 合并（仅 Wave 1 sidecar）
 12 phase12_wave1_shared_page_refresh          — Wave 1 后刷新 shared state
-13 phase13_wave2_prepare                      — Wave 2 已移除（2026-07-28），no-op
-14 phase14_wave2_collect                      — Wave 2 已移除，no-op
-15 phase15_wave2_evidence_gate                — Wave 2 已移除，no-op
-16 phase16_wave3_prepare                      — Wave 3 manifest（competition + valuation）
-17 phase17_wave3_collect                      — 检查 Wave 3 输出
-18 phase18_wave3_evidence_gate                — Wave 3 证据门禁（FAIL → repair → 重跑）
-19 phase19_wave3_shared_page_refresh          — Wave 3 后刷新 shared state
-20 phase20_wave4_prepare                      — Wave 4 manifest（dealbreaker_risk）
-21 phase21_wave4_collect                      — 检查 Wave 4 输出
-22 phase22_wave4_evidence_gate                — Wave 4 证据门禁（FAIL → repair → 重跑）
-23 phase23_wave4_shared_page_refresh          — Wave 4 后刷新 shared state
+13 phase13_wave3_prepare                      — Wave 3 manifest（competition + valuation）
+14 phase14_wave3_collect                      — 检查 Wave 3 输出
+15 phase15_wave3_evidence_gate                — Wave 3 证据门禁（FAIL → repair → 重跑）
+16 phase16_wave3_shared_page_refresh          — Wave 3 后刷新 shared state
+17 phase17_wave4_prepare                      — Wave 4 manifest（dealbreaker_risk）
+18 phase18_wave4_collect                      — 检查 Wave 4 输出
+19 phase19_wave4_evidence_gate                — Wave 4 证据门禁（FAIL → repair → 重跑）
+20 phase20_wave4_shared_page_refresh          — Wave 4 后刷新 shared state
 ─── Quality Gates ───
-24 phase24_bp_claim_coverage_validation       — Claim 覆盖校验（repair → 最多 2 轮 → 降级放行）
-25 phase25_bp_cross_dimension_gate            — 跨维度一致性（HIGH→WARN 放行，仅 CRITICAL 阻断）
-26 phase26_bp_section_package_validation      — Section package 校验（v1→v2 自动升级）
+21 phase21_bp_claim_coverage_validation       — Claim 覆盖校验（repair → 最多 2 轮 → 降级放行）
+22 phase22_bp_cross_dimension_gate            — 跨维度一致性（HIGH→WARN 放行，仅 CRITICAL 阻断）
+23 phase23_bp_section_package_validation      — Section package 校验（v1→v2 自动升级）
 ─── Synthesis ───
-27 phase27_synthesis_prepare                  — 统稿子代理 manifest（instruction store 加载）
-28 phase28_synthesis_collect                  — 统稿收集（脚注密度 repair → 最多 1 轮 → 降级）
+24 phase24_synthesis_prepare                  — 统稿子代理 manifest（instruction store 加载）
+25 phase25_synthesis_collect                  — 统稿收集（脚注密度 repair → 最多 1 轮 → 降级）
 ─── Final Assembly + Delivery ───
-29 phase29_bp_debate_review                   — 对抗评审（BLOCKING 硬阻断，其余 WARN 放行）
-30 phase30_bp_final_assembly                  — Assembler 生成快速浏览版（降级为附件）
-31 phase31_bp_readability_review              — 可读性审查（技术术语动态化）
-32 phase32_bp_investment_judgment             — 投资判断汇总（stage_tier 感知阈值）
-33 phase33_delivery                           — Delivery gate + DOCX 生成 + 维度 DOCX + 交付 [heavy_bg]
+26 phase26_bp_debate_review                   — 对抗评审（BLOCKING 硬阻断，其余 WARN 放行）
+27 phase27_bp_final_assembly                  — Assembler 生成快速浏览版（降级为附件）
+28 phase28_bp_readability_review              — 可读性审查（技术术语动态化）
+29 phase29_bp_investment_judgment             — 投资判断汇总（stage_tier 感知阈值）
+30 phase30_delivery                           — Delivery gate + DOCX 生成 + 维度 DOCX + 交付 [heavy_bg]
 ```
 
 ## 提交任务
@@ -276,7 +273,7 @@ debate_review FAIL 但 6+ 维度文件齐全时，自动 force-assemble 并写�
 
 managed Python lxml 签名无效时自动 fallback 到系统 Python（`/opt/anaconda3/bin/python3`）。
 
-## BP 最终交付（phase33，2026-06-26 更新）
+## BP 最终交付（phase30，2026-06-26 更新）
 
 **最终交付物是 DOCX 文件**，由 `build_bp_dd_report_docx.py` 从 `bp_synthesis.md` 生成。
 
@@ -300,7 +297,7 @@ managed Python lxml 签名无效时自动 fallback 到系统 Python（`/opt/anac
 
 - 8 维度原材料先进入 section package 与 quality gate
 - `build_bp_dd_report_docx.py` 生成 Word 报告
-- **⚠️ 交付硬规则**：管线 `phase33_delivery` 完成后，返回值含 `deliver_to_user: true` 和 `docx_path`
+- **⚠️ 交付硬规则**：管线 `phase30_delivery` 完成后，返回值含 `deliver_to_user: true` 和 `docx_path`
   Coordinator 必须执行以下交付动作：
   1. 在聊天窗口告知用户报告完成 + 文件路径
   2. 调用 `open_result_view` 展示报告（如适用）

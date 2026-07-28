@@ -4,7 +4,7 @@ BP DD 管线任务树预设
 
 为完整 BP 尽调链路创建任务树：
 phase01_document_intake -> phase02_company_verify -> phase03_research_plan -> phase04_presearch
--> Wave 1/2 dispatch/collect -> shared page/gates -> synthesis -> IC/RedTeam/reviews -> phase33_delivery
+-> Wave 1/2 dispatch/collect -> shared page/gates -> synthesis -> IC/RedTeam/reviews -> phase30_delivery
 """
 from __future__ import annotations
 
@@ -112,43 +112,19 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         blocked_by=[wave1_collect.id],
     )
 
-    wave2_prepare = create(
-        subject="Wave 2 客户收入验证派发",
-        description="派发客户收入验证任务，读取 Wave 1 产品/技术/团队信息交叉验证",
-        active_form="正在派发 Wave 2 子任务",
-        phase="phase13_wave2_prepare",
-        blocked_by=[shared_refresh_1.id],
-    )
-
-    wave2_collect = create(
-        subject="Wave 2 客户收入验证收集",
-        description="确认 Wave 2 客户收入输出齐全并做基础质量检查",
-        active_form="正在收集 Wave 2 输出",
-        phase="phase14_wave2_collect",
-        blocked_by=[wave2_prepare.id],
-    )
-
-    wave2_evidence_gate = create(
-        subject="Wave 2 证据门禁",
-        description="检查 Wave 2 客户收入验证输出是否达到质量要求",
-        active_form="正在执行 Wave 2 证据门禁",
-        phase="phase15_wave2_evidence_gate",
-        blocked_by=[wave2_collect.id],
-    )
-
     wave3_prepare = create(
         subject="Wave 3 竞争+估值推理派发",
-        description="派发竞争定位、估值回报两个跨维分析任务，读取 Wave 1+2 输出",
+        description="派发竞争定位、估值回报两个跨维分析任务，读取 Wave 1 输出",
         active_form="正在派发 Wave 3 子任务",
-        phase="phase16_wave3_prepare",
-        blocked_by=[wave2_evidence_gate.id],
+        phase="phase13_wave3_prepare",
+        blocked_by=[shared_refresh_1.id],
     )
 
     wave3_collect = create(
         subject="Wave 3 竞争+估值推理收集",
         description="确认 Wave 3 竞争/估值两个维度输出齐全并做基础质量检查",
         active_form="正在收集 Wave 3 输出",
-        phase="phase17_wave3_collect",
+        phase="phase14_wave3_collect",
         blocked_by=[wave3_prepare.id],
     )
 
@@ -156,7 +132,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="Wave 3 证据门禁",
         description="检查 Wave 3 竞争+估值输出是否达到质量要求",
         active_form="正在执行 Wave 3 证据门禁",
-        phase="phase18_wave3_evidence_gate",
+        phase="phase15_wave3_evidence_gate",
         blocked_by=[wave3_collect.id],
     )
 
@@ -164,7 +140,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="刷新共享尽调页 Wave 3",
         description="把 Wave 2-3 输出合并进共享尽调页、共享状态和 claim coverage",
         active_form="正在三次刷新共享尽调页",
-        phase="phase19_wave3_shared_page_refresh",
+        phase="phase16_wave3_shared_page_refresh",
         blocked_by=[wave3_evidence_gate.id],
     )
 
@@ -172,7 +148,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="Wave 4 Deal Breaker 派发",
         description="派发 Deal Breaker 反向论证任务，读取 Wave 1-3 全量输出",
         active_form="正在派发 Wave 4 子任务",
-        phase="phase20_wave4_prepare",
+        phase="phase17_wave4_prepare",
         blocked_by=[shared_refresh_3.id],
     )
 
@@ -180,7 +156,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="Wave 4 Deal Breaker 收集",
         description="确认 Wave 4 Deal Breaker 输出齐全并做基础质量检查",
         active_form="正在收集 Wave 4 输出",
-        phase="phase21_wave4_collect",
+        phase="phase18_wave4_collect",
         blocked_by=[wave4_prepare.id],
     )
 
@@ -188,7 +164,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="Wave 4 证据门禁",
         description="检查 Wave 4 Deal Breaker 输出是否达到质量要求",
         active_form="正在执行 Wave 4 证据门禁",
-        phase="phase22_wave4_evidence_gate",
+        phase="phase19_wave4_evidence_gate",
         blocked_by=[wave4_collect.id],
     )
 
@@ -196,7 +172,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="刷新共享尽调页 Wave 4",
         description="把 Wave 4 输出合并进共享尽调页、共享状态和 claim coverage",
         active_form="正在四次刷新共享尽调页",
-        phase="phase23_wave4_shared_page_refresh",
+        phase="phase20_wave4_shared_page_refresh",
         blocked_by=[wave4_evidence_gate.id],
     )
 
@@ -204,7 +180,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="BP Claim 覆盖门禁",
         description="检查关键 BP claim 是否已被八维输出覆盖、验证或明确列为 data gap",
         active_form="正在检查 BP claim 覆盖",
-        phase="phase24_bp_claim_coverage_validation",
+        phase="phase21_bp_claim_coverage_validation",
         blocked_by=[shared_refresh_4.id],
     )
 
@@ -220,7 +196,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="Section Package 门禁",
         description="验证 section package 的 claim、fact、答案边界和叙事块结构",
         active_form="正在验证 section package",
-        phase="phase26_bp_section_package_validation",
+        phase="phase23_bp_section_package_validation",
         blocked_by=[fact_merge.id],
     )
 
@@ -228,7 +204,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="跨维度一致性门禁",
         description="检查估值、客户收入、竞争定位、风险结论之间的跨维度矛盾",
         active_form="正在检查跨维度一致性",
-        phase="phase25_bp_cross_dimension_gate",
+        phase="phase22_bp_cross_dimension_gate",
         blocked_by=[section_gate.id],
     )
 
@@ -236,7 +212,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="统稿派发",
         description="把 Wave 1-4 八个维度输出重组为投资逻辑连贯的 BP 尽调报告底稿",
         active_form="正在派发统稿任务",
-        phase="phase27_synthesis_prepare",
+        phase="phase24_synthesis_prepare",
         blocked_by=[cross_gate.id],
     )
 
@@ -244,7 +220,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="统稿收集",
         description="确认 bp_synthesis.md 已生成并同步到任务根目录和 outputs 目录",
         active_form="正在收集统稿输出",
-        phase="phase28_synthesis_collect",
+        phase="phase25_synthesis_collect",
         blocked_by=[synthesis_prepare.id],
     )
 
@@ -252,7 +228,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="对抗评审",
         description="执行 BP 报告对抗评审，拦截高置信低来源、逻辑漏洞和未披露数据缺口",
         active_form="正在做对抗评审",
-        phase="phase29_bp_debate_review",
+        phase="phase26_bp_debate_review",
         blocked_by=[synthesis_collect.id],
     )
 
@@ -260,7 +236,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="最终报告组装",
         description="结合统稿和门禁结果生成最终 BP 报告 markdown",
         active_form="正在组装最终报告",
-        phase="phase30_bp_final_assembly",
+        phase="phase27_bp_final_assembly",
         blocked_by=[debate_review.id],
     )
 
@@ -268,7 +244,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="可读性门禁",
         description="检查最终报告是否仍像维度拼接、是否重复事实、是否残留内部术语",
         active_form="正在检查报告可读性",
-        phase="phase31_bp_readability_review",
+        phase="phase28_bp_readability_review",
         blocked_by=[final_assembly.id],
     )
 
@@ -276,7 +252,7 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         subject="交付报告",
         description="通过交付门禁后生成尽调报告 DOCX，并登记交付审计与附件",
         active_form="正在生成尽调报告",
-        phase="phase33_delivery",
+        phase="phase30_delivery",
         blocked_by=[readability.id],
     )
 

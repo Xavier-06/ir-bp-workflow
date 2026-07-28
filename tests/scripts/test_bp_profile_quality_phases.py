@@ -15,8 +15,6 @@ from runtime.profiles.bp_profile import (
     _run_bp_delivery_inner,
     _run_bp_readability_review,
     _run_bp_dispatch_prepare,
-    _run_bp_wave2_prepare,
-    _run_bp_wave2_collect,
     _run_bp_wave3_prepare,
     _run_bp_wave3_collect,
     _run_bp_wave4_prepare,
@@ -41,22 +39,21 @@ def test_bp_profile_registers_research_plan_before_presearch(tmp_path):
     assert "phase06_search_plan_compile" in phases
     assert "phase07_bp_fact_store_bootstrap" in phases
     assert "phase12_wave1_shared_page_refresh" in phases
-    assert "phase19_wave3_shared_page_refresh" in phases
-    assert "phase23_wave4_shared_page_refresh" in phases
-    assert "phase24_bp_claim_coverage_validation" in phases
-    assert "phase25_bp_cross_dimension_gate" in phases
+    assert "phase16_wave3_shared_page_refresh" in phases
+    assert "phase20_wave4_shared_page_refresh" in phases
+    assert "phase21_bp_claim_coverage_validation" in phases
+    assert "phase22_bp_cross_dimension_gate" in phases
     assert "phase10_wave1_evidence_gate" in phases
-    assert "phase15_wave2_evidence_gate" in phases
-    assert "phase18_wave3_evidence_gate" in phases
-    assert "phase22_wave4_evidence_gate" in phases
+    assert "phase15_wave3_evidence_gate" in phases
+    assert "phase19_wave4_evidence_gate" in phases
     assert "phase11_bp_fact_store_merge" in phases
-    assert "phase26_bp_section_package_validation" in phases
-    assert "phase27_synthesis_prepare" in phases
-    assert "phase28_synthesis_collect" in phases
+    assert "phase23_bp_section_package_validation" in phases
+    assert "phase24_synthesis_prepare" in phases
+    assert "phase25_synthesis_collect" in phases
     # IC/RedTeam phases removed (2026-06-13): phase32/33/33_5/34
-    assert "phase29_bp_debate_review" in phases
-    assert "phase30_bp_final_assembly" in phases
-    assert "phase31_bp_readability_review" in phases
+    assert "phase26_bp_debate_review" in phases
+    assert "phase27_bp_final_assembly" in phases
+    assert "phase28_bp_readability_review" in phases
     assert phases.index("phase02_company_verify") < phases.index("phase03_presearch")
     assert phases.index("phase03_presearch") < phases.index("phase04_research_plan")
     assert phases.index("phase04_research_plan_collect") < phases.index("phase05_bp_shared_page_init")
@@ -66,23 +63,21 @@ def test_bp_profile_registers_research_plan_before_presearch(tmp_path):
     assert phases.index("phase09_dispatch_collect") < phases.index("phase10_wave1_evidence_gate")
     assert phases.index("phase10_wave1_evidence_gate") < phases.index("phase11_bp_fact_store_merge")
     assert phases.index("phase11_bp_fact_store_merge") < phases.index("phase12_wave1_shared_page_refresh")
-    assert phases.index("phase12_wave1_shared_page_refresh") < phases.index("phase13_wave2_prepare")
-    assert phases.index("phase14_wave2_collect") < phases.index("phase15_wave2_evidence_gate")
-    assert phases.index("phase15_wave2_evidence_gate") < phases.index("phase16_wave3_prepare")
-    assert phases.index("phase17_wave3_collect") < phases.index("phase18_wave3_evidence_gate")
-    assert phases.index("phase18_wave3_evidence_gate") < phases.index("phase19_wave3_shared_page_refresh")
-    assert phases.index("phase19_wave3_shared_page_refresh") < phases.index("phase20_wave4_prepare")
-    assert phases.index("phase21_wave4_collect") < phases.index("phase22_wave4_evidence_gate")
-    assert phases.index("phase22_wave4_evidence_gate") < phases.index("phase23_wave4_shared_page_refresh")
-    assert phases.index("phase23_wave4_shared_page_refresh") < phases.index("phase24_bp_claim_coverage_validation")
-    assert phases.index("phase24_bp_claim_coverage_validation") < phases.index("phase25_bp_cross_dimension_gate")
-    assert phases.index("phase25_bp_cross_dimension_gate") < phases.index("phase26_bp_section_package_validation")
-    assert phases.index("phase26_bp_section_package_validation") < phases.index("phase27_synthesis_prepare")
-    assert phases.index("phase27_synthesis_prepare") < phases.index("phase28_synthesis_collect")
-    assert phases.index("phase28_synthesis_collect") < phases.index("phase29_bp_debate_review")
-    assert phases.index("phase29_bp_debate_review") < phases.index("phase30_bp_final_assembly")
-    assert phases.index("phase30_bp_final_assembly") < phases.index("phase31_bp_readability_review")
-    assert phases.index("phase31_bp_readability_review") < phases.index("phase33_delivery")
+    assert phases.index("phase12_wave1_shared_page_refresh") < phases.index("phase13_wave3_prepare")
+    assert phases.index("phase14_wave3_collect") < phases.index("phase15_wave3_evidence_gate")
+    assert phases.index("phase15_wave3_evidence_gate") < phases.index("phase16_wave3_shared_page_refresh")
+    assert phases.index("phase16_wave3_shared_page_refresh") < phases.index("phase17_wave4_prepare")
+    assert phases.index("phase18_wave4_collect") < phases.index("phase19_wave4_evidence_gate")
+    assert phases.index("phase19_wave4_evidence_gate") < phases.index("phase20_wave4_shared_page_refresh")
+    assert phases.index("phase20_wave4_shared_page_refresh") < phases.index("phase21_bp_claim_coverage_validation")
+    assert phases.index("phase21_bp_claim_coverage_validation") < phases.index("phase22_bp_cross_dimension_gate")
+    assert phases.index("phase22_bp_cross_dimension_gate") < phases.index("phase23_bp_section_package_validation")
+    assert phases.index("phase23_bp_section_package_validation") < phases.index("phase24_synthesis_prepare")
+    assert phases.index("phase24_synthesis_prepare") < phases.index("phase25_synthesis_collect")
+    assert phases.index("phase25_synthesis_collect") < phases.index("phase26_bp_debate_review")
+    assert phases.index("phase26_bp_debate_review") < phases.index("phase27_bp_final_assembly")
+    assert phases.index("phase27_bp_final_assembly") < phases.index("phase28_bp_readability_review")
+    assert phases.index("phase28_bp_readability_review") < phases.index("phase30_delivery")
 
 
 def test_bp_narrative_assembly_keeps_machine_metadata_out_of_delivery_markdown(tmp_path):
@@ -317,11 +312,11 @@ def test_bp_profile_registers_synthesis_handlers_before_ic_and_delivery(tmp_path
 
     profile = BPProfile(runtime_root=tmp_path)
 
-    prepare_result = profile.run_phase("phase27_synthesis_prepare", job_ctx)
-    collect_result = profile.run_phase("phase28_synthesis_collect", job_ctx)
+    prepare_result = profile.run_phase("phase24_synthesis_prepare", job_ctx)
+    collect_result = profile.run_phase("phase25_synthesis_collect", job_ctx)
 
-    assert prepare_result["phase"] == "phase27_synthesis_prepare"
-    assert collect_result["phase"] == "phase28_synthesis_collect"
+    assert prepare_result["phase"] == "phase24_synthesis_prepare"
+    assert collect_result["phase"] == "phase25_synthesis_collect"
     assert collect_result["ok"] is True
 
 

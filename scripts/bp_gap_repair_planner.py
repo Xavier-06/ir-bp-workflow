@@ -8,7 +8,6 @@ from typing import Any
 
 GATE_FILES = [
     "bp_wave1_evidence_gate.json",
-    "bp_wave2_evidence_gate.json",
     "bp_claim_coverage_gate.json",
     "bp_cross_dimension_gate.json",
 ]

@@ -21,15 +21,14 @@ Phase Runner — 后台独立执行单个管线阶段
     phase01_document_intake   — 文档 OCR + 结构化
     phase01b_company_intake   — 公司名搜索入库（无 PDF 模式，needs_dispatch）
     phase02_company_verify   — 主体核验
-    phase04_presearch         — 预搜索
+    phase04_research_plan     — 研究计划派发
     phase08_dispatch_prepare  — 子代理派发准备（Wave 1）
     phase09_dispatch_collect  — 子代理输出收集（Wave 1）
-    phase13_wave2_prepare/collect — Wave 2 客户收入验证
-    phase16_wave3_prepare/collect — Wave 3 竞争+估值
-    phase20_wave4_prepare/collect — Wave 4 Deal Breaker
-    phase27_synthesis_prepare — 统稿派发（Wave 5）
-    phase28_synthesis_collect — 统稿收集（Wave 5）
-    phase33_delivery          — 交付
+    phase13_wave3_prepare/collect — Wave 3 竞争+估值
+    phase17_wave4_prepare/collect — Wave 4 Deal Breaker
+    phase24_synthesis_prepare — 统稿派发
+    phase25_synthesis_collect — 统稿收集
+    phase30_delivery          — 交付
 """
 from __future__ import annotations
 

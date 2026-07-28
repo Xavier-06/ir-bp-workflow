@@ -135,7 +135,6 @@ def evaluate_bp_delivery_gate(task_dir: Path) -> dict[str, Any]:
     # ── 统一检查所有 evidence gate 的降级标记 ──
     for gate_filename in [
         "bp_wave1_evidence_gate.json",
-        "bp_wave2_evidence_gate.json",
         "bp_wave3_evidence_gate.json",
         "bp_wave4_evidence_gate.json",
     ]:

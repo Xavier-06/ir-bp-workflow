@@ -26,14 +26,14 @@ bp_pipeline_bg.py（编排器）
 |-------|------|---------|
 | phase01_document_intake | 30s | 前台 |
 | phase02_company_verify | 2-5min | **后台** |
-| phase04_presearch | 3-10min | **后台** |
+| phase03_presearch | 3-10min | **后台** |
 | phase08_dispatch_prepare | 秒级 | 前台 |
 | phase09_dispatch_collect | 秒级 | 前台 |
-| phase25_competition_prepare | 秒级 | 前台 |
-| phase25_competition_collect | 秒级 | 前台 |
-| phase27_synthesis_prepare | 秒级 | 前台 |
-| phase28_synthesis_collect | 秒级 | 前台 |
-| phase33_delivery | 2-5min | **后台** |
+| phase13_wave3_prepare/collect | 秒级 | 前台 |
+| phase17_wave4_prepare/collect | 秒级 | 前台 |
+| phase24_synthesis_prepare | 秒级 | 前台 |
+| phase25_synthesis_collect | 秒级 | 前台 |
+| phase30_delivery | 2-5min | **后台** |
 
 ## WorkBuddy Agent 调用示例
 

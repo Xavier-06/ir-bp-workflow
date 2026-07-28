@@ -8,7 +8,7 @@
 | 管线 | 触发方式 | 规模 | 产出 |
 |------|---------|------|------|
 | **IR** | "分析比亚迪" | 9 步 + 统稿 · 4 波 · 32 phase（deep） | 券商级研报 DOCX |
-| **BP** | "帮我看下这个 BP" + 上传文件 | 11 角色 + 统稿 · 4 波 · 39 phase | 尽调报告 DOCX |
+| **BP** | "帮我看下这个 BP" + 上传文件 | 11 角色 + 统稿 · 4 波 · 36 phase | 尽调报告 DOCX |
 | **IC** | "做个半导体行业研究" | 5 种原型 · 最多 16 角色 · 19 phase | 行业研究报告 DOCX |
 | **LIT** | "做个固态电池技术评估" | 7 角色 · 3 波 · 20 phase | 技术评估报告 MD |
 
@@ -24,7 +24,7 @@
 │   IR 管线     │   BP 管线     │   IC 管线     │     LIT 管线           │
 │  券商研报      │  BP 尽调      │  行业研究      │     文献综述           │
 │  9步+统稿     │  11角色+统稿   │  5原型×16角色  │     7角色             │
-│  4波·32phase  │  4波·39phase  │  19 phase     │     3波·20phase       │
+│  4波·32phase  │  4波·36phase  │  19 phase     │     3波·20phase       │
 ├──────────────┴──────────────┴──────────────┴────────────────────────┤
 │                          共享基础设施                                 │
 │  kernel.py（Phase 状态机）· search_gateway（6 层搜索降级链）            │
@@ -39,7 +39,7 @@
 
 ## BP 管线（商业计划书尽调）
 
-**一句话**：BP 文件进来 → OCR 结构化 → Wave 0 投资假说先行 → 4 个维度分波调研 → 共识挑战/催化剂/行业研报 → Fact Store 全局事实库 → 门禁校验 → 不合格自动修复 → 统稿 → 对抗评审 → DOCX 交付。
+**一句话**：BP 文件进来 → OCR 结构化 → Wave 0 投资假说先行 → 4 维度基础采集 → 竞争+估值交叉验证 → 红队风险/共识挑战/催化剂/行业研报 → Fact Store 全局事实库 → 门禁校验 → 不合格自动修复 → 统稿 → 对抗评审 → DOCX 交付。
 
 每个分析结论都必须有可追溯的证据（claim → fact → source），没有证据的结论会被门禁拦截并修复。
 
@@ -47,9 +47,9 @@
 BP 文件（PDF/PPTX）
         │
         ▼
-Phase 01-07: 预处理（脚本，无子代理）
+Phase 01-07: 预处理
   01  OCR 识别 → 结构化公司数据（无文件时跳过）
-  01b 公司名搜索入库（无 PDF 模式）
+  01b 公司名搜索入库（无 PDF 模式，子代理搜索）
   02  天眼查工商验证
   03  预搜索（已废弃，子代理全权搜索）
   04  研究计划 → 子代理派发（tyc + westock + search_deep 自主搜索）
@@ -70,36 +70,34 @@ Wave 1: 基础证据采集（4 角色 sequential）
         │
         ▼
 Wave 3: 竞争 + 估值（2 角色 sequential）
-  16 派发 → 17 收集 → 18 门禁 → 19 共享页刷新
+  13 派发 → 14 收集 → 15 门禁 → 16 共享页刷新
   读 Wave 0+1 输出做交叉验证
         │
         ▼
 Wave 4: 叙事层（4 角色）★
-  20 派发 → 21 收集 → 22 门禁 → 23 共享页刷新
+  17 派发 → 18 收集 → 19 门禁 → 20 共享页刷新
   红队风险 / 共识挑战 / 催化剂 / 行业研报
   读全量输出做反向论证
         │
         ▼
-Phase 24-26: 全局校验
-  24 Claim 覆盖校验（每个 claim 有证据？）
-  25 跨维度一致性（不同维度引用同一数字？）
-  26 Section Package 校验（格式完整性）
+Phase 21-23: 全局校验
+  21 Claim 覆盖校验（每个 claim 有证据？）
+  22 跨维度一致性（不同维度引用同一数字？）
+  23 Section Package 校验（格式完整性）
         │
         ▼
-Phase 27-28: 统稿（1 个子代理）
+Phase 24-25: 统稿（1 个子代理）
   读 11 维度 .md + Fact Store → 写最终报告
   脚注密度不达标 → repair 子代理补脚注
         │
         ▼
-Phase 29-33: 交付
-  29 对抗评审 → 30 最终组装 → 31 可读性审查
-  32 投资判断汇总 → 33 DOCX 生成 + 桌面复制
+Phase 26-30: 交付
+  26 对抗评审 → 27 最终组装 → 28 可读性审查
+  29 投资判断汇总 → 30 DOCX 生成 + 桌面复制
         │
         ▼
   DD 尽调报告.docx + 维度独立 DOCX
 ```
-
-> **Wave 2（客户收入验证）已于 2026-07-28 移除**，phase 13-15 保留为 no-op 占位。
 
 ### BP 11 角色 + 统稿
 
@@ -118,7 +116,7 @@ Phase 29-33: 交付
 | `bp_industry_research` | W4 | 行业研报整合（6 大类基准数据） | westock + IMA |
 | `bp_统稿` | — | 读全量维度输出 + Fact Store → 最终报告 | — |
 
-### BP 39 Phase 完整清单
+### BP 36 Phase 完整清单
 
 | # | Phase | 类型 | 说明 |
 |---|-------|------|------|
@@ -140,27 +138,24 @@ Phase 29-33: 交付
 | 10 | wave1_evidence_gate | 门禁 | Wave 1 证据校验（repair） |
 | 11 | bp_fact_store_merge | 脚本 | Fact Store 合并 |
 | 12 | wave1_shared_page_refresh | 脚本 | 共享页刷新 |
-| 13 | wave2_prepare | — | ~~已移除~~ no-op 占位 |
-| 14 | wave2_collect | — | ~~已移除~~ no-op 占位 |
-| 15 | wave2_evidence_gate | — | ~~已移除~~ no-op 占位 |
-| 16 | wave3_prepare | dispatch | Wave 3 派发（2 角色 sequential） |
-| 17 | wave3_collect | 收集 | Wave 3 收集 |
-| 18 | wave3_evidence_gate | 门禁 | Wave 3 证据校验（repair） |
-| 19 | wave3_shared_page_refresh | 脚本 | 共享页刷新 |
-| 20 | wave4_prepare | dispatch | Wave 4 派发（4 角色: dealbreaker + 共识 + 催化剂 + 行业研报） |
-| 21 | wave4_collect | 收集 | Wave 4 收集 |
-| 22 | wave4_evidence_gate | 门禁 | Wave 4 证据校验（repair, 假说类角色跳过 claim 检查） |
-| 23 | wave4_shared_page_refresh | 脚本 | 共享页刷新 |
-| 24 | bp_claim_coverage_validation | 门禁 | Claim 覆盖校验（repair, 最多 2 轮 → 降级放行） |
-| 25 | bp_cross_dimension_gate | 门禁 | 跨维度一致性（HIGH → WARN 放行） |
-| 26 | bp_section_package_validation | 校验 | Section Package 校验 |
-| 27 | synthesis_prepare | dispatch | 统稿派发（7 维度三件套 + 4 叙事角色仅 md） |
-| 28 | synthesis_collect | 收集 | 统稿收集（脚注密度 repair） |
-| 29 | bp_debate_review | 校验 | 对抗评审（HIGH → MEDIUM，仅 BLOCKING 硬阻断） |
-| 30 | bp_final_assembly | 脚本 | 最终组装 |
-| 31 | bp_readability_review | 校验 | 可读性审查 |
-| 32 | bp_investment_judgment | 脚本 | 投资判断汇总 |
-| 33 | delivery | 交付 | DOCX 生成 + 维度独立 DOCX + delivery gate [heavy_bg, 600s] |
+| 13 | wave3_prepare | dispatch | Wave 3 派发（2 角色 sequential） |
+| 14 | wave3_collect | 收集 | Wave 3 收集 |
+| 15 | wave3_evidence_gate | 门禁 | Wave 3 证据校验（repair） |
+| 16 | wave3_shared_page_refresh | 脚本 | 共享页刷新 |
+| 17 | wave4_prepare | dispatch | Wave 4 派发（4 角色: dealbreaker + 共识 + 催化剂 + 行业研报） |
+| 18 | wave4_collect | 收集 | Wave 4 收集 |
+| 19 | wave4_evidence_gate | 门禁 | Wave 4 证据校验（repair, 假说类角色跳过 claim 检查） |
+| 20 | wave4_shared_page_refresh | 脚本 | 共享页刷新 |
+| 21 | bp_claim_coverage_validation | 门禁 | Claim 覆盖校验（repair, 最多 2 轮 → 降级放行） |
+| 22 | bp_cross_dimension_gate | 门禁 | 跨维度一致性（HIGH → WARN 放行） |
+| 23 | bp_section_package_validation | 校验 | Section Package 校验 |
+| 24 | synthesis_prepare | dispatch | 统稿派发（7 维度三件套 + 4 叙事角色仅 md） |
+| 25 | synthesis_collect | 收集 | 统稿收集（脚注密度 repair） |
+| 26 | bp_debate_review | 校验 | 对抗评审（HIGH → MEDIUM，仅 BLOCKING 硬阻断） |
+| 27 | bp_final_assembly | 脚本 | 最终组装 |
+| 28 | bp_readability_review | 校验 | 可读性审查 |
+| 29 | bp_investment_judgment | 脚本 | 投资判断汇总 |
+| 30 | delivery | 交付 | DOCX 生成 + 维度独立 DOCX + delivery gate [heavy_bg, 600s] |
 
 ---
 
@@ -395,11 +390,11 @@ prepare() → 找第一个未完成 role → 返回 1 个 manifest + has_more: t
 
 | 门禁 | Phase | 最大 repair | 特殊处理 |
 |------|-------|------------|---------|
-| Wave 证据门禁 | P10/P18/P22 | 1 次 | T1/T2 blocking claims 直接降级 WARN |
-| Claim 覆盖 | P24 | 2 次 | 超过后降级 PASS_WITH_DISCLOSURE |
-| 统稿脚注 | P28 | 1 次 | 动态阈值：每 2000 字 ≥ 3 个脚注 |
-| 对抗评审 | P29 | — | 仅 BLOCKING 硬阻断（空维度 / 100% 无 facts / 无 section） |
-| 交付门禁 | P33 | — | 可读性 / 对抗 FAIL → WARN |
+| Wave 证据门禁 | P10/P15/P19 | 1 次 | T1/T2 blocking claims 直接降级 WARN |
+| Claim 覆盖 | P21 | 2 次 | 超过后降级 PASS_WITH_DISCLOSURE |
+| 统稿脚注 | P25 | 1 次 | 动态阈值：每 2000 字 ≥ 3 个脚注 |
+| 对抗评审 | P26 | — | 仅 BLOCKING 硬阻断（空维度 / 100% 无 facts / 无 section） |
+| 交付门禁 | P30 | — | 可读性 / 对抗 FAIL → WARN |
 
 **文件锁保护**：repair 子代理写共享文件时用 `bp_file_lock.locked_read_modify_write()`（flock 独占锁），防止并行写丢数据。
 
@@ -451,7 +446,7 @@ ir-bp-workflow/
 │   ├── profiles/                         # 管线 Profile
 │   │   ├── base.py                       # 抽象基类
 │   │   ├── ir_profile.py                 # IR 管线（9 步 + 统稿 + Stage Tier）
-│   │   ├── bp_profile.py                 # BP 管线（39 Phase + 4 波 + 统稿）
+│   │   ├── bp_profile.py                 # BP 管线（36 Phase + 4 波 + 统稿）
 │   │   ├── bp_constants.py               # BP 共享常量
 │   │   ├── ic_profile.py                 # IC 管线（19 Phase + 5 原型）
 │   │   ├── ic_topic_profile.py           # IC 课题 Profile

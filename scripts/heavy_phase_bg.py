@@ -45,7 +45,7 @@ HEAVY_PHASES = {
     "phase01_document_intake",
     "phase02_company_verify",
     "phase04_presearch",
-    "phase33_delivery",
+    "phase30_delivery",
     # IR phases
     "phase14_delivery",
     "phase05_extract",
@@ -65,7 +65,7 @@ NO_TIMEOUT_PHASES = {
 PHASE_TIMEOUTS = {
     # BP phases
     "phase02_company_verify": 600,
-    "phase33_delivery": 600,
+    "phase30_delivery": 600,
     # IR phases
     "phase14_delivery": 600,
     "phase05_extract": 900,
@@ -167,7 +167,7 @@ def launch_heavy_phase(
         "phase01_document_intake": 20,
         "phase04_presearch": 15,
         "phase02_company_verify": 5,
-        "phase33_delivery": 5,
+        "phase30_delivery": 5,
     }
     est = _EST_MINUTES.get(phase, 10)
     if phase in NO_TIMEOUT_PHASES:

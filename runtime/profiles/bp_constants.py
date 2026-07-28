@@ -75,12 +75,6 @@ BP_WAVE1_ROLE_SLUGS: dict[str, str] = {
     "bp_market_supply_chain": "market_supply_chain",
 }
 
-# Wave 2: 客户收入验证 —— 已移除（2026-07-28）
-# 根因：T1 跳过、T2/T3 价值有限（客户/收入信息已在 product_commercial 维度覆盖），
-# 跑 customer_revenue 只会产出空 stub + 触发 evidence gate 降级，浪费子代理调用。
-# 保留空 dict 以保证向后兼容（旧 job 数据可能仍引用）。
-BP_WAVE2_ROLE_SLUGS: dict[str, str] = {}
-
 # Wave 3: 竞争定位 + 估值回报 —— 读 Wave1 输出
 BP_WAVE3_ROLE_SLUGS: dict[str, str] = {
     "bp_competition_positioning": "competition_positioning",
@@ -108,7 +102,6 @@ BP_LEGACY_ROLE_SLUGS: dict[str, str] = {
 BP_ALL_ROLE_SLUGS: dict[str, str] = {
     **BP_WAVE0_ROLE_SLUGS,
     **BP_WAVE1_ROLE_SLUGS,
-    **BP_WAVE2_ROLE_SLUGS,
     **BP_WAVE3_ROLE_SLUGS,
     **BP_WAVE4_ROLE_SLUGS,
 }
@@ -117,7 +110,6 @@ BP_ALL_ROLE_SLUGS: dict[str, str] = {
 BP_WAVE_ROLES: dict[int, list[str]] = {
     0: list(BP_WAVE0_ROLE_SLUGS.keys()),
     1: list(BP_WAVE1_ROLE_SLUGS.keys()),
-    2: list(BP_WAVE2_ROLE_SLUGS.keys()),
     3: list(BP_WAVE3_ROLE_SLUGS.keys()),
     4: list(BP_WAVE4_ROLE_SLUGS.keys()),
 }
