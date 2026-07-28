@@ -246,7 +246,7 @@ search_deep / 腾讯新闻（web 兜底）
 ### ⚠️ 铁律
 - **facts JSON 的 source_url 和 MD 正文的 [^N] 脚注必须对应**
 - **禁止只在 facts JSON 里写 URL 而不在 MD 正文写脚注**——统稿子代理依赖你 MD 中的脚注标记
-- **禁止只写内部文件名**：❌ `[^N]: step1_data.md`
+- **禁止只写内部文件名**：❌ `[^N]: step2_industry.md`
 - **每条脚注必须有真实来源标注 + 日期**，不能编造 URL
 
 ### 输出结构要求

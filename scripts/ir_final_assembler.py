@@ -87,11 +87,44 @@ def write_final_report(task_id: str, tasks_dir: Path = TASKS_DIR) -> str:
     section_index = _read_json(tasks_dir / f"{task_id}-section_packages.json", {"task_id": task_id, "packages": []})
     debate_review = _read_json(tasks_dir / f"{task_id}-debate_review.json", {"verdict": "REWRITE_REQUIRED", "issues": [{"code": "MISSING_DEBATE_REVIEW"}]})
 
-    result = assemble_final_report(research_plan, section_index, debate_review)
     md_path = tasks_dir / f"{task_id}-final_report.md"
+
+    # ── v3.0: 优先采用统稿子代理的单一产出（step8_master.md / synthesis.md）──
+    # 统稿子代理已把 9 个 step 组织成连贯叙事（Key Debates 骨架），质量远高于 section 机械拼接。
+    # step8_master.md 由 phase13 synthesis_collect 从 synthesis.md 同步而来。
+    # 仅当统稿缺失/过短时才降级回 section 拼接（保底，不留断裂）。
+    entity = research_plan.get("entity", "目标公司")
+    candidate_master = tasks_dir / f"{task_id}-step8_master.md"
+    candidate_synthesis = tasks_dir / f"{task_id}-synthesis.md"
+    master_src = None
+    for cand in (candidate_master, candidate_synthesis):
+        if cand.exists() and cand.stat().st_size > 2000:
+            master_src = cand
+            break
+
+    if master_src is not None and debate_review.get("verdict") in ("PASS", "WARN"):
+        try:
+            md_path.write_text(master_src.read_text(encoding="utf-8"), encoding="utf-8")
+            result = {
+                "ok": True,
+                "block_reason": "",
+                "markdown_path": str(md_path),
+                "source": "synthesis_master",
+                "master_source": master_src.name,
+                "sections_assembled": ["step8_master (synthesis)"],
+                "issues": [],
+            }
+            output = tasks_dir / f"{task_id}-final_assembly.json"
+            output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            return str(output)
+        except Exception:
+            pass  # 降级到 section 拼接
+
+    result = assemble_final_report(research_plan, section_index, debate_review)
     if result.get("ok"):
         md_path.write_text(result["markdown"], encoding="utf-8")
         result["markdown_path"] = str(md_path)
+        result["source"] = "section_concat_fallback"
     else:
         result["markdown_path"] = ""
 

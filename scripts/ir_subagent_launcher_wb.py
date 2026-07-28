@@ -119,8 +119,9 @@ def _load_industry_overlay(industry: str) -> str:
 STEP_QUALITY_THRESHOLD = 3
 
 # Step 角色名
+# v3.0 (2026-07-28): 删除 step1_data，数据收集合并到 phase04 research plan
+# 下游 step 不再依赖 step1_data，改为读取 research plan 阶段产出的 enriched_data_pack.json
 STEP_ROLE = {
-    'step1_data': '投研_主笔_数据收集',
     'step2_industry': '投研_主笔_行业分析',
     'step3_biz': '投研_主笔_商业模式',
     'step4_finance': '投研_主笔_财务分析',
@@ -141,22 +142,23 @@ STEP_ROLE = {
 IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp', 'ima-mcp']
 
 # 步间依赖关系
+# v3.0 (2026-07-28): 删除 step1_data，下游 step 不再依赖它
+# 数据收集在 phase04 research plan 完成，产出 enriched_data_pack.json 供所有 step 引用
 STEP_DEPS = {
-    'step1_data': [],
-    'step2_industry': ['step1_data'],
-    'step3_biz': ['step1_data'],
-    'step4_finance': ['step1_data'],
-    'step5_mgmt': ['step1_data'],
+    'step2_industry': [],
+    'step3_biz': [],
+    'step4_finance': [],
+    'step5_mgmt': [],
     'step_macro': [],
-    'step6_insight': ['step1_data', 'step2_industry', 'step3_biz', 'step6b_valuation', 'step_macro'],
-    'step6b_valuation': ['step1_data', 'step2_industry', 'step4_finance', 'step_macro'],
-    'step7_risk': ['step1_data', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step6b_valuation', 'step_macro'],
-    'step8_master': ['step1_data', 'step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro', 'step6_insight', 'step6b_valuation', 'step7_risk'],
+    'step6_insight': ['step2_industry', 'step3_biz', 'step6b_valuation', 'step_macro'],
+    'step6b_valuation': ['step2_industry', 'step4_finance', 'step_macro'],
+    'step7_risk': ['step3_biz', 'step4_finance', 'step5_mgmt', 'step6b_valuation', 'step_macro'],
+    'step8_master': ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro', 'step6_insight', 'step6b_valuation', 'step7_risk'],
 }
 
 # 并行发射波次
+# v3.0: Wave0 删除（原 step1_data），直接从 5 维度并行开始
 LAUNCH_WAVES = [
-    ['step1_data'],
     ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro'],
     ['step6b_valuation'],
     ['step6_insight', 'step7_risk'],
@@ -165,7 +167,6 @@ LAUNCH_WAVES = [
 
 # 超时
 STEP_TIMEOUTS = {
-    'step1_data': 900,
     'step2_industry': 900,
     'step3_biz': 900,
     'step4_finance': 900,
@@ -178,8 +179,8 @@ STEP_TIMEOUTS = {
 }
 
 # Step 查询关键词（用于自动补搜）
+# v3.0: 删除 step1_data 条目
 _STEP_KEYWORDS = {
-    'step1_data': 'stock price market cap PE ratio EPS dividend analyst rating 市值 股价 市盈率',
     'step2_industry': 'industry market size market share growth rate TAM penetration competitive landscape 行业规模 竞争格局',
     'step3_biz': 'business model product revenue customer supply chain 商业模式 产品线 客户 收入结构',
     'step4_finance': 'financial report revenue profit margin cash flow ROE debt 财报 营收 毛利率 净利润 现金流',
@@ -192,11 +193,6 @@ _STEP_KEYWORDS = {
 }
 
 _STEP_QUERY_TEMPLATES = {
-    'step1_data': [
-        '"{entity}" stock price market cap PE EPS analyst rating',
-        '"{entity}" investor relations results announcement',
-        'site:hkexnews.hk "{entity}" results announcement',
-    ],
     'step2_industry': [
         '"{entity}" industry market size competitive landscape',
         '"{entity}" market share industry report',
@@ -589,7 +585,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
 
     # Industry KPI checklist — 对 step1~step4 注入行业特定 KPI 指引
     kpi_checklist_path = REFS_DIR / 'industry-kpi-checklist.md'
-    if step in ('step1_data', 'step2_industry', 'step3_biz', 'step4_finance') and kpi_checklist_path.exists():
+    if step in ('step2_industry', 'step3_biz', 'step4_finance') and kpi_checklist_path.exists():
         brief_lines.append(f'')
         brief_lines.append(f'## Industry-Specific KPI Checklist')
         brief_lines.append(f'')
@@ -656,19 +652,6 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
 
     # 角色专属 ANTI-DEFECT RULES
     step_rules = {
-        'step1_data': (
-            'ANTI-DEFECT RULES:\n'
-            '1. FINANCING/LISTING STATUS: Before citing any company (target or competitor), verify their '
-            'current listing/financing status. If yfinance returns no data for a previously known ticker, '
-            'search whether the company has been delisted, privatized, or acquired.\n'
-            '2. PERSON VERIFICATION: Every person name cited must be verified via at least 1 independent '
-            'source. NEVER fabricate person names or positions from model training data.\n'
-            '3. YFINANCE ACCURACY: For key financial data (revenue, market cap, PE), cross-verify yfinance '
-            'data with at least 1 search_deep or news source (东财/雪球/公司IR页). If discrepancy >10%, investigate.\n'
-            '4. COMPETITOR FINANCING VERIFICATION: For every competitor in comparison tables, search-verify '
-            'their current financing/IPO status. NEVER use stale training data (e.g. "private, B轮" when '
-            'company has IPO\'d). If listed, use yfinance for real-time market cap and cite ticker.\n'
-        ),
         'step2_industry': (
             'ANTI-DEFECT RULES:\n'
             '1. COMPETITOR STATUS VERIFICATION: For every competitor listed, search-verify their current '
@@ -1424,7 +1407,8 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
 
     # 构建主 AI 的精确执行指令
     # step8_master 的前序 step 列表（需要读取它们的完整输出）
-    _STEP8_PRIOR_STEPS = ['step1_data', 'step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro', 'step6_insight', 'step6b_valuation', 'step7_risk']
+    # v3.0: 删除 step1_data，数据通过 enriched_data_pack.json 提供
+    _STEP8_PRIOR_STEPS = ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro', 'step6_insight', 'step6b_valuation', 'step7_risk']
 
     task_instructions = []
     for r in dispatched:
@@ -1441,6 +1425,18 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'{output_path}\n'
             f'禁止写入任何其他路径（如 search-stepX.md、bref-stepX.md 等）。\n'
             f'唯一完成条件：上述文件成功写入且内容完整。\n\n'
+        )
+
+        # ── 统一注入：数据包路径（v3.0 替代 step1_data）──
+        # v3.0 (2026-07-28): step1_data 已删除，数据在 phase04 research plan 阶段产出
+        # 所有 step 读取 enriched_data_pack.json 获取行情/财务/研报/行业数据
+        data_pack_path = TASKS_DIR / f'{task_id}-enriched_data_pack.json'
+        prompt_body += (
+            f'【数据包 - 核心输入】\n'
+            f'phase04 research plan 已完成数据收集，结构化数据包在：\n'
+            f'{data_pack_path}\n'
+            f'你必须用 Read 工具读取此文件，获取行情/财务/研报摘要/行业数据/工商信息。\n'
+            f'此文件替代了原 step1_data，是你分析的基础数据输入。\n\n'
         )
 
         # ── 统一注入：所有有依赖的 step 都列出前序文件路径 ──
@@ -1636,7 +1632,8 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
         _OFFICIAL = ['sec.gov','hkexnews.hk','cninfo.com.cn','szse.cn','sse.com.cn','ir.','investor.']
         _REPUTABLE = ['reuters.com','bloomberg.com','wsj.com','ft.com','economist.com','scmp.com','caixin.com','36kr.com','cls.cn','eastmoney.com','xueqiu.com']
         _REDFLAGS = ['待补','待填','TODO','无法验证','无法获取','需要进一步']
-        _STEP_ORDER = ['step1_data','step2_industry','step3_biz','step4_finance','step5_mgmt','step_macro','step6_insight','step6b_valuation','step7_risk','step8_master']
+        # v3.0: 删除 step1_data，数据在 phase04 完成
+        _STEP_ORDER = ['step2_industry','step3_biz','step4_finance','step5_mgmt','step_macro','step6_insight','step6b_valuation','step7_risk','step8_master']
         scores, issues = {}, []
         for step in _STEP_ORDER:
             f = TASKS_DIR / f'{task_id}-{step}.md'

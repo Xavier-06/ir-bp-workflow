@@ -101,9 +101,9 @@ IR_RESEARCH_TIERS: dict[str, dict[str, Any]] = {
         "label": "快速扫描（最小化验证）",
         "skip": {
             "phase09_wave1_evidence_gate", "phase09_wave2_evidence_gate",
-            "phase09_wave3_evidence_gate", "phase09_wave4_evidence_gate",
+            "phase09_wave3_evidence_gate",
             "phase10_wave1_shared_refresh", "phase10_wave2_shared_refresh",
-            "phase10_wave3_shared_refresh", "phase10_wave4_shared_refresh",
+            "phase10_wave3_shared_refresh",
             "phase12_debate_review",
             "phase14_claim_coverage",
             "phase14_cross_dimension_gate",
@@ -247,26 +247,61 @@ Agent tool 参数：
 - entity(标的名称), ticker(股票代码), market(市场), english_name(英文名)
 - 你是唯一的数据搜索者，所有数据源都需要你自己查
 
-## 搜索策略（必须严格按顺序）
+## Step 0.5: 大行研报为骨架（最高优先级 — v3.0 新增）
 
-### Step 1: 行情与财务 (westock-mcp)
+**核心原则：不重复造轮子。大行分析师已经做了 90% 的分析工作（行业框架、估值模型、财务预测），你只需在他们基础上补充增量。**
+
+**必须执行**：在 IMA 自建研报库搜索 {entity} 的大行研报（GS/MS/JPM/Citi/HSBC/UBS/BofA/Bernstein/Nomura/DB），找到最新的 1-2 篇全文研报并 fetch。
+
+```
+mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="Goldman Sachs Morgan Stanley JPMorgan {entity} {ticker}")
+```
+
+从候选列表中筛选外资大行（标题含 Goldman/Morgan Stanley/JPMorgan/Citi/HSBC/UBS/BofA/Bernstein）+ 发布日期最近 + can_fetch_content=true 的条目，用 `mcp__ima-mcp__fetch_media_content(media_id="...")` 拿全文。
+
+**如果找到大行研报全文**（≥6000 字符），解析出骨架结构写入 `benchmark_skeleton.json`：
+
+```json
+{{
+  "bank": "Goldman Sachs",
+  "report_date": "2026-06-17",
+  "rating": "Buy",
+  "target_price": "HK$860",
+  "key_debates": [
+    {{"id": "KD-1", "title": "M3 定价策略", "summary": "通过低定价+高采用率走另一条 ARR 路径", "data_points": ["token 定价 $0.22/1M", "OpenRouter #1 排名"]}},
+    {{"id": "KD-2", "title": "...", "summary": "...", "data_points": ["..."]}}
+  ],
+  "financial_forecast": {{"revenue": {{"2026E": 300, "2027E": 880, "2028E": 2470}}, "gpm": {{"2026E": "26%", "2027E": "24%"}}, "adj_net_loss": {{"2026E": -425}}}},
+  "valuation_method": {{"approach": "DCF", "wacc": "12%", "terminal_growth": "2%", "key_assumptions": ["市占率 0.2-0.7pct/年→2030E 2.5%", "长期 EBIT margin 18%"]}},
+  "scenarios": {{"bear": 330, "base": 860, "bull": 1350}},
+  "revenue_split": {{"C端": {{"2026E": 149, "2027E": 558}}, "B端": {{"2026E": 151, "2027E": 322}}}},
+  "key_risks": ["模型性能不及预期", "盈利可见度慢", "地缘政治"]
+}}
+```
+
+**将 benchmark_skeleton.json 写入** `{tasks_dir / f'{job_ctx.job_id}-benchmark_skeleton.json'}`。
+
+**如果找不到大行研报**（未覆盖标的或 IMA 无全文），跳过此步，在 search_summary 中标注 `"benchmark_found": false`，后续回退到从零搜索模式。
+
+## Step 1: 行情与财务 (westock-mcp) — 增量数据收集
 - westock-mcp.data_quote: query by entity名称或ticker -> PE/PB/市值/股价
 - `data_finance` 查 {entity} → 营收/净利润/ROE/毛利率趋势（最近3年）
 - `data_report` 搜 {entity} 研报 → 机构评级/目标价/核心观点（最多5条）
 
-### Step 2: 行业数据 (westock-mcp)
+## Step 2: 行业数据 (westock-mcp)
 - `data_sector` 查所属行业 → PE分位/成分股/涨跌幅
 
-### Step 2.5: 公司工商验证 (tyc-mcp)
+## Step 2.5: 公司工商验证 (tyc-mcp)
 - `tyc-mcp.search_companies`: query "{entity}" → 获取 company_id
 - `tyc-mcp.get_company_basic_profile`: 注册资本、成立日期、经营范围、股东结构、融资历史、法律风险
 - 如果 tyc 找不到（小市值/非上市公司）：记录在 search_summary 中，继续后续步骤
 
-### Step 3: 资金面（大盘股可查，小盘股跳过）
+## Step 3: 资金面（大盘股可查，小盘股跳过）
 - `data_fund_flow` 查 {entity} → 主力资金净流入
 
-### Step 4: Web 补搜（中英双语，结构化源优先）
-优先用 westock-mcp / NeoData / 天眼查 等结构化源补搜验证（search_deep 仅作兜底，最多 8 轮）:
+## Step 4: 增量 Web 补搜（中英双语，结构化源优先）
+**有骨架时**：只搜大行研报未覆盖的增量信息（最新模型/产品/新闻/行业动态），不重复搜研报已有的基础数据。
+**无骨架时**：完整搜索（竞争格局/风险/商业模式/管理层/催化剂）。
 - `"{{entity}}" 竞争格局 市场份额 2025 2026`
 - `"{{entity}}" 风险 挑战 负面 2025`  
 - `"{{entity}}" 商业模式 护城河`
@@ -276,7 +311,7 @@ Agent tool 参数：
 - `"{{entity}}" risk bear case downside {{year}}`
 - `"{{entity}}" business model moat competitive advantage`
 
-### Step 5: 中文实时新闻（tencent_news_search，Bash 调用，自动降级NeoData doc）
+## Step 5: 中文实时新闻（tencent_news_search，Bash 调用，自动降级NeoData doc）
 你是唯一的搜索者（没有上游 presearch），必须用 Bash 调 tencent_news_search 补充实时动态（自动降级NeoData doc）：
 ```bash
 cd ~/.workbuddy/ir_runtime && python3 -c "
@@ -290,7 +325,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 **如果 {entity} 是上市公司**，额外用 westock-mcp `data_news` 拿个股级公告/新闻/研报动态（比通用新闻更聚焦该公司）：
 `mcp__westock-mcp__data_news(symbol="sh600519", type=3, limit=10)`（type: 0公告 1研报 2新闻 3全部；symbol 不确定时先用 `data_search` 检索代码）
 
-### Step 6: IMA 知识库预扫描（自建研报库为主力源 — 增量信息层）
+## Step 6: IMA 知识库增量扫描（自建研报库为主力源 — 增量信息层）
 
 用 ima-mcp 的 search_knowledge 搜索知识库，提取机构级增量信息。**自建研报库是主力源（投行/券商研报全文可 fetch），所有搜索第一优先。**
 **必须搜 2-3 个最相关的 KB，每个 KB 用不同关键词搜 1-2 次。**
@@ -323,29 +358,66 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 
 - 你是唯一的搜索者，请系统性地完成以上所有搜索
 
+## Step 7: 输出 enriched_data_pack.json（v3.0 新增 — 替代 step1_data）
+
+**将 Step 0.5~6 收集的所有结构化数据汇总为一个 JSON 文件**，写入 `{tasks_dir / f'{job_ctx.job_id}-enriched_data_pack.json'}`：
+
+```json
+{{
+  "entity": "{entity}", "market": "{market}", "ticker": "{ticker}",
+  "generated_at": "ISO时间",
+  "benchmark_skeleton_ref": "benchmark_skeleton.json 路径（如有）",
+  "quote": {{"price": 0, "market_cap": "", "pe": "", "pb": "", "eps": ""}},
+  "financials": {{"revenue": {{}}, "net_income": {{}}, "gpm": {{}}, "npm": {{}}}},
+  "analyst_consensus": {{"rating_distribution": {{}}, "avg_target_price": "", "coverage_count": 0}},
+  "industry": {{"sector_name": "", "sector_pe_percentile": "", "peers": []}},
+  "company_profile": {{"registered_capital": "", "founded": "", "business_scope": "", "shareholders": []}},
+  "fund_flow": {{"main_net_inflow": "", "north_holding": ""}},
+  "news_highlights": ["最新动态1", "最新动态2"],
+  "ima_insights": [
+    {{"bank": "GS", "title": "...", "key_points": ["..."], "report_date": "..."}}
+  ],
+  "incremental_data": {{
+    "latest_model": "最新模型/产品更新",
+    "latest_financials": "最新财报数据（如有）",
+    "industry_news": "行业重要新闻"
+  }}
+}}
+```
+
+此文件是所有下游 step（step2-8）的核心数据输入，替代了原来的 step1_data 独立子代理。
+
 ## 分析任务
 
 1. **Core Questions (7条)**: 围绕基本面、行业、商业模式、管理层、估值、风险
 2. **Strategic Questions (5条)**: 基于结构化数据发现的异常/矛盾设计尖锐问题
-3. **Fact Requirements (30+条)**: 验证每条 claim 所需的 fact 项
-4. **Section Requirements (10个)**: 分配到 IR 10步骤
+3. **Key Debates (3-5条)**: 核心投资辩论（对标 GS Key Debates 风格），每条含 title + summary + data_points
+4. **Fact Requirements (30+条)**: 验证每条 claim 所需的 fact 项
+5. **Section Requirements (9个)**: 分配到 IR 9步骤
 
-## Step 分配规则
-step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, step6b_valuation, step6_insight, step7_risk, step8_master
+## Step 分配规则（v3.0: 删除 step1_data，9 步）
+step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, step6b_valuation, step6_insight, step7_risk, step8_master
 
 ## 输出
 写入 `{tasks_dir / f'{job_ctx.job_id}-ir_research_plan.json'}`:
 
 ```json
 {{
-  "schema_version": "ir_research_plan.v3",
+  "schema_version": "ir_research_plan.v4",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}", "market": "{market}",
   "query": "{query}", "ticker": "{ticker}", "english_name": "{english_name}",
   "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "ima-mcp:机构研报/纪要", "search_deep:公开信息", "tencent_news:实时动态"],
+  "benchmark_found": true,
+  "benchmark_skeleton_ref": "{tasks_dir / f'{job_ctx.job_id}-benchmark_skeleton.json'}",
   "core_questions": [...], "strategic_questions": [...],
+  "key_debates": [
+    {{"id": "KD-1", "title": "核心辩论1", "summary": "论点", "data_points": ["数据点1", "数据点2"]}},
+    {{"id": "KD-2", "title": "核心辩论2", "summary": "...", "data_points": ["..."]}},
+    {{"id": "KD-3", "title": "核心辩论3", "summary": "...", "data_points": ["..."]}}
+  ],
   "fact_requirements": [...], "section_requirements": {{}},
   "coverage_matrix": {{}}, "plan_status": "ready",
-  "search_summary": {{"westock_quote_found": true, "analyst_views": 0, "web_evidence_count": 0}},
+  "search_summary": {{"westock_quote_found": true, "benchmark_found": true, "analyst_views": 0, "web_evidence_count": 0}},
   "ima_insights": [
     {{"kb_name": "KB名称", "doc_title": "文档标题", "key_points": ["要点1", "要点2"], "relevance": "high/medium"}},
   ]
@@ -1440,7 +1512,7 @@ def _run_debate_review_phase(runtime_root: Path, job_ctx: JobContext) -> dict[st
 # ═══════════════════════════════════════════════════════════
 
 _SYNTHESIS_STEPS = [
-    "step1_data", "step2_industry", "step3_biz", "step4_finance",
+    "step2_industry", "step3_biz", "step4_finance",
     "step5_mgmt", "step_macro", "step6b_valuation", "step6_insight", "step7_risk",
 ]
 
@@ -1691,6 +1763,24 @@ def _run_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str,
 
         else:
             quality["gate_verdict"] = "PASS"
+
+        # ── v3.0: 单一统稿源同步 ──
+        # synthesis.md 是 phase13 统稿子代理的唯一产出，DOCX 生成器(build_ir_broker_report_docx.py)
+        # 读的是 {tid}-step8_master.md。这里把 synthesis.md 同步为 step8_master.md，
+        # 消除"两份统稿、DOCX 读不到"的断裂，实现单一统稿源。
+        step8_path = tasks_dir / f"{job_ctx.job_id}-step8_master.md"
+        try:
+            shutil.copy2(synthesis_path, step8_path)
+            quality["step8_synced"] = True
+        except Exception as e:
+            quality["step8_sync_error"] = str(e)
+        # 同步到 jobs/outputs/（DOCX 生成器的 fallback 路径）
+        ws = _workspace_for(job_ctx)
+        if ws is not None:
+            try:
+                shutil.copy2(synthesis_path, ws.outputs_dir / "step8_master.md")
+            except Exception:
+                pass
 
         return {
             "ok": True,
@@ -2217,11 +2307,11 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 # Per-step DOCX 独立导出（P2）
 # ═══════════════════════════════════════════════
 _STEP_DOCX_STEPS = (
-    "step1_data", "step2_industry", "step3_biz", "step4_finance",
+    "step2_industry", "step3_biz", "step4_finance",
     "step5_mgmt", "step_macro", "step6_insight", "step6b_valuation", "step7_risk",
 )
 _STEP_DOCX_LABELS = {
-    "step1_data": "数据收集", "step2_industry": "行业分析", "step3_biz": "商业模式",
+    "step2_industry": "行业分析", "step3_biz": "商业模式",
     "step4_finance": "财务分析", "step5_mgmt": "管理层与治理", "step_macro": "宏观分析",
     "step6_insight": "差异化洞察", "step6b_valuation": "预测与估值", "step7_risk": "风险与催化",
 }
@@ -2270,18 +2360,16 @@ def _IR_FULL_PHASE_HANDLERS(runtime_root: Path) -> dict[str, Any]:
         "phase08_dispatch_prepare": lambda job_ctx: _run_dispatch_prepare(runtime_root, job_ctx, sequential=True),
         "phase09_dispatch_collect": lambda job_ctx: _run_dispatch_collect(runtime_root, job_ctx),
         "phase09_wave_evidence_gate": lambda job_ctx: _run_wave_evidence_gate(runtime_root, job_ctx),
-        # ── Batch3: per-wave evidence gate (独立 gate per wave) ──
+        # ── Batch3: per-wave evidence gate (独立 gate per wave, v3.0: 3 波) ──
         "phase09_wave1_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=0),
         "phase09_wave2_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=1),
         "phase09_wave3_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=2),
-        "phase09_wave4_evidence_gate": lambda job_ctx: _run_single_wave_evidence_gate(runtime_root, job_ctx, wave_idx=3),
         "phase10_fact_store_merge": lambda job_ctx: _run_fact_store_merge(runtime_root, job_ctx),
         "phase10_shared_state_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx),
-        # ── Batch3: per-wave shared_state_refresh ──
+        # ── Batch3: per-wave shared_state_refresh (v3.0: 3 波) ──
         "phase10_wave1_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=0),
         "phase10_wave2_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=1),
         "phase10_wave3_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=2),
-        "phase10_wave4_shared_refresh": lambda job_ctx: _run_shared_state_refresh(runtime_root, job_ctx, after_wave=3),
         "phase11_section_package_validation": lambda job_ctx: _run_section_package_validation(runtime_root, job_ctx),
         "phase12_debate_review": lambda job_ctx: _run_debate_review_phase(runtime_root, job_ctx),
         "phase13_synthesis_prepare": lambda job_ctx: _run_synthesis_prepare(runtime_root, job_ctx),
@@ -2357,16 +2445,14 @@ class IRProfile(PipelineProfile):
             "phase08_dispatch_prepare": [],
             "phase09_dispatch_collect": [],
             "phase09_wave_evidence_gate": [],
-            "phase09_wave1_evidence_gate": ["{task_id}-step1_data-facts.json", "{task_id}-step1_data-section.json"],
-            "phase09_wave2_evidence_gate": ["{task_id}-step2_industry-facts.json", "{task_id}-step3_biz-facts.json", "{task_id}-step4_finance-facts.json", "{task_id}-step5_mgmt-facts.json"],
-            "phase09_wave3_evidence_gate": ["{task_id}-step6b_valuation-facts.json"],
-            "phase09_wave4_evidence_gate": ["{task_id}-step6_insight-facts.json", "{task_id}-step7_risk-facts.json"],
+            "phase09_wave1_evidence_gate": ["{task_id}-step2_industry-facts.json", "{task_id}-step3_biz-facts.json", "{task_id}-step4_finance-facts.json", "{task_id}-step5_mgmt-facts.json", "{task_id}-step_macro-facts.json"],
+            "phase09_wave2_evidence_gate": ["{task_id}-step6b_valuation-facts.json"],
+            "phase09_wave3_evidence_gate": ["{task_id}-step6_insight-facts.json", "{task_id}-step7_risk-facts.json"],
             "phase10_fact_store_merge": ["{task_id}-fact_store.json", "{task_id}-fact_store_index.json"],
             "phase10_shared_state_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
             "phase10_wave1_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
             "phase10_wave2_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
             "phase10_wave3_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
-            "phase10_wave4_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
             "phase11_section_package_validation": ["{task_id}-section_packages.json", "{task_id}-section_gate.json"],
             "phase12_debate_review": ["{task_id}-debate_review.json"],
             "phase13_synthesis_prepare": ["{task_id}-synthesis_manifest.json"],

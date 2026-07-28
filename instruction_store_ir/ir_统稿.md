@@ -8,7 +8,6 @@
 
 | Step | 文件 | 内容 |
 |------|------|------|
-| step1_data | `{JOB_ID}-step1_data.md` | 行情与基础数据 |
 | step2_industry | `{JOB_ID}-step2_industry.md` | 行业与市场格局 |
 | step3_biz | `{JOB_ID}-step3_biz.md` | 业务模式与护城河 |
 | step4_finance | `{JOB_ID}-step4_finance.md` | 财务分析 |
@@ -29,7 +28,7 @@
 （1-2 页，核心投资逻辑 + 评级/目标价 + 关键假设）
 
 ## 一、公司基本面与业绩趋势
-（来自 step1_data，聚焦收入/利润/现金流/分部表现）
+（来自 enriched_data_pack.json + step4_finance，聚焦收入/利润/现金流/分部表现）
 
 ## 二、行业空间与竞争格局
 （来自 step2_industry，TAM/SAM/SOM + 竞争地位 + 行业 KPI）

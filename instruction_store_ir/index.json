@@ -65,7 +65,6 @@
   ],
   "pipeline_bindings": {
     "ir": {
-      "step1_data": "投研_主笔_数据收集",
       "step2_industry": "投研_主笔_行业分析",
       "step3_biz": "投研_主笔_商业模式",
       "step4_finance": "投研_主笔_财务分析",

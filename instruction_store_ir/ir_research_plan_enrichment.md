@@ -58,8 +58,8 @@
 - **不要问百科式问题**（如"公司主营业务是什么"）
 - 聚焦**最可能改变投资结论的变量**（如"海外收入增长是铺货驱动还是品牌复购驱动"）
 - 优先从 structured 数据中的异常设计问题（如 PE 显著偏离行业均值）
-- 每条问题必须指定 owner_section（必须是以下 10 个 step 之一）:
-  - step1_data, step2_industry, step3_biz, step4_finance, step5_mgmt
+- 每条问题必须指定 owner_section（必须是以下 9 个 step 之一）:
+  - step2_industry, step3_biz, step4_finance, step5_mgmt
   - step_macro, step6b_valuation, step6_insight, step7_risk, step8_master
 - 每条问题必须指定 required_fact_keys（必须是骨架计划 fact_requirements 中已有的 fact_key）
 - 问题 ID 格式: ESQ1-ESQ5
