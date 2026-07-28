@@ -1,0 +1,11 @@
+{
+  "schema_version": "bp_fact_store_index.v1",
+  "task_id": "TASK-20260727-002",
+  "entity": "湖南星澜新能源科技有限公司",
+  "market": "cn",
+  "total_facts": 0,
+  "fact_ids": [],
+  "facts_by_type": {},
+  "facts_by_source_tier": {},
+  "generated_at": "2026-07-27T14:32:28"
+}

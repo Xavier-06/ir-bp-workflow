@@ -74,12 +74,30 @@ def validate_section_package(package: dict[str, Any]) -> dict[str, Any]:
     if not package:
         return {"passed": False, "issues": [{"severity": "FAIL", "code": "MISSING_PACKAGE", "message": "No section package found"}]}
 
+    # 归一化 schema_version（对齐 BP validator 的 alias 容忍，2026-07-27）：
+    # 子代理可能写出各种变体或漏写 schema_version，统一归一化到 SCHEMA_VERSION，
+    # 只对真正未知的版本报 UNSUPPORTED_SCHEMA_VERSION。
+    schema_aliases = {
+        "ir_section.v1": SCHEMA_VERSION,
+        "ir_section_sidecar.v1": SCHEMA_VERSION,
+        "ir_step_section.v1": SCHEMA_VERSION,
+        "ir_section_package.v2": SCHEMA_VERSION,
+        "section_package.v1": SCHEMA_VERSION,
+    }
+    schema_version = package.get("schema_version")
+    if schema_version in schema_aliases:
+        package["schema_version"] = schema_aliases[schema_version]
+        schema_version = schema_aliases[schema_version]
+    elif not schema_version:
+        package["schema_version"] = SCHEMA_VERSION
+        schema_version = SCHEMA_VERSION
+
     for field in REQUIRED_FIELDS:
         if field not in package:
             code = "MISSING_SCHEMA_VERSION" if field == "schema_version" else "MISSING_FIELD"
             issues.append({"severity": "FAIL", "code": code, "message": f"Missing field: {field}"})
-    if package.get("schema_version") and package.get("schema_version") != SCHEMA_VERSION:
-        issues.append({"severity": "FAIL", "code": "UNSUPPORTED_SCHEMA_VERSION", "message": f"Unsupported schema_version: {package.get('schema_version')}"})
+    if schema_version and schema_version != SCHEMA_VERSION:
+        issues.append({"severity": "FAIL", "code": "UNSUPPORTED_SCHEMA_VERSION", "message": f"Unsupported schema_version: {schema_version}"})
 
     claims = package.get("claims", [])
     if not isinstance(claims, list) or not claims:
