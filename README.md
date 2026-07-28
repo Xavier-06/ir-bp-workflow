@@ -7,9 +7,9 @@
 
 | 管线 | 触发方式 | 规模 | 产出 |
 |------|---------|------|------|
-| **IR** | "分析比亚迪" | 9 步 + 统稿 · 4 波 · 32 phase（deep） | 券商级研报 DOCX |
-| **BP** | "帮我看下这个 BP" + 上传文件 | 11 角色 + 统稿 · 4 波 · 36 phase | 尽调报告 DOCX |
-| **IC** | "做个半导体行业研究" | 5 种原型 · 最多 16 角色 · 19 phase | 行业研究报告 DOCX |
+| **IR** | "分析比亚迪" | 9 步 + 统稿 · 4 波 · 28 phase（deep） | 券商级研报 DOCX |
+| **BP** | "帮我看下这个 BP" + 上传文件 | 11 角色 + 统稿 · 4 波 · 35 phase | 尽调报告 DOCX |
+| **IC** | "做个半导体行业研究" | 5 种原型 · 最多 16 角色 · 18 phase | 行业研究报告 DOCX |
 | **LIT** | "做个固态电池技术评估" | 7 角色 · 3 波 · 20 phase | 技术评估报告 MD |
 
 ---
@@ -24,7 +24,7 @@
 │   IR 管线     │   BP 管线     │   IC 管线     │     LIT 管线           │
 │  券商研报      │  BP 尽调      │  行业研究      │     文献综述           │
 │  9步+统稿     │  11角色+统稿   │  5原型×16角色  │     7角色             │
-│  4波·32phase  │  4波·36phase  │  19 phase     │     3波·20phase       │
+│  4波·28phase  │  4波·35phase  │  18 phase     │     3波·20phase       │
 ├──────────────┴──────────────┴──────────────┴────────────────────────┤
 │                          共享基础设施                                 │
 │  kernel.py（Phase 状态机）· search_gateway（6 层搜索降级链）            │
@@ -51,7 +51,6 @@ Phase 01-07: 预处理
   01  OCR 识别 → 结构化公司数据（无文件时跳过）
   01b 公司名搜索入库（无 PDF 模式，子代理搜索）
   02  天眼查工商验证
-  03  预搜索（已废弃，子代理全权搜索）
   04  研究计划 → 子代理派发（tyc + westock + search_deep 自主搜索）
   05  共享尽调页初始化
   06  搜索工单编译
@@ -116,7 +115,7 @@ Phase 26-30: 交付
 | `bp_industry_research` | W4 | 行业研报整合（6 大类基准数据） | westock + IMA |
 | `bp_统稿` | — | 读全量维度输出 + Fact Store → 最终报告 | — |
 
-### BP 36 Phase 完整清单
+### BP 35 Phase 完整清单
 
 | # | Phase | 类型 | 说明 |
 |---|-------|------|------|
@@ -124,7 +123,6 @@ Phase 26-30: 交付
 | 01b | company_intake | dispatch | 公司名搜索入库（无 PDF 模式） |
 | 01b | company_intake_collect | 收集 | 搜索入库收集 |
 | 02 | company_verify | 脚本 | 天眼查工商 / 风险验证 [heavy_bg, 600s] |
-| 03 | presearch | 脚本 | 预搜索（已废弃，子代理全权搜索） |
 | 04 | research_plan | dispatch | 研究计划子代理派发（tyc + westock + search_deep 自主搜索） |
 | 04c | research_plan_collect | 收集 | 读子代理输出 → schema 归一化 → 校验落盘 |
 | 05 | bp_shared_page_init | 脚本 | 共享尽调页初始化 |
@@ -200,9 +198,9 @@ Phase 26-30: 交付
 
 | Tier | Phase 数 | 裁剪内容 |
 |------|---------|---------|
-| **deep**（默认） | 32 | 全量，不裁剪 |
-| **standard** | 30 | 跳过 claim_coverage + cross_dimension_gate |
-| **quick** | 20 | 跳过 per-wave gate / debate / claim / cross / readability |
+| **deep**（默认） | 28 | 全量，不裁剪 |
+| **standard** | 26 | 跳过 claim_coverage + cross_dimension_gate |
+| **quick** | 18 | 跳过 per-wave gate / debate / claim / cross / readability |
 
 核心数据采集链（preflight → delivery + 统稿）任何 tier 均完整。
 
@@ -245,28 +243,27 @@ Phase 26-30: 交付
 | ic_cross_cutting | 全部 | 交叉维度 |
 | ic_report_synthesizer | 全部 | 统稿 |
 
-### IC 19 Phase
+### IC 18 Phase
 
 ```
-01  topic_intake              课题元数据解析（DOCX/MD/JSON）
-02  multi_company_verify      批量公司工商验证
-03  presearch                 [已废弃] 搜索全交给子代理
-03b extract                   [已废弃]
-04  research_plan             研究计划 → 子代理全权搜索 + archetype 判定
-04  research_plan_collect     读子代理输出 → ic_research_plan.json
-06  precompute                行业规模预计算 + 财务基准
-07  dispatch_prepare          Wave 派发（sequential, archetype-driven）
-08  dispatch_collect          Wave 收集 + 质量检查 [retry]
-08b fact_store_init           Fact Store 初始化
-09  evidence_gate             Step 输出质量门禁 [repair]
-09b fact_store_merge          Fact Store 合并
-10  claim_coverage            Claim 覆盖校验（FAIL → 非阻断）
-10b cross_dimension_gate      跨维度一致性（FAIL → WARN 放行）
-11  debate_review             对抗审查
-11b final_assembly            最终组装
-11c readability_review        可读性审查（FAIL → WARN 放行）
-11d investment_judgment       投资判断汇总（超配/标配/低配）
-12  delivery                  交付 [heavy_bg]
+01   topic_intake              课题元数据解析（DOCX/MD/JSON）
+02   multi_company_verify      批量公司工商验证
+04   research_plan             研究计划 → 子代理全权搜索 + archetype 判定
+04   research_plan_collect     读子代理输出 → ic_research_plan.json
+06   precompute                行业规模预计算 + 财务基准
+07   dispatch_prepare          Wave 派发（sequential, archetype-driven）
+08   dispatch_collect          Wave 收集 + 质量检查 [retry]
+08b  fact_store_init           Fact Store 初始化
+08b5 shared_state_init         共享状态初始化
+09   evidence_gate             Step 输出质量门禁 [repair]
+09b  fact_store_merge          Fact Store 合并
+10   claim_coverage            Claim 覆盖校验（FAIL → 非阻断）
+10b  cross_dimension_gate      跨维度一致性（FAIL → WARN 放行）
+11   debate_review             对抗审查
+11b  final_assembly            最终组装
+11c  readability_review        可读性审查（FAIL → WARN 放行）
+11d  investment_judgment       投资判断汇总（超配/标配/低配）
+12   delivery                  交付 [heavy_bg]
 ```
 
 ---
@@ -446,9 +443,9 @@ ir-bp-workflow/
 │   ├── profiles/                         # 管线 Profile
 │   │   ├── base.py                       # 抽象基类
 │   │   ├── ir_profile.py                 # IR 管线（9 步 + 统稿 + Stage Tier）
-│   │   ├── bp_profile.py                 # BP 管线（36 Phase + 4 波 + 统稿）
+│   │   ├── bp_profile.py                 # BP 管线（35 Phase + 4 波 + 统稿）
 │   │   ├── bp_constants.py               # BP 共享常量
-│   │   ├── ic_profile.py                 # IC 管线（19 Phase + 5 原型）
+│   │   ├── ic_profile.py                 # IC 管线（18 Phase + 5 原型）
 │   │   ├── ic_topic_profile.py           # IC 课题 Profile
 │   │   ├── lit_review_profile.py         # LIT 管线（20 Phase + 3 波）
 │   │   └── lit_constants.py              # LIT 共享常量
