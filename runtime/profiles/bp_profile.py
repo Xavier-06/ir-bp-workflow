@@ -223,21 +223,6 @@ def _run_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
     return launch_heavy_phase(runtime_root, job_ctx, "phase02_company_verify", pipeline="bp")
 
 
-def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 03: presearch — 已废弃（v5.3 路径B），搜索全部交给 phase04 子代理。
-
-    v5.3 改动: 与 IR/IC 管线对齐，砍掉 presearch。BP 子代理全权搜索:
-    tyc-mcp(工商/法律/融资) + westock-mcp(行业/研报) + search_deep + tencent_news。
-    """
-    print(f"  ⏭️  [bp] phase03 presearch 已跳过（搜索由 phase04 子代理全权执行）", flush=True)
-    return {
-        "ok": True,
-        "mode": "skipped_subagent_search",
-        "phase": "phase03_presearch",
-        "job_id": job_ctx.job_id,
-        "result": {"skipped": True, "reason": "subagent_handles_all_search"},
-    }
-
 
 def _bp_entity_market(job_ctx: JobContext) -> tuple[str, str]:
     metadata = job_ctx.metadata or {}
@@ -282,7 +267,6 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
     instruction = bp_build_research_plan_instruction(
         entity=entity, market=market, stage_tier=stage_tier,
         job_id=job_ctx.job_id, task_dir=task_dir, brief_path=brief_path,
-        presearch_available=False,
         has_skeleton=has_skeleton,
         skeleton_path=skeleton_path if has_skeleton else None,
     )
@@ -442,83 +426,6 @@ def _classify_source_tier(url: str) -> str:
     """根据 URL 判断 source_tier。"""
     media_domains = ("36kr", "sohu", "sina", "qq.com", "baidu", "zhihu")
     return "media" if any(d in url for d in media_domains) else "research"
-
-
-def _extract_presearch_facts(task_dir: Path) -> list[dict[str, Any]]:
-    """Extract structured facts from presearch step files.
-
-    Presearch results contain search snippets with titles, URLs, and content.
-    We extract verifiable factual claims from these snippets so sub-agents
-    start with a non-empty fact store.
-    """
-    facts: list[dict[str, Any]] = []
-    fact_counter = 0
-    for step_file in sorted(task_dir.glob("bp_presearch_step_*.md")):
-        try:
-            text = step_file.read_text(encoding="utf-8")
-        except Exception:
-            continue
-        step_name = step_file.stem.replace("bp_presearch_step_", "")
-        # Parse markdown lines looking for factual snippets with URLs
-        current_url = ""
-        current_title = ""
-        current_content = ""
-        for line in text.split("\n"):
-            stripped = line.strip()
-            if stripped.startswith("### [") or stripped.startswith("## ["):
-                # Save previous fact if we have one
-                if current_url and current_content and len(current_content) >= 20:
-                    fact_counter += 1
-                    facts.append({
-                        "fact_id": f"BP-PRESEARCH-{step_name.upper()}-F{fact_counter:03d}",
-                        "claim": current_title or current_content[:80],
-                        "value": current_content[:200],
-                        "unit": "",
-                        "period": "待验证",
-                        "source_url": current_url,
-                        "source_tier": _classify_source_tier(current_url),
-                        "source_quote": current_content[:150],
-                        "question_id": f"presearch_{step_name}",
-                        "fact_type": f"presearch_{step_name}",
-                        "confidence": "medium",
-                    })
-                current_url = ""
-                current_title = ""
-                current_content = ""
-                # Extract URL from markdown link [title](url)
-                link_match = re.search(r'\[([^\]]*)\]\(([^)]+)\)', stripped)
-                if link_match:
-                    current_title = link_match.group(1)
-                    current_url = link_match.group(2)
-            elif stripped.startswith("URL:"):
-                current_url = stripped[4:].strip()
-            elif stripped.startswith("- ") and "http" in stripped:
-                # URL line
-                url_match = re.search(r'(https?://\S+)', stripped)
-                if url_match:
-                    current_url = url_match.group(1)
-            elif stripped and not stripped.startswith("#") and not stripped.startswith("---"):
-                if len(stripped) >= 20:
-                    current_content += " " + stripped
-
-        # Flush last fact
-        if current_url and current_content and len(current_content) >= 20:
-            fact_counter += 1
-            facts.append({
-                "fact_id": f"BP-PRESEARCH-{step_name.upper()}-F{fact_counter:03d}",
-                "claim": current_title or current_content[:80],
-                "value": current_content[:200],
-                "unit": "",
-                "period": "待验证",
-                "source_url": current_url,
-                "source_tier": _classify_source_tier(current_url),
-                "source_quote": current_content[:150],
-                "question_id": f"presearch_{step_name}",
-                "fact_type": f"presearch_{step_name}",
-                "confidence": "medium",
-            })
-
-    return facts[:50]  # Cap at 50 facts to avoid bloating
 
 
 def _extract_company_verify_facts(task_dir: Path) -> list[dict[str, Any]]:
@@ -692,16 +599,13 @@ def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dic
     """Phase 07: 初始化 BP 事实库 — 注入 research_plan + company_verify 事实，
     子代理启动时 fact store 不再为空。
 
-    v5.3: presearch 被砍后，改从 bp_research_plan.json 提取 seed facts。
-    兼容旧 job：如果 presearch 文件存在仍会提取（向后兼容）。
+    seed facts 来源：bp_research_plan.json（phase04 子代理产出）+ company_verify。
     """
     task_dir = _task_dir(runtime_root, job_ctx)
 
-    # Collect seed facts from research_plan (v5.3) and company verification
+    # Collect seed facts from research_plan and company verification
     seed_facts: list[dict[str, Any]] = []
     seed_facts.extend(_extract_research_plan_facts(task_dir))
-    # Backward compat: if old presearch files exist, still extract them
-    seed_facts.extend(_extract_presearch_facts(task_dir))
     seed_facts.extend(_extract_company_verify_facts(task_dir))
 
     # Deduplicate by fact_id
@@ -714,13 +618,12 @@ def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dic
             unique_facts.append(fact)
 
     payload = _bp_fact_store_payload(job_ctx, facts=unique_facts)
-    payload["source_files"] = ["research_plan", "presearch_steps_compat", "company_verify_report"]
+    payload["source_files"] = ["research_plan", "company_verify_report"]
     store_path, index_path = _write_bp_fact_store(task_dir, payload)
 
     research_count = sum(1 for f in unique_facts if "RESEARCH" in str(f.get("fact_id", "")))
-    presearch_count = sum(1 for f in unique_facts if "PRESEARCH" in str(f.get("fact_id", "")))
     company_count = sum(1 for f in unique_facts if "COMPANY" in str(f.get("fact_id", "")))
-    print(f"    📦 Fact Store bootstrap: {len(unique_facts)} seed facts (research_plan={research_count}, presearch_compat={presearch_count}, company_verify={company_count})", flush=True)
+    print(f"    📦 Fact Store bootstrap: {len(unique_facts)} seed facts (research_plan={research_count}, company_verify={company_count})", flush=True)
 
     return {
         "ok": True,
@@ -732,7 +635,6 @@ def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dic
             "index_path": str(index_path),
             "total_facts": len(unique_facts),
             "research_plan_facts": research_count,
-            "presearch_facts": presearch_count,
             "company_verify_facts": company_count,
         },
     }
@@ -1910,10 +1812,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                     return specs
         except Exception:
             pass
-    # v5.3: presearch 被砍后，子代理应从 research_plan 获取上下文
-    # 向后兼容：如果旧 presearch 文件存在也列出来
     research_plan_file = str(task_dir / "bp_research_plan.json") if (task_dir / "bp_research_plan.json").exists() else ""
-    presearch_files = sorted(str(p) for p in task_dir.glob("bp_presearch_step*.md"))
 
     # Generic extraction — works for any industry
     products = _extract_list_field(profile, task_dir, "products",
@@ -1939,7 +1838,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "company_name": profile.get("company_name", ""),
                 "founders": profile.get("founders", []),
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1952,7 +1850,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "products": products,
                 "customers": customers,
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1965,7 +1862,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "products": products,
                 "tech_keywords": tech_keywords,
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1978,7 +1874,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "products": products,
                 "competitors": competitors,
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -1991,7 +1886,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "products": products,
                 "competitors": competitors,
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -2005,7 +1899,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "competitors": competitors,
                 "financing_rounds": profile.get("financing_rounds", []),
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -2019,7 +1912,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "competitors": competitors,
                 "customers": customers,
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         # ── v4.5 新增：投资叙事层 4 角色 ──
@@ -2031,7 +1923,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -2042,7 +1933,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -2053,7 +1943,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
         {
@@ -2065,7 +1954,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "company_name": profile.get("company_name", ""),
                 "competitors": competitors,
                 "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
             },
         },
     ]
@@ -3645,7 +3533,6 @@ class BPProfile(PipelineProfile):
             "phase01b_company_intake": lambda job_ctx: _run_company_intake(runtime_root, job_ctx),              # 01b → needs_dispatch (公司名搜索入库)
             "phase01b_company_intake_collect": lambda job_ctx: _run_company_intake_collect(runtime_root, job_ctx),  # 01b collect
             "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),               # 02 [heavy_bg]
-            "phase03_presearch": lambda job_ctx: _run_presearch(runtime_root, job_ctx),                         # 03 [heavy_bg] ★前置：research_plan之前
             "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),                 # 04 → needs_dispatch (子代理派发, tyc+westock)
             "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx), # 04c
             "phase05_bp_shared_page_init": lambda job_ctx: _run_bp_shared_page_init(runtime_root, job_ctx),     # 05
@@ -3714,7 +3601,6 @@ class BPProfile(PipelineProfile):
             "phase01b_company_intake": [],
             "phase01b_company_intake_collect": ["bp_step0_profile.json"],
             "phase02_company_verify": ["company_verify_report.json"],
-            # [v5.3] phase03_presearch 已废弃: 子代理全权搜索
             "phase04_research_plan": [],  # v5.2: 子代理直接生成plan, skeleton仅作可选参考
             "phase04_research_plan_collect": ["bp_research_plan.json"],
             "phase05_bp_shared_page_init": ["bp_shared_diligence_page.md"],

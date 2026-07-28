@@ -30,7 +30,7 @@ from runtime.profiles.bp_profile import (
 from scripts.bp_narrative_assembler import assemble_bp_report
 
 
-def test_bp_profile_registers_research_plan_before_presearch(tmp_path):
+def test_bp_profile_registers_research_plan_before_dispatch(tmp_path):
     profile = BPProfile(runtime_root=tmp_path)
 
     phases = profile.phases()
@@ -51,11 +51,11 @@ def test_bp_profile_registers_research_plan_before_presearch(tmp_path):
     assert "phase24_synthesis_prepare" in phases
     assert "phase25_synthesis_collect" in phases
     # IC/RedTeam phases removed (2026-06-13): phase32/33/33_5/34
+    # presearch removed (2026-07-28): phase03 已删，research_plan 子代理全权搜索
     assert "phase26_bp_debate_review" in phases
     assert "phase27_bp_final_assembly" in phases
     assert "phase28_bp_readability_review" in phases
-    assert phases.index("phase02_company_verify") < phases.index("phase03_presearch")
-    assert phases.index("phase03_presearch") < phases.index("phase04_research_plan")
+    assert phases.index("phase02_company_verify") < phases.index("phase04_research_plan")
     assert phases.index("phase04_research_plan_collect") < phases.index("phase05_bp_shared_page_init")
     assert phases.index("phase05_bp_shared_page_init") < phases.index("phase06_search_plan_compile")
     assert phases.index("phase06_search_plan_compile") < phases.index("phase07_bp_fact_store_bootstrap")

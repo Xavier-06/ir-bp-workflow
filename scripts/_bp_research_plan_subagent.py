@@ -53,8 +53,6 @@ def bp_build_research_plan_brief(
             "profile": str(task_dir / "bp_step0_profile.json"),
             "claim_inventory": str(task_dir / "bp_claim_inventory.json") if has_claim_inventory else None,
         },
-        "presearch_available": (task_dir / "bp_presearch_results.json").exists(),
-        "presearch_path": str(task_dir / "bp_presearch_results.json") if (task_dir / "bp_presearch_results.json").exists() else None,
     }
 
 
@@ -65,13 +63,10 @@ def bp_build_research_plan_instruction(
     job_id: str,
     task_dir: Path,
     brief_path: Path,
-    presearch_available: bool,
     has_skeleton: bool,
     skeleton_path: Path | None,
 ) -> str:
     """Build the main-AI instruction for dispatching the research plan subagent."""
-
-    presearch_path = task_dir / "bp_presearch_results.json"
 
     instruction = (
         "PHASE04 BP RESEARCH PLAN - Dispatch Subagent\n"
@@ -100,8 +95,6 @@ def bp_build_research_plan_instruction(
         f"3. `{task_dir / 'bp_step0_profile.json'}` - structured company profile\n"
     )
 
-    if presearch_available:
-        instruction += f"4. `{presearch_path}` - phase03 web presearch results (reference only)\n"
     if has_skeleton and skeleton_path:
         instruction += f"5. `{skeleton_path}` - legacy script skeleton (reference claim structure only)\n"
 

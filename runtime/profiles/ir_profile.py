@@ -535,25 +535,6 @@ def _run_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dict[s
     }
 
 
-def _run_presearch(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 03: presearch — 已废弃（v5.3 路径B），搜索全部交给 phase04 子代理。
-
-    v5.3 改动: 与 IC 管线对齐，砍掉 presearch。IR 子代理全权搜索:
-    westock-mcp(行情/财务/研报/行业/资金流) + tyc-mcp(工商) + search_deep + tencent_news。
-    """
-    print(f"  ⏭️  [ir] phase03 presearch 已跳过（搜索由 phase04 子代理全权执行）", flush=True)
-    return {
-        "ok": True,
-        "mode": "skipped_subagent_search",
-        "phase": "phase03_presearch",
-        "job_id": job_ctx.job_id,
-        "result": {"skipped": True, "reason": "subagent_handles_all_search"},
-    }
-
-
-# [v5.3] _run_presearch_inner + _run_extract 已删除: presearch+extract砍掉, 子代理全权搜索
-
-
 # ═══════════════════════════════════════════════════════════
 # Phase 1.2: Precompute — 三大预计算引擎（财务指标/技术指标/行业对标）
 # ═══════════════════════════════════════════════════════════
