@@ -46,9 +46,9 @@ Phase 01b 子代理在搜索过程中会尝试发现公开的 BP PDF：
 10 phase10_wave1_evidence_gate                — Wave 1 证据门禁（FAIL → repair 子代理 → 重跑）
 11 phase11_bp_fact_store_merge                — Wave 1 后 Fact store 合并（仅 Wave 1 sidecar）
 12 phase12_wave1_shared_page_refresh          — Wave 1 后刷新 shared state
-13 phase13_wave2_prepare                      — Wave 2 manifest（customer_revenue），T1 跳过
-14 phase14_wave2_collect                      — 检查 Wave 2 输出
-15 phase15_wave2_evidence_gate                — Wave 2 证据门禁（FAIL → repair → 重跑）
+13 phase13_wave2_prepare                      — Wave 2 已移除（2026-07-28），no-op
+14 phase14_wave2_collect                      — Wave 2 已移除，no-op
+15 phase15_wave2_evidence_gate                — Wave 2 已移除，no-op
 16 phase16_wave3_prepare                      — Wave 3 manifest（competition + valuation）
 17 phase17_wave3_collect                      — 检查 Wave 3 输出
 18 phase18_wave3_evidence_gate                — Wave 3 证据门禁（FAIL → repair → 重跑）
@@ -110,17 +110,16 @@ cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestra
 - T1 估值折价上限 35%（不谈流动性折价）
 - T1 claim_coverage 中"客户收入不可验证"不算 blocker
 - T1 investment_judgment 中客户/收入相关 HIGH 降为 MEDIUM
-- **T1 synthesis_prepare 自动跳过 Wave 2 维度**：为 customer_revenue_validation 创建占位文件（md + facts sidecar + section sidecar），coordinator 不需要手动创建
 
-## BP Step 波次（5 阶段派发）
+## BP Step 波次（4 阶段派发，Wave 2 已移除 2026-07-28）
 
 | 波次 | 维度 | 依赖 |
 |------|------|------|
+| Wave 0 | investment_hypothesis | 无（先行者） |
 | Wave 1 | company_team_compliance, product_commercial, tech_ip_moat, market_supply_chain | 无（sequential 逐个派发） |
-| Wave 2 | customer_revenue_validation | Wave 1 |
-| Wave 3 | competition_positioning, valuation_return | Wave 1 + Wave 2 |
-| Wave 4 | dealbreaker_risk | Wave 1 + Wave 2 + Wave 3 |
-| Synthesis | 统稿（读取全部 8 维度输出） | 全部 |
+| Wave 3 | competition_positioning, valuation_return | Wave 1 |
+| Wave 4 | dealbreaker_risk, consensus_challenge, catalyst, industry_research | Wave 0 + Wave 1 + Wave 3 |
+| Synthesis | 统稿（读取全部维度输出） | 全部 |
 
 ## BP 子代理派发硬规则（2026-07-06 更新）
 

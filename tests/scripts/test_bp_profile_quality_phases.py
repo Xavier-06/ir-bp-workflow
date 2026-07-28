@@ -222,7 +222,6 @@ def test_run_research_plan_writes_bp_due_diligence_plan(tmp_path):
         "bp_market_supply_chain",
         "bp_competition_positioning",
         "bp_valuation_return",
-        "bp_customer_revenue_validation",
         "bp_dealbreaker_risk",
     }
     assert payload["coverage_matrix"]
@@ -252,14 +251,14 @@ def test_bp_dispatch_prepare_uses_four_evidence_collection_roles_without_valuati
     dispatch_payload = json.loads((tmp_path / "tasks" / "BP-WAVE1" / "phase2_dispatch.json").read_text(encoding="utf-8"))
     assert dispatch_payload["wave_design"] == "wave1_evidence_collection_4_roles"
     assert dispatch_payload["current_subagent"] == "bp_company_team_compliance"
-    assert dispatch_payload["total_subagents"] == 12  # v4.5: 8 维度 + 4 叙事角色
+    assert dispatch_payload["total_subagents"] == 11  # v5.0: 7 维度 + 4 叙事角色
 
 
 def test_bp_wave3_prepare_dispatches_two_roles_with_shared_inputs(tmp_path):
     task_dir = tmp_path / "tasks" / "BP-WAVE3"
     task_dir.mkdir(parents=True)
     outputs_dir = task_dir
-    for slug in ("company_team_compliance", "product_commercial", "tech_ip_moat", "market_supply_chain", "customer_revenue_validation"):
+    for slug in ("company_team_compliance", "product_commercial", "tech_ip_moat", "market_supply_chain"):
         (outputs_dir / f"bp_phase2_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
     (task_dir / "bp_shared_diligence_page.md").write_text("# Shared\n", encoding="utf-8")
     (task_dir / "bp_shared_state.json").write_text("{}", encoding="utf-8")
@@ -308,7 +307,6 @@ def test_bp_profile_registers_synthesis_handlers_before_ic_and_delivery(tmp_path
         "market_supply_chain",
         "competition_positioning",
         "valuation_return",
-        "customer_revenue_validation",
         "dealbreaker_risk",
     ):
         (task_dir / f"bp_phase2_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
@@ -337,7 +335,6 @@ def test_bp_synthesis_prepare_requires_all_eight_wave_outputs_and_names_them_in_
         "market_supply_chain",
         "competition_positioning",
         "valuation_return",
-        "customer_revenue_validation",
         "dealbreaker_risk",
     ):
         (task_dir / f"bp_phase2_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
@@ -356,14 +353,12 @@ def test_bp_synthesis_prepare_requires_all_eight_wave_outputs_and_names_them_in_
         "market_supply_chain",
         "competition_positioning",
         "valuation_return",
-        "customer_revenue_validation",
         "dealbreaker_risk",
     }
     manifest = json.loads((task_dir / "bp_phase3_manifest_synthesis.json").read_text(encoding="utf-8"))
     # system_prompt 来自 instruction_store_bp/bp_统稿.md（测试 tmp_path 无 instruction store 时为 ERROR fallback）
     prompt = manifest["system_prompt"]
     if not prompt.startswith("ERROR"):
-        assert "客户收入验证" in prompt or "customer_revenue" in prompt
         assert "Deal Breaker" in prompt or "dealbreaker" in prompt.lower()
     # 无论 prompt 来源，manifest 结构必须正确
     assert manifest["role"] == "bp_统稿"
@@ -504,7 +499,7 @@ def test_run_bp_search_plan_compile_writes_claim_level_work_orders(tmp_path):
             "core_questions": [{
                 "question_id": "BQ2",
                 "question": "客户收入是否可验证？",
-                "owner_section": "bp_customer_revenue_validation",
+                "owner_section": "bp_product_commercial",
                 "priority": "critical",
                 "required_fact_keys": ["customer_evidence", "revenue_evidence"],
             }],
@@ -517,7 +512,7 @@ def test_run_bp_search_plan_compile_writes_claim_level_work_orders(tmp_path):
             "claim_matrix": [{
                 "claim_id": "BC005",
                 "claim": "测试公司客户收入可以被验证。",
-                "owner_section": "bp_customer_revenue_validation",
+                "owner_section": "bp_product_commercial",
                 "priority": "critical",
                 "required_fact_keys": ["customer_evidence", "revenue_evidence"],
             }],
@@ -839,7 +834,11 @@ def test_bp_section_package_validation_fails_missing_packages(tmp_path):
     assert (task_dir / "bp_section_packages.json").exists()
 
 
-def test_bp_section_package_validation_requires_v2_answers_claim_ids_and_narrative_blocks(tmp_path):
+def test_bp_section_package_validation_auto_upgrades_v1_mislabeled_as_v2(tmp_path):
+    # 2026-07-28 bugfix: 子代理常产出 v1 风格包但误标 schema_version=v2（缺 answers/
+    # claim_ids_covered/narrative_blocks/search_audit），旧 validator 直接走 v2 严格校验
+    # → 全包硬 FAIL（生产环境曾因此卡死 11/11 包）。修复后：缺结构性三件套视为 v1 误标，
+    # 自动降级触发 _upgrade_v1_to_v2 合成缺失字段并放行（_auto_upgraded_from_v1=True）。
     task_dir = tmp_path / "tasks" / "BP-SECTIONS-V2-REQUIRED"
     task_dir.mkdir(parents=True)
     (task_dir / "bp_fact_store_index.json").write_text(json.dumps({"fact_ids": ["BF-0001"], "total_facts": 1}), encoding="utf-8")
@@ -862,13 +861,12 @@ def test_bp_section_package_validation_requires_v2_answers_claim_ids_and_narrati
 
     result = _run_bp_section_package_validation(tmp_path, job_ctx)
 
-    assert result["ok"] is False
-    issues = result["result"]["section_gate"]["packages"][0]["validation"]["issues"]
-    codes = {issue["code"] for issue in issues}
-    assert "MISSING_FIELD" in codes
-    assert any("answers" in issue["message"] for issue in issues)
-    assert any("claim_ids_covered" in issue["message"] for issue in issues)
-    assert any("narrative_blocks" in issue["message"] for issue in issues)
+    # v1 误标包被自动降级救援 → 通过
+    assert result["ok"] is True
+    assert result["result"]["section_gate"]["passed"] is True
+    pkg = result["result"]["section_gate"]["packages"][0]["package"]
+    # schema_version 被就地降级为 v1（_upgrade_v1_to_v2 返回新 dict，原始包记录降级后的版本号）
+    assert pkg["schema_version"] == "bp_section_package.v1"
 
 
 def test_bp_section_package_validation_passes_valid_v2_package(tmp_path):

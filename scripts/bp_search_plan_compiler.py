@@ -64,7 +64,7 @@ def _query_family(fact_keys: list[str], claim_text: str) -> str:
         return "product_benchmark"
     # ── Existing families ──
     if any(key in fact_keys for key in CUSTOMER_REVENUE_KEYS) or any(word in joined for word in ("客户", "订单", "收入", "营收", "回款")):
-        return "customer_revenue_validation"
+        return "product_commercial"
     if any(key in fact_keys for key in VALUATION_KEYS) or "估值" in joined:
         return "valuation_validation"
     if any(key in fact_keys for key in ("competitor_set", "differentiation", "market_position")):
@@ -78,7 +78,7 @@ def _query_family(fact_keys: list[str], claim_text: str) -> str:
 
 def _queries(entity: str, family: str, fact_keys: list[str], claim_text: str) -> list[str]:
     templates = {
-        "customer_revenue_validation": [
+        "product_commercial": [
             '"{entity}" 客户 合同 订单 回款',
             '"{entity}" 招投标 采购 中标',
             '"{entity}" revenue customer contract delivery',
@@ -179,7 +179,7 @@ def _source_tiers(fact_keys: list[str], facts: dict[str, dict[str, Any]]) -> lis
 def _requires_counter_search(priority: str, family: str, claim_text: str) -> bool:
     if priority == "critical":
         return True
-    if family in {"customer_revenue_validation", "valuation_validation", "tech_route_comparison", "product_benchmark"}:
+    if family in {"product_commercial", "valuation_validation", "tech_route_comparison", "product_benchmark"}:
         return True
     lowered = claim_text.lower()
     return any(keyword.lower() in lowered for keyword in COUNTER_SEARCH_KEYWORDS)

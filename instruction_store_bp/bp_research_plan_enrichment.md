@@ -56,14 +56,13 @@
 - 不要问 BP 已经回答了的问题
 - 聚焦 BP 中"最可能改变投资结论"的变量
 - 优先从 structured 数据中发现的异常/矛盾设计问题
-- 每条问题必须指定 owner_section（必须是以下 8 个之一）:
+- 每条问题必须指定 owner_section（必须是以下 7 个之一）:
   - bp_company_team_compliance
   - bp_product_commercial
   - bp_tech_ip_moat
   - bp_market_supply_chain
   - bp_competition_positioning
   - bp_valuation_return
-  - bp_customer_revenue_validation
   - bp_dealbreaker_risk
 - 每条问题必须指定 required_fact_keys（必须是骨架计划 fact_requirements 中已有的 fact_key）
 - 问题 ID 格式: ESQ1-ESQ5

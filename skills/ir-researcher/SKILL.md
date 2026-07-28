@@ -102,14 +102,14 @@ Markdown 格式（方便阅读）同路径 `.md` 后缀。
 
 **BP 任务（v4.4+，2026-06-29 更新）**：
 
-BP 管线 8 个维度，分 5 波次 sequential 派发：
+BP 管线 7 个维度，分 4 波次 sequential 派发：
 
 | Wave | Role slug | 维度 | 说明 |
 |------|-----------|------|------|
-| 1 | team_compliance, product_tech, market_competition, financial_ops | 团队合规/产品技术/市场竞争/财务运营 | 基础四维并行 |
-| 2 | customer_revenue | 客户收入 | T1/T2 跳过 |
-| 3 | competition, valuation | 竞争/估值 | |
-| 4 | dealbreaker_risk | 交易杀手风险 | |
+| 0 | investment_hypothesis | 投资假说 | 先行者 |
+| 1 | company_team_compliance, product_commercial, tech_ip_moat, market_supply_chain | 团队合规/产品商业化/技术IP/市场供应链 | 基础四维并行 |
+| 3 | competition_positioning, valuation_return | 竞争/估值 | |
+| 4 | dealbreaker_risk, consensus_challenge, catalyst, industry_research | 红队/共识/催化剂/行业研报 | |
 | S | bp_synthesis | 统稿 | 读取所有维度输出 |
 
 - **Sequential 派发**：每个 wave 每次只返回 1 个 role 的 manifest，has_more=True 时重跑当前 phase 派发下一个

@@ -64,12 +64,6 @@
       "description": "Wave 3: 融资历史各轮估值变化、可比公司估值对标（主营业务重合筛选）、估值事实呈现（不给估值建议）"
     },
     {
-      "key": "bp_customer_revenue_validation",
-      "name": "客户与收入真实性验证分析师",
-      "file": "bp_customer_revenue_validation.md",
-      "description": "Wave 2: 客户、订单、合同、回款、收入拆分和商业化真实性验证"
-    },
-    {
       "key": "bp_dealbreaker_risk",
       "name": "Deal Breaker 红队分析师",
       "file": "bp_dealbreaker_risk.md",
@@ -151,7 +145,6 @@
       "market_supply_chain": "bp_market_supply_chain",
       "competition_positioning": "bp_competition_positioning",
       "valuation_return": "bp_valuation_return",
-      "customer_revenue_validation": "bp_customer_revenue_validation",
       "dealbreaker_risk": "bp_dealbreaker_risk",
       "investment_hypothesis": "bp_investment_hypothesis",
       "consensus_challenge": "bp_consensus_challenge",

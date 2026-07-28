@@ -13,8 +13,8 @@ def _write_valid_task(task_dir):
                         "validation": {"passed": True, "issues": []},
                         "package": {
                             "schema_version": "bp_section_package.v2",
-                            "section_id": "bp_customer_revenue_validation",
-                            "section_title": "客户收入验证",
+                            "section_id": "bp_product_commercial",
+                            "section_title": "产品商业化",
                             "key_messages": ["无商业化证据"],
                             "claims": [{"claim_id": "BC005", "claim": "客户订单收入可验证", "fact_ids": ["BP-CUSTOMER-F001"], "reasoning": "未发现证据", "confidence": "high", "source_quality": "database"}],
                             "facts_used": ["BP-CUSTOMER-F001"],

@@ -20,7 +20,7 @@ CLAIM_RULES: list[dict[str, Any]] = [
     {
         "claim_type": "revenue",
         "keywords": ("收入", "营收", "销售额", "回款", "ARR", "MRR", "GMV"),
-        "owner_section": "bp_customer_revenue_validation",
+        "owner_section": "bp_product_commercial",
         "priority": "critical",
         "evidence_required": ["financial_statement", "bank_record", "contract"],
     },

@@ -230,8 +230,8 @@ def bp_build_research_plan_instruction(
         f'```\n'
         f'\n'
         f'## Constraints\n'
-        f'- All owner_section: bp_company_team_compliance, bp_product_commercial, bp_tech_ip_moat, bp_market_supply_chain, bp_competition_positioning, bp_valuation_return, bp_customer_revenue_validation, bp_dealbreaker_risk\n'
-        f'- Minimum: 10 claims, 30 fact_keys, covering all 8 sections\n'
+        f'- All owner_section: bp_company_team_compliance, bp_product_commercial, bp_tech_ip_moat, bp_market_supply_chain, bp_competition_positioning, bp_valuation_return, bp_dealbreaker_risk\n'
+        f'- Minimum: 10 claims, 30 fact_keys, covering all 7 sections\n'
         f'- If tyc cannot find company (T1/T2): note in search_summary and still generate full plan\n'
         f'- **MANDATORY**: `competitors` field MUST contain at least 3 named companies (list of {{name, ticker, main_business}}). DO NOT leave it empty unless the BP has ZERO competitor mentions.\n'
         f'- Write bp_research_plan.json directly; no need to notify main AI\n'
@@ -251,7 +251,7 @@ def _normalize_research_plan_schema(plan: dict[str, Any]) -> dict[str, Any]:
     section_keys = {
         "bp_company_team_compliance", "bp_product_commercial", "bp_tech_ip_moat",
         "bp_market_supply_chain", "bp_competition_positioning", "bp_valuation_return",
-        "bp_customer_revenue_validation", "bp_dealbreaker_risk",
+        "bp_dealbreaker_risk",
         # 投资叙事层
         "bp_investment_hypothesis", "bp_consensus_challenge", "bp_catalyst", "bp_industry_research",
     }

@@ -37,7 +37,6 @@ IMA_ROLE_KB_MAP = {
     "bp_market_supply_chain":      ["self_built_research", "industry_reports", "curated_reports"],
     "bp_competition_positioning":  ["self_built_research", "institutional_notes"],
     "bp_valuation_return":         ["self_built_research", "institutional_notes"],
-    "bp_customer_revenue_validation": ["self_built_research", "industry_reports"],
     "bp_dealbreaker_risk":         ["self_built_research", "institutional_notes"],
     "bp_consensus_challenge":      ["self_built_research", "institutional_notes"],
     "bp_catalyst":                 ["self_built_research", "institutional_notes"],
@@ -55,7 +54,6 @@ BP_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
     'bp_market_supply_chain': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     'bp_competition_positioning': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     'bp_valuation_return': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
-    'bp_customer_revenue_validation': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     'bp_dealbreaker_risk': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     # v4.5 新增：投资叙事层 4 角色
     'bp_investment_hypothesis': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
@@ -77,18 +75,19 @@ BP_WAVE1_ROLE_SLUGS: dict[str, str] = {
     "bp_market_supply_chain": "market_supply_chain",
 }
 
-# Wave 2: 客户收入验证 —— 读 Wave1 产品/技术信息交叉验证
-BP_WAVE2_ROLE_SLUGS: dict[str, str] = {
-    "bp_customer_revenue_validation": "customer_revenue_validation",
-}
+# Wave 2: 客户收入验证 —— 已移除（2026-07-28）
+# 根因：T1 跳过、T2/T3 价值有限（客户/收入信息已在 product_commercial 维度覆盖），
+# 跑 customer_revenue 只会产出空 stub + 触发 evidence gate 降级，浪费子代理调用。
+# 保留空 dict 以保证向后兼容（旧 job 数据可能仍引用）。
+BP_WAVE2_ROLE_SLUGS: dict[str, str] = {}
 
-# Wave 3: 竞争定位 + 估值回报 —— 读 Wave1+Wave2 输出
+# Wave 3: 竞争定位 + 估值回报 —— 读 Wave1 输出
 BP_WAVE3_ROLE_SLUGS: dict[str, str] = {
     "bp_competition_positioning": "competition_positioning",
     "bp_valuation_return": "valuation_return",
 }
 
-# Wave 4: Deal Breaker + 共识挑战 + 催化剂 + 行业研报 —— 读 Wave0/1/2/3 全量输出
+# Wave 4: Deal Breaker + 共识挑战 + 催化剂 + 行业研报 —— 读 Wave0/1/3 全量输出
 BP_WAVE4_ROLE_SLUGS: dict[str, str] = {
     "bp_dealbreaker_risk": "dealbreaker_risk",
     "bp_consensus_challenge": "consensus_challenge",

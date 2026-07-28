@@ -188,7 +188,7 @@ def _add_evidence_quality_issues(packages: list[dict[str, Any]], coverage: dict[
                         upstream_text = str(upstream_claim.get("claim") or "")
                         upstream_status = str(upstream_claim.get("status") or "").lower()
                         upstream_owner = str(upstream_claim.get("owner_section") or upstream_claim.get("owner") or "")
-                        if (_has_revenue_customer_assumption(upstream_text) or "customer_revenue" in upstream_owner) and upstream_status != "supported":
+                        if (_has_revenue_customer_assumption(upstream_text) or "product_commercial" in upstream_owner) and upstream_status != "supported":
                             unsupported.append(upstream_claim.get("claim_id", ""))
                 if unsupported:
                     issues.append({
@@ -255,12 +255,12 @@ def _add_logic_contradictions(packages: list[dict[str, Any]], issues: list[dict[
             "message": "技术维度声称领先/独创，但竞争维度评估为弱/未验证——逻辑矛盾，需明确哪个判断正确",
         })
 
-    # Contradiction 2: Market says "huge TAM" but Customer Revenue says "no verified revenue"
+    # Contradiction 2: Market says "huge TAM" but Product Commercial says "no verified revenue"
     market_text = section_texts.get("market", "").lower()
-    cust_text = section_texts.get("customer_revenue", "").lower()
+    cust_text = section_texts.get("commercial", "").lower()
     market_large = any(sig in market_text for sig in _LARGE_MARKET_SIGNALS)
     revenue_low = any(re.search(sig, cust_text) for sig in _LOW_REVENUE_SIGNALS) if cust_text else False
-    # Also check unverified ratio in customer_revenue
+    # Also check unverified ratio in commercial (product_commercial now covers customer/revenue)
     if not revenue_low and cust_text:
         unverified_count = cust_text.count("未验证") + cust_text.count("仅bp") + cust_text.count("unverified")
         if unverified_count >= 3:
@@ -269,10 +269,10 @@ def _add_logic_contradictions(packages: list[dict[str, Any]], issues: list[dict[
         issues.append({
             "severity": "HIGH",
             "code": "LARGE_MARKET_BUT_NO_VERIFIED_REVENUE",
-            "message": "行业维度声称大市场，但客户收入维度显示收入未验证/极少——需解释为何渗透率为零",
+            "message": "行业维度声称大市场，但产品商业化维度显示收入未验证/极少——需解释为何渗透率为零",
         })
 
-    # Contradiction 3: Commercial says "mass production" but Customer Revenue says "no customer confirmed"
+    # Contradiction 3: Commercial says "mass production" but no customer confirmed
     comm_text = section_texts.get("commercial", "").lower()
     mass_prod_markers = ("量产", "批量出货", "mass production", "shipped", "delivered")
     comm_mass_prod = any(sig in comm_text for sig in mass_prod_markers)
@@ -281,10 +281,10 @@ def _add_logic_contradictions(packages: list[dict[str, Any]], issues: list[dict[
         issues.append({
             "severity": "HIGH",
             "code": "MASS_PRODUCTION_BUT_NO_CUSTOMER_CONFIRMATION",
-            "message": "商业化维度声称量产出货，但客户验证维度未找到任何客户确认——需补充客户侧证据",
+            "message": "产品商业化维度声称量产出货，但未找到任何客户确认——需补充客户侧证据",
         })
 
-    # Contradiction 4: Valuation uses revenue forecast but Customer Revenue says revenue unverified
+    # Contradiction 4: Valuation uses revenue forecast but revenue unverified
     val_text = section_texts.get("valuation", "").lower()
     val_uses_forecast = any(sig in val_text for sig in ("营收预测", "收入预测", "revenue forecast", "预计.*收入", "预测.*营收"))
     if val_uses_forecast and revenue_low:

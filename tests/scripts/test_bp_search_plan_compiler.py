@@ -12,7 +12,7 @@ def _research_plan():
             {
                 "question_id": "BQ2",
                 "question": "客户收入是否可验证？",
-                "owner_section": "bp_customer_revenue_validation",
+                "owner_section": "bp_product_commercial",
                 "priority": "critical",
                 "required_fact_keys": ["customer_evidence", "revenue_evidence", "order_evidence"],
             },
@@ -29,7 +29,7 @@ def _research_plan():
             {
                 "claim_id": "BC005",
                 "claim": "测试公司的客户、订单、收入可以被独立验证。",
-                "owner_section": "bp_customer_revenue_validation",
+                "owner_section": "bp_product_commercial",
                 "priority": "critical",
                 "required_fact_keys": ["customer_evidence", "revenue_evidence"],
             },
@@ -68,7 +68,7 @@ def test_critical_customer_revenue_claim_generates_deep_search_work_order():
 
     assert plan["schema_version"] == "bp_search_plan.v1"
     assert task["search_task_id"] == "BST-001"
-    assert task["owner_section"] == "bp_customer_revenue_validation"
+    assert task["owner_section"] == "bp_product_commercial"
     assert task["priority"] == "critical"
     assert len(task["queries"]) >= 4
     assert task["min_unique_queries"] >= 4
@@ -94,7 +94,7 @@ def test_owner_section_search_plan_slice_contains_only_relevant_tasks():
 
     slices = plan["owner_section_index"]
 
-    assert slices["bp_customer_revenue_validation"] == ["BST-001"]
+    assert slices["bp_product_commercial"] == ["BST-001"]
     assert slices["bp_valuation_return"] == ["BST-002"]
 
 

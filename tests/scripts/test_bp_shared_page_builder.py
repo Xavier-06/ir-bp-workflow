@@ -14,7 +14,7 @@ def test_bp_claim_with_only_gap_facts_stays_unverified(tmp_path):
                     {
                         "claim_id": "BC005",
                         "claim": "客户、订单、收入可以被独立验证",
-                        "owner_section": "bp_customer_revenue_validation",
+                        "owner_section": "bp_product_commercial",
                         "priority": "critical",
                     }
                 ],
@@ -40,12 +40,12 @@ def test_bp_claim_with_only_gap_facts_stays_unverified(tmp_path):
         ),
         encoding="utf-8",
     )
-    (tmp_path / "bp_phase2_customer_revenue_validation-section.json").write_text(
+    (tmp_path / "bp_phase2_product_commercial-section.json").write_text(
         json.dumps(
             {
                 "schema_version": "bp_section_package.v2",
-                "section_id": "bp_customer_revenue_validation",
-                "section_title": "客户收入验证",
+                "section_id": "bp_product_commercial",
+                "section_title": "产品商业化",
                 "key_messages": ["无外部商业化证据"],
                 "claims": [
                     {
@@ -85,7 +85,7 @@ def test_bp_claim_with_gap_then_positive_fact_remains_unverified_for_critical_cl
                 "schema_version": "bp_research_plan.v2",
                 "task_id": "BP-GAP-POSITIVE",
                 "entity": "测试公司",
-                "claim_matrix": [{"claim_id": "BC005", "claim": "客户订单收入可验证", "owner_section": "bp_customer_revenue_validation", "priority": "critical"}],
+                "claim_matrix": [{"claim_id": "BC005", "claim": "客户订单收入可验证", "owner_section": "bp_product_commercial", "priority": "critical"}],
             },
             ensure_ascii=False,
         ),
@@ -104,7 +104,7 @@ def test_bp_claim_with_gap_then_positive_fact_remains_unverified_for_critical_cl
         encoding="utf-8",
     )
     for name, fact_id, gaps in [
-        ("bp_phase2_customer_revenue_validation-section.json", "BP-CUSTOMER-F001", ["客户合同缺失"]),
+        ("bp_phase2_product_commercial-section.json", "BP-CUSTOMER-F001", ["客户合同缺失"]),
         ("bp_phase2_company_team_compliance-section.json", "BP-CUSTOMER-F002", []),
     ]:
         (tmp_path / name).write_text(

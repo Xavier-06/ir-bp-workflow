@@ -19,7 +19,6 @@ _DIMENSION_ROLES = {
     "product_commercial": "产品商业化",
     "tech_ip_moat": "技术与壁垒",
     "market_supply_chain": "市场与供应链",
-    "customer_revenue_validation": "客户与收入验证",
     "competition_positioning": "竞争定位",
     "valuation_return": "估值与回报",
     "dealbreaker_risk": "Deal Breaker 风险",
@@ -191,12 +190,12 @@ def build_investment_judgment(task_dir: Path) -> dict[str, Any]:
         # T1 阶段多数维度置信度低是正常状态（无公开数据）
         overall_risk = "HIGH — 多数维度置信度低"
     elif high_risk_count >= 1:
-        # T1 进一步判断：如果低置信度主要来自 customer_revenue/valuation，不算 MEDIUM
+        # T1 进一步判断：如果低置信度主要来自 valuation，不算 MEDIUM
         if stage_tier == "T1":
             non_customer_low = sum(
                 1 for d in dimensions
                 if d["confidence"] == "低"
-                and d["slug"] not in ("customer_revenue_validation", "valuation_return")
+                and d["slug"] not in ("valuation_return",)
             )
             if non_customer_low >= 2:
                 overall_risk = "MEDIUM — 团队/技术等核心维度存在不确定性"

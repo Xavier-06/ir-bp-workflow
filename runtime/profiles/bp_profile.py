@@ -1093,6 +1093,21 @@ def _validate_bp_section_package(package: dict[str, Any], fact_ids: set[str], cl
     if schema_version not in {"bp_section_package.v1", "bp_section_package.v2"}:
         issues.append({"severity": "FAIL", "code": "UNSUPPORTED_SCHEMA_VERSION", "message": f"Unsupported schema_version: {schema_version}"})
 
+    # 2026-07-28 fix: 子代理标了 v2 但实为 v1 风格包 → 自动降级 v1 触发 auto-upgrade。
+    # 根因：子代理产出 v1 风格包但误标 v2，validator 只在 schema_version==v1 时触发
+    # _upgrade_v1_to_v2，v2 路径直接走严格校验 → 全包 FAIL（本次跑管线 11/11 包卡死）。
+    #
+    # 判定标准：仅当结构性三件套（answers/claim_ids_covered/narrative_blocks）整体缺失
+    # 才认定为 v1 误标，降级走 auto-upgrade 合成。若三件套已具备、仅缺单个字段
+    # （如缺 search_audit 或某 answer 缺 limits），属真正的 v2 缺陷，保持 v2 严格校验 → FAIL，
+    # 不能借降级绕过合法校验。
+    if schema_version == "bp_section_package.v2":
+        _structural_trio = ("answers", "claim_ids_covered", "narrative_blocks")
+        _missing_trio = [f for f in _structural_trio if f not in package or not package.get(f)]
+        if len(_missing_trio) == len(_structural_trio):
+            package["schema_version"] = "bp_section_package.v1"
+            schema_version = "bp_section_package.v1"
+
     # Bug 5 fix: auto-upgrade v1 → v2 before validation
     if schema_version == "bp_section_package.v1":
         package = _upgrade_v1_to_v2(package)
@@ -1130,13 +1145,20 @@ def _validate_bp_section_package(package: dict[str, Any], fact_ids: set[str], cl
         for field in claim_required:
             if field not in claim:
                 issues.append({"severity": "FAIL", "code": "MISSING_CLAIM_FIELD", "message": f"Claim {idx} missing field: {field}"})
-        if schema_version == "bp_section_package.v2" and claim_ids and claim.get("claim_id") not in claim_ids:
+        # 2026-07-27: 只有当 claim 实际带 claim_id 时才校验其值；
+        # 缺 claim_id 键（None）不应误报 UNKNOWN_CLAIM_ID（auto-upgraded / 兜底自愈包常无 claim_id）。
+        if schema_version == "bp_section_package.v2" and claim_ids and claim.get("claim_id") is not None and claim.get("claim_id") not in claim_ids:
             issues.append({"severity": "FAIL", "code": "UNKNOWN_CLAIM_ID", "message": f"Claim {idx} references unknown claim_id: {claim.get('claim_id')}"})
         for fact_id in claim.get("fact_ids", []) or []:
             if fact_id not in fact_ids:
                 issues.append({"severity": "FAIL", "code": "UNKNOWN_FACT_ID", "message": f"Claim {idx} references unknown fact_id: {fact_id}"})
         if not claim.get("fact_ids"):
-            issues.append({"severity": "FAIL", "code": "CLAIM_WITHOUT_FACTS", "message": f"Claim {idx} has no fact_ids"})
+            # 2026-07-28: auto-upgraded 包降级为 WARN（子代理有时忘绑 fact_ids，
+            # 但 report/claim 本身有 reasoning 有价值，不应硬阻断管线）。
+            if is_auto_upgraded:
+                issues.append({"severity": "WARN", "code": "CLAIM_WITHOUT_FACTS", "message": f"Claim {idx} has no fact_ids"})
+            else:
+                issues.append({"severity": "FAIL", "code": "CLAIM_WITHOUT_FACTS", "message": f"Claim {idx} has no fact_ids"})
 
     if not package.get("facts_used"):
         issues.append({"severity": "FAIL", "code": "MISSING_FACTS_USED", "message": "facts_used is empty"})
@@ -1194,6 +1216,30 @@ def _validate_bp_section_package(package: dict[str, Any], fact_ids: set[str], cl
     return {"passed": not hard_fail, "issues": issues}
 
 
+def _harvest_fact_ids(obj: Any) -> set[str]:
+    """递归 harvest JSON 中所有 fact_id / fact_ids 字段值。
+
+    子代理 sidecar facts.json 的 fact_id 可能嵌在嵌套结构里
+    (如 comparable_transactions[].fact_id, regulations[].fact_ids)，
+    不只存于扁平 facts[] 列表。此函数遍历整个 JSON 树收集所有 fact_id。
+    """
+    result: set[str] = set()
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "fact_id" and isinstance(v, str):
+                result.add(v)
+            elif k == "fact_ids" and isinstance(v, list):
+                for x in v:
+                    if isinstance(x, str):
+                        result.add(x)
+            else:
+                result |= _harvest_fact_ids(v)
+    elif isinstance(obj, list):
+        for x in obj:
+            result |= _harvest_fact_ids(x)
+    return result
+
+
 def _load_bp_fact_ids(task_dir: Path) -> set[str]:
     path = task_dir / "bp_fact_store_index.json"
     fact_ids: set[str] = set()
@@ -1207,15 +1253,20 @@ def _load_bp_fact_ids(task_dir: Path) -> set[str]:
     # 合并 outputs 目录下所有 *-facts.json sidecar 中的 fact_id
     # 子代理不一定全部回写中央 fact store（phase30 merge 可能因格式异常跳过），
     # 但 sidecar 里一定有对应的 fact。不合并会导致下游校验误报 UNKNOWN_FACT_ID。
+    # 2026-07-28: 递归 harvest 嵌套结构中的 fact_id（子代理常把 fact_id 嵌在
+    # comparable_transactions[]/regulations[] 等列表里，而非扁平 facts[] 列表）。
     outputs_dir = task_dir / "outputs"
     if outputs_dir.exists():
         for facts_file in outputs_dir.glob("*-facts.json"):
             try:
                 payload = json.loads(facts_file.read_text(encoding="utf-8"))
+                # 先取扁平 facts[] 列表（标准格式）
                 facts = payload.get("facts", []) if isinstance(payload, dict) else []
                 for f in facts:
                     if isinstance(f, dict) and f.get("fact_id"):
                         fact_ids.add(str(f["fact_id"]))
+                # 再递归 harvest 嵌套结构中的 fact_id
+                fact_ids |= _harvest_fact_ids(payload)
             except Exception:
                 continue
     return fact_ids
@@ -1227,6 +1278,8 @@ def _load_section_sidecar_fact_ids(section_file: Path) -> set[str]:
     子代理的 facts 不一定全部回写中央 fact store（phase30 merge 可能遇到
     格式异常文件而跳过），所以 section package 验证器必须同时读取 sidecar
     中的 fact_id，避免误报 UNKNOWN_FACT_ID。
+
+    2026-07-28: 递归 harvest 嵌套结构中的 fact_id（对齐 _load_bp_fact_ids）。
     """
     facts_path = section_file.with_name(f"{section_file.stem}-facts.json")
     if not facts_path.exists():
@@ -1234,8 +1287,15 @@ def _load_section_sidecar_fact_ids(section_file: Path) -> set[str]:
     payload = _safe_load_json_with_repair(facts_path)
     if payload is None:
         return set()
+    fact_ids: set[str] = set()
+    # 标准扁平 facts[] 列表
     facts = payload.get("facts", []) if isinstance(payload, dict) else []
-    return {str(f.get("fact_id")) for f in facts if isinstance(f, dict) and f.get("fact_id")}
+    for f in facts:
+        if isinstance(f, dict) and f.get("fact_id"):
+            fact_ids.add(str(f.get("fact_id")))
+    # 递归 harvest 嵌套结构
+    fact_ids |= _harvest_fact_ids(payload)
+    return fact_ids
 
 
 def _load_bp_claim_ids(task_dir: Path) -> set[str]:
@@ -1774,10 +1834,11 @@ def _run_bp_investment_judgment(runtime_root: Path, job_ctx: JobContext) -> dict
 
 
 # ── Phase 08-23: BP 子代理发射（5-Wave 结构）────────────────
-# Wave 1: 基础四维并行（行业/团队/技术/产品）—— 互不依赖
-# Wave 2: 客户收入验证 —— 读 Wave1 产品/技术信息交叉验证
-# Wave 3: 竞争+估值并行 —— 读 Wave1+Wave2 输出，竞争需要客户数据
-# Wave 4: Deal Breaker —— 读 Wave1/2/3 全量输出
+# Wave 0: 投资假说先行者
+# Wave 1: 基础四维并行（团队合规/产品商业化/技术IP/市场供应链）—— 互不依赖
+# Wave 2: （已移除 2026-07-28，原为客户收入验证）
+# Wave 3: 竞争+估值并行 —— 读 Wave1 输出
+# Wave 4: Deal Breaker + 共识挑战 + 催化剂 + 行业研报 —— 读 Wave0/1/3 全量输出
 # Wave 5: 统稿 —— 读全部 8 个维度
 
 # Wave role slug 常量已统一至 bp_constants.py，此处通过模块顶部 import 引用。
@@ -1943,20 +2004,6 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "company_name": profile.get("company_name", ""),
                 "products": products,
                 "competitors": competitors,
-                "financing_rounds": profile.get("financing_rounds", []),
-                "research_plan": research_plan_file,
-                "presearch_steps_compat": presearch_files,
-            },
-        },
-        {
-            "role_name": "bp_customer_revenue_validation",
-            "brief_key": "bp_customer_revenue_validation",
-            "description": "Wave 2 Cross-Validation: 客户、订单、合同、回款、收入拆分和商业化真实性验证",
-            "output_file": str(task_dir / "bp_phase2_customer_revenue_validation.md"),
-            "key_inputs": {
-                "company_name": profile.get("company_name", ""),
-                "products": products,
-                "customers": customers,
                 "financing_rounds": profile.get("financing_rounds", []),
                 "research_plan": research_plan_file,
                 "presearch_steps_compat": presearch_files,
@@ -2466,10 +2513,9 @@ def _run_bp_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext, wave: in
     而是生成 repair manifests 并暂停管线（needs_dispatch），
     等主 AI 派发 repair 子代理修复后恢复。
     """
-    # Wave 2 gate 也跳过（prepare 和 collect 已跳过，没有输出可检查）
-    if wave == 2 and _should_skip_wave2(runtime_root, job_ctx):
-        print("  ⏭️  T1（种子/天使轮）跳过 Wave 2 evidence gate", flush=True)
-        return {"ok": True, "skipped": True, "reason": "T1_skip_wave2"}
+    # Wave 2 已移除（2026-07-28），wave==2 的 gate 永远无输出可检查 → 直接跳过
+    if wave == 2:
+        return {"ok": True, "skipped": True, "reason": "wave2_removed_2026-07-28"}
 
     from scripts.bp_wave_evidence_gate import evaluate_bp_wave_evidence_gate, build_repair_manifests
 
@@ -2547,90 +2593,25 @@ def _shared_inputs(task_dir: Path) -> dict[str, str]:
     }
 
 
-# ── Wave 2: 客户收入验证 ────────────────────────────
+# ── Wave 2: 客户收入验证（已移除 2026-07-28）────────────────────
+# 根因：T1 跳过 + T2/T3 价值有限（客户/收入已在 product_commercial 覆盖），
+# 跑 customer_revenue 只产出空 stub + 触发 evidence gate 降级，浪费子代理调用。
+# 保留 no-op 函数以维持 phase handler 映射完整（phase13/14/15 仍注册但立即返回）。
 
 
 def _should_skip_wave2(runtime_root: Path, job_ctx: JobContext) -> bool:
-    """T1（种子/天使轮）跳过 Wave 2 客户收入验证。
-
-    天使轮公司无公开客户和收入是正常状态，跑客户收入验证只会输出"无数据"，
-    浪费子代理调用且触发 evidence gate 的 blocking_claims 降级。
-    """
-    from scripts.bp_stage_utils import read_stage_from_task
-    task_dir = _task_dir(runtime_root, job_ctx)
-    stage_tier = read_stage_from_task(task_dir)
-    return stage_tier == "T1"
+    """Wave 2 已移除，永远跳过。"""
+    return True
 
 
 def _run_bp_wave2_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Wave 2: 客户收入验证 — sequential 模式。"""
-    if _should_skip_wave2(runtime_root, job_ctx):
-        print("  ⏭️  T1（种子/天使轮）跳过 Wave 2 客户收入验证", flush=True)
-        return {"ok": True, "skipped": True, "reason": "T1_skip_wave2"}
-
-    from scripts.bp_subagent_launcher_wb import _spawn_one
-
-    task_dir = _task_dir(runtime_root, job_ctx)
-    outputs_dir = _outputs_dir(runtime_root, job_ctx)
-    profile = _load_bp_profile(task_dir)
-
-    all_subs = _dispatch_role_specs(task_dir, profile)
-    wave2_subs = [s for s in all_subs if s["role_name"] in _WAVE2_ROLES]
-    if len(wave2_subs) != len(_WAVE2_ROLES):
-        found = {s["role_name"] for s in wave2_subs}
-        missing = [role for role in _WAVE2_ROLES if role not in found]
-        return {"ok": False, "error": f"wave2 role spec missing: {missing}"}
-
-    # sequential：找 pending
-    pending = []
-    for sub in wave2_subs:
-        slug = BP_WAVE2_ROLE_SLUGS[sub["role_name"]]
-        is_complete, _ = _role_outputs_complete(sub["role_name"], slug, outputs_dir, task_dir)
-        if not is_complete:
-            pending.append(sub)
-
-    if not pending:
-        return {"ok": True, "needs_dispatch": False, "has_more": False,
-                "mode": "bp_wave2_prepare", "phase": "phase13_wave2_prepare", "job_id": job_ctx.job_id}
-
-    sub = pending[0]
-    prior_outputs = _prior_wave_files(BP_WAVE1_ROLE_SLUGS.items(), task_dir, outputs_dir)
-    shared = _shared_inputs(task_dir)
-    sub["output_file"] = str(outputs_dir / Path(sub["output_file"]).name)
-    sub["key_inputs"]["prior_dimension_outputs"] = prior_outputs
-    sub["key_inputs"]["shared_inputs"] = shared
-    sub["wave_inputs"] = {**shared, **prior_outputs}
-
-    spawn_result = _spawn_one(job_ctx.job_id, sub, task_dir=task_dir)
-    manifest_path = spawn_result.get("manifest_path", "") if isinstance(spawn_result, dict) else str(spawn_result)
-
-    has_more = len(pending) > 1
-    remaining = [s["role_name"] for s in pending[1:]]
-
-    return {
-        "ok": True, "needs_dispatch": True, "has_more": has_more,
-        "mode": "bp_wave2_prepare", "phase": "phase13_wave2_prepare", "job_id": job_ctx.job_id,
-        "dispatch_info": {"manifests": [manifest_path], "current_role": sub["role_name"],
-                          "remaining_roles": remaining, "task_dir": str(task_dir), "outputs_dir": str(outputs_dir)},
-        "instruction": _dispatch_completion_instruction_sequential(
-            sub["role_name"], BP_WAVE2_ROLE_SLUGS, "phase14_wave2_collect",
-            has_more=has_more, remaining=remaining),
-    }
+    """Wave 2 已移除，no-op。"""
+    return {"ok": True, "skipped": True, "reason": "wave2_removed_2026-07-28"}
 
 
 def _run_bp_wave2_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """检查 Wave 2 客户收入验证输出。v2: 加 retry 缓冲。"""
-    if _should_skip_wave2(runtime_root, job_ctx):
-        print("  ⏭️  T1（种子/天使轮）跳过 Wave 2 收集", flush=True)
-        return {"ok": True, "skipped": True, "reason": "T1_skip_wave2"}
-    task_dir = _task_dir(runtime_root, job_ctx)
-    outputs_dir = _outputs_dir(runtime_root, job_ctx)
-    return _collect_with_retry(
-        "wave2_collect",
-        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE2_ROLE_SLUGS, _WAVE2_ROLES, "phase14_wave2_collect"),
-        job_id=job_ctx.job_id,
-        outputs_dir=outputs_dir,
-    )
+    """Wave 2 已移除，no-op。"""
+    return {"ok": True, "skipped": True, "reason": "wave2_removed_2026-07-28"}
 
 
 # ── Wave 3: 竞争 + 估值 ────────────────────────────
@@ -2668,9 +2649,8 @@ def _run_bp_wave3_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                 "mode": "bp_wave3_prepare", "phase": "phase16_wave3_prepare", "job_id": job_ctx.job_id}
 
     sub = pending[0]
-    # 汇总 Wave 1 + Wave 2 输出
+    # 汇总 Wave 1 输出（Wave 2 已移除）
     prior_outputs = _prior_wave_files(BP_WAVE1_ROLE_SLUGS.items(), task_dir, outputs_dir)
-    prior_outputs.update(_prior_wave_files(BP_WAVE2_ROLE_SLUGS.items(), task_dir, outputs_dir))
     shared = _shared_inputs(task_dir)
     sub["output_file"] = str(outputs_dir / Path(sub["output_file"]).name)
     sub["key_inputs"]["prior_dimension_outputs"] = prior_outputs
@@ -2737,10 +2717,9 @@ def _run_bp_wave4_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                 "mode": "bp_wave4_prepare", "phase": "phase20_wave4_prepare", "job_id": job_ctx.job_id}
 
     sub = pending[0]
-    # 汇总 Wave 0 + Wave 1 + Wave 2 + Wave 3 输出
+    # 汇总 Wave 0 + Wave 1 + Wave 3 输出（Wave 2 已移除）
     prior_outputs = _prior_wave_files(BP_WAVE0_ROLE_SLUGS.items(), task_dir, outputs_dir)
     prior_outputs.update(_prior_wave_files(BP_WAVE1_ROLE_SLUGS.items(), task_dir, outputs_dir))
-    prior_outputs.update(_prior_wave_files(BP_WAVE2_ROLE_SLUGS.items(), task_dir, outputs_dir))
     prior_outputs.update(_prior_wave_files(BP_WAVE3_ROLE_SLUGS.items(), task_dir, outputs_dir))
     shared = _shared_inputs(task_dir)
     sub["output_file"] = str(outputs_dir / Path(sub["output_file"]).name)
@@ -2915,56 +2894,13 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
     task_dir = _task_dir(runtime_root, job_ctx)
     outputs_dir = _outputs_dir(runtime_root, job_ctx)
 
-    # Bug 3 fix: 感知 stage_tier，对被跳过的 wave 维度创建占位文件
+    # Bug 3 fix: 感知 stage_tier（供 prompt 模板使用）
+    # Wave 2 已移除（2026-07-28），不再需要 skipped_slugs 占位逻辑
     stage_tier = read_stage_from_task(task_dir)
     skipped_slugs: set[str] = set()
-    if stage_tier == "T1":
-        # T1 跳过 Wave 2（customer_revenue_validation）
-        skipped_slugs = set(BP_WAVE2_ROLE_SLUGS.values())
+    # Wave 2 已移除，BP_WAVE2_ROLE_SLUGS 为空，无需占位
 
-    def _ensure_placeholder(slug: str) -> None:
-        """为被跳过的维度创建最小占位文件（md + facts + section sidecar）。"""
-        for d in (outputs_dir, task_dir):
-            md_path = d / f"bp_phase2_{slug}.md"
-            if md_path.exists():
-                continue
-            md_path.write_text(
-                f"# {slug.replace('_', ' ').title()}\n\n"
-                f"> 本维度因融资阶段（{stage_tier}）跳过。\n"
-                f"> {stage_tier}（种子/天使轮）公司无公开客户和收入是正常状态。\n",
-                encoding="utf-8",
-            )
-            facts_path = md_path.with_name(f"{md_path.stem}-facts.json")
-            if not facts_path.exists():
-                facts_path.write_text(json.dumps({
-                    "schema_version": "bp_fact_store.v1",
-                    "task_id": job_ctx.job_id,
-                    "entity": job_ctx.entity,
-                    "facts": [],
-                    "source_files": [],
-                }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            section_path = md_path.with_name(f"{md_path.stem}-section.json")
-            if not section_path.exists():
-                section_path.write_text(json.dumps({
-                    "schema_version": "bp_section_package.v2",
-                    "section_id": slug,
-                    "section_title": slug.replace("_", " ").title(),
-                    "key_messages": [f"{stage_tier} 阶段跳过本维度"],
-                    "claims": [],
-                    "facts_used": [],
-                    "counter_evidence": [],
-                    "data_gaps": [f"{stage_tier} 阶段无需验证客户收入"],
-                    "markdown_draft": f"# {slug.replace('_', ' ').title()}\n\n本维度因融资阶段（{stage_tier}）跳过。",
-                    "answers": [],
-                    "claim_ids_covered": [],
-                    "narrative_blocks": [],
-                    "search_audit": {"queries": [], "fetched_urls": [], "source_domains": [], "claim_coverage": []},
-                }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    for slug in skipped_slugs:
-        _ensure_placeholder(slug)
-
-    # 检查 8 个 Wave 1-4 输出是否齐全（md + facts sidecar + section sidecar 全部存在且非空）
+    # 检查 7 个 Wave 1-4 维度输出是否齐全（md + facts sidecar + section sidecar 全部存在且非空）
     # Bug 1 fix: 对齐 _role_outputs_complete 标准（md>100B, facts>10B, section>10B），
     # 避免空 sidecar 文件通过检查导致下游统稿子代理拿到损坏输入。
     # 同时包 _collect_with_retry 等待 sidecar 落盘（与其他 collect 一致）。
@@ -3823,9 +3759,9 @@ class BPProfile(PipelineProfile):
             "phase08_dispatch_prepare": ["phase2_dispatch.json"],
             "phase09_dispatch_collect": [],
             "phase10_wave1_evidence_gate": ["bp_wave1_evidence_gate.json"],
-            "phase13_wave2_prepare": [],
-            "phase14_wave2_collect": [],
-            "phase15_wave2_evidence_gate": ["bp_wave2_evidence_gate.json"],
+            "phase13_wave2_prepare": [],  # Wave 2 已移除 (2026-07-28)，no-op
+            "phase14_wave2_collect": [],  # Wave 2 已移除
+            "phase15_wave2_evidence_gate": [],  # Wave 2 已移除
             "phase16_wave3_prepare": [],
             "phase17_wave3_collect": [],
             "phase18_wave3_evidence_gate": ["bp_wave3_evidence_gate.json"],

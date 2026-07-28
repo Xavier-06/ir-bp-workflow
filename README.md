@@ -359,7 +359,6 @@ Layer 5: yfinance（美股估值）
 | `bp_product_commercial` | W1 | 产品/商业化/客户 | 天眼查 + westock-mcp |
 | `bp_tech_ip_moat` | W1 | 技术/IP/护城河 | 天眼查 + westock-mcp |
 | `bp_market_supply_chain` | W1 | 市场/行业/供应链 | 天眼查 + westock-mcp |
-| `bp_customer_revenue_validation` | W2 | 客户收入交叉验证 | 天眼查 + westock-mcp |
 | `bp_competition_positioning` | W3 | 竞品清单/差异化/可复制性 | 天眼查 + westock-mcp |
 | `bp_valuation_return` | W3 | 估值情况/可比公司 | 天眼查 + westock-mcp |
 | `bp_dealbreaker_risk` | W4 | 红队风险/deal breaker | 天眼查 + westock-mcp |

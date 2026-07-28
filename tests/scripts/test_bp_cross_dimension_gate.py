@@ -30,7 +30,7 @@ def test_cross_gate_detects_valuation_depends_on_unsupported_revenue(tmp_path):
         tmp_path / "bp_claim_coverage.json",
         {
             "claims": [
-                {"claim_id": "BC_REV", "claim": "客户收入已验证", "owner_section": "bp_customer_revenue_validation", "priority": "critical", "status": "unverified", "fact_ids": ["BF-REV"]}
+                {"claim_id": "BC_REV", "claim": "客户收入已验证", "owner_section": "bp_product_commercial", "priority": "critical", "status": "unverified", "fact_ids": ["BF-REV"]}
             ],
         },
     )

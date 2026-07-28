@@ -26,7 +26,6 @@ ROLE_TO_KEY = {
     'bp_market_supply_chain': 'market_supply_chain',
     'bp_competition_positioning': 'competition_positioning',
     'bp_valuation_return': 'valuation_return',
-    'bp_customer_revenue_validation': 'customer_revenue_validation',
     'bp_dealbreaker_risk': 'dealbreaker_risk',
     # v4.5 新增：投资叙事层 4 角色
     'bp_investment_hypothesis': 'investment_hypothesis',
@@ -54,7 +53,6 @@ CURRENT_BP_ROLES = {
     'bp_market_supply_chain',
     'bp_competition_positioning',
     'bp_valuation_return',
-    'bp_customer_revenue_validation',
     'bp_dealbreaker_risk',
     # v4.5 新增：投资叙事层
     'bp_investment_hypothesis',
@@ -963,11 +961,6 @@ _BP_SEARCH_TEMPLATES = {
         '"{entity}" financing valuation comparable companies transaction',
         '"{entity}" funding round valuation exit IPO acquisition',
         '"{entity}" 融资 估值 可比公司 退出 并购 IPO',
-    ],
-    'bp_customer_revenue_validation': [
-        '"{entity}" customer contract order delivery revenue',
-        '"{entity}" customer validation repayment pipeline',
-        '"{entity}" 客户 合同 订单 交付 回款 收入',
     ],
     'bp_dealbreaker_risk': [
         '"{entity}" risk litigation debt default qualification',

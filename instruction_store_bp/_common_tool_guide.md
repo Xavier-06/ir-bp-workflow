@@ -449,7 +449,6 @@ fetch 到研报全文不是终点，必须**逐表逐参数抄录**以下硬数�
 | market_supply_chain | 自建研报库 | 行研智库、精选行业报告 |
 | competition_positioning | 自建研报库 | 机构调研纪要 |
 | valuation_return | 自建研报库 | 机构调研纪要 |
-| customer_revenue_validation | 自建研报库 | 行研智库 |
 | dealbreaker_risk | 自建研报库 | 机构调研纪要 |
 | consensus_challenge | 自建研报库 | 机构调研纪要 |
 | catalyst | 自建研报库 | 机构调研纪要 |
@@ -518,7 +517,6 @@ IMA 来源: [列出引用的 IMA 知识库名 + 标题]
 | market_supply_chain | NeoData(api+doc)行业研报/竞对/新闻 + yfinance 美股竞对 + TYC 供应商 + WebSearch 行业/政策 + **westock-mcp 上市竞对板块/产业链/资金流/北向/机构评级** + **IMA 自建研报库/行研智库/精选报告（行业深度/白皮书/TAM）** | 估值建模/技术路线/团队分析 |
 | competition_positioning | TYC 竞品验证 + NeoData(api+doc)/yfinance 竞品财务/新闻/研报 + **westock-mcp 板块/产业链/资金流/北向/机构评级** + WebSearch 竞品情报 + **IMA 自建研报库/机构调研纪要（竞品投行研报/机构点评）** | 估值主模型/客户收入主结论/泛化风险 |
 | valuation_return | NeoData(api+doc)/yfinance/enrich_valuation 三源估值+研报 + **westock-mcp 板块/产业链/机构评级/资金流** + WebSearch 可比交易 + **IMA 自建研报库/机构调研纪要（可比公司估值/目标价方法论）** | 客户验证/技术判断/竞品主分析/市场规模 |
-| customer_revenue_validation | TYC 客户全量验证 + WebSearch 收入/订单 + NeoData(api)上市客户 + **NeoData(doc)客户新闻/订单报道** + **westock-mcp 上市客户板块/产业链/资金流** + **IMA 自建研报库/行研智库（客户投行研报/机构点评）** | 估值分析/技术判断/市场规模/竞品主分析 |
 | dealbreaker_risk | TYC 风险全扫(35项) + **NeoData(doc)负面新闻/风险舆情/监管动态** + WebSearch 负面/舆情/监管 + NeoData(api)前置验证 + **westock-mcp 上市主体板块/产业链/资金流/北向/机构评级（风险佐证）** + **IMA 自建研报库/机构调研纪要（风险信号/外资观点）** | 估值建模/客户主验证/技术判断/市场规模 |
 | 统稿 | Read 所有维度输出 + Write 完整报告 | 搜任何外部数据 |
 

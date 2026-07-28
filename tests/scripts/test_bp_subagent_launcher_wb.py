@@ -133,7 +133,7 @@ def test_build_brief_includes_claim_level_search_work_order(tmp_path, monkeypatc
                 {
                     "search_task_id": "BST-001",
                     "claim_id": "BC005",
-                    "owner_section": "bp_customer_revenue_validation",
+                    "owner_section": "bp_product_commercial",
                     "queries": ["\"测试公司\" 客户 合同 订单 回款"],
                     "min_unique_queries": 4,
                     "min_fetched_urls": 2,
@@ -152,9 +152,9 @@ def test_build_brief_includes_claim_level_search_work_order(tmp_path, monkeypatc
         encoding="utf-8",
     )
     sub = {
-        "role_name": "bp_customer_revenue_validation",
-        "description": "客户收入验证",
-        "output_file": str(task_dir / "bp_phase2_customer_revenue_validation.md"),
+        "role_name": "bp_product_commercial",
+        "description": "产品商业化验证",
+        "output_file": str(task_dir / "bp_phase2_product_commercial.md"),
         "key_inputs": {},
     }
 
@@ -234,36 +234,31 @@ def test_spawn_one_manifest_persists_wave_inputs_beyond_preview(tmp_path, monkey
     for path in list(shared_inputs.values()) + list(prior_outputs.values()):
         Path(path).write_text("{}", encoding="utf-8")
     sub = {
-        "role_name": "bp_customer_revenue_validation",
-        "description": "客户收入验证",
-        "output_file": str(task_dir / "bp_phase2_customer_revenue_validation.md"),
+        "role_name": "bp_product_commercial",
+        "description": "产品商业化验证",
+        "output_file": str(task_dir / "bp_phase2_product_commercial.md"),
         "key_inputs": {"shared_inputs": shared_inputs, "prior_dimension_outputs": prior_outputs},
         "wave_inputs": {**shared_inputs, **prior_outputs},
     }
 
     _spawn_one("TASK-BP", sub, task_dir=task_dir)
 
-    manifest = json.loads((task_dir / "bp_phase2_manifest_customer_revenue_validation.json").read_text(encoding="utf-8"))
+    manifest = json.loads((task_dir / "bp_phase2_manifest_product_commercial.json").read_text(encoding="utf-8"))
     assert manifest["key_inputs"]["shared_inputs"] == shared_inputs
     assert manifest["wave_inputs"]["bp_company_team_compliance"] == prior_outputs["bp_company_team_compliance"]
 
 
 def test_new_bp_roles_have_role_specific_system_prompt_boundaries():
-    assert "客户" in ROLE_SYSTEM_PROMPTS["bp_customer_revenue_validation"]
-    assert "收入" in ROLE_SYSTEM_PROMPTS["bp_customer_revenue_validation"]
+    assert "客户" in ROLE_SYSTEM_PROMPTS["bp_product_commercial"]
     assert "Deal Breakers" in ROLE_SYSTEM_PROMPTS["bp_dealbreaker_risk"]
     assert "公司主体" in ROLE_SYSTEM_PROMPTS["bp_company_team_compliance"]
     assert "市场规模" in ROLE_SYSTEM_PROMPTS["bp_market_supply_chain"]
 
 
-def test_wave2_customer_and_dealbreaker_prompts_do_not_reuse_competition_final_chapter():
-    customer_prompt = ROLE_SYSTEM_PROMPTS["bp_customer_revenue_validation"]
+def test_wave_dealbreaker_prompts_do_not_reuse_competition_final_chapter():
     dealbreaker_prompt = ROLE_SYSTEM_PROMPTS["bp_dealbreaker_risk"]
 
-    assert "writing the final chapter" not in customer_prompt
     assert "writing the final chapter" not in dealbreaker_prompt
-    assert "客户清单" in customer_prompt
-    assert "收入真实性分级" in customer_prompt
     assert "Deal Breaker 清单" in dealbreaker_prompt
     assert "不可缓释" in dealbreaker_prompt
 
@@ -288,7 +283,6 @@ def test_all_current_bp_roles_are_registered_in_instruction_store():
         "bp_market_supply_chain",
         "bp_competition_positioning",
         "bp_valuation_return",
-        "bp_customer_revenue_validation",
         "bp_dealbreaker_risk",
     }
 
@@ -309,7 +303,6 @@ def test_current_bp_role_prompts_are_loaded_exactly_from_instruction_store():
 
     assert "# BP 产品商业化分析师" in ROLE_SYSTEM_PROMPTS["bp_product_commercial"]
     assert "# BP 技术、IP 与壁垒分析师" in ROLE_SYSTEM_PROMPTS["bp_tech_ip_moat"]
-    assert "# BP 客户与收入真实性验证分析师" in ROLE_SYSTEM_PROMPTS["bp_customer_revenue_validation"]
     assert "# BP Deal Breaker 红队分析师" in ROLE_SYSTEM_PROMPTS["bp_dealbreaker_risk"]
     assert "技术原理深度分析" not in ROLE_SYSTEM_PROMPTS["bp_product_commercial"]
     assert "客户清单" not in ROLE_SYSTEM_PROMPTS["bp_tech_ip_moat"]
