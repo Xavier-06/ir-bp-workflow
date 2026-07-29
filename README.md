@@ -7,10 +7,23 @@
 
 | 管线 | 触发方式 | 规模 | 产出 |
 |------|---------|------|------|
-| **IR** | "分析比亚迪" | 9 步 + 统稿 · 4 波 · 28 phase（deep） | 券商级研报 DOCX |
-| **BP** | "帮我看下这个 BP" + 上传文件 | 11 角色 + 统稿 · 4 波 · 35 phase | 尽调报告 DOCX |
+| **IR** | "分析比亚迪" | 8 step + 统稿 · 3 波 · 28 phase（deep） | 券商级研报 DOCX |
+| **BP** | "帮我看下这个 BP" + 上传文件 | 10 角色 + 统稿 · 3 波 · 31 phase | 尽调报告 DOCX |
 | **IC** | "做个半导体行业研究" | 5 种原型 · 最多 16 角色 · 18 phase | 行业研究报告 DOCX |
 | **LIT** | "做个固态电池技术评估" | 7 角色 · 3 波 · 20 phase | 技术评估报告 MD |
+
+---
+
+## 版本演进（v6.1，2026-07-29）
+
+本仓库近期做了几轮结构性瘦身，如果你拿旧文档对照代码会发现对不上，以下是关键变更：
+
+- **BP 删除 Wave 0 投资假说先行者**：原 `phase07b/07c/07d`（`bp_investment_hypothesis` 角色）彻底移除。假说在所有维度之前跑属于空转——Wave1 各维度本身就在做验证，且无硬下游依赖。角色从 11 减为 10。
+- **BP 删除独立工商核验 phase**：原 `phase02_company_verify` 移除。工商核验已内化进研究计划子代理（`phase04_research_plan` 自带 tyc-mcp 直调），不再单独占一个 phase。
+- **BP phase 连续重编号**：从断档编号（01/01b/04/04c/05-30）连续化为 **01-31**。子代理输出文件也从远古命名 `bp_phase2_{slug}.*` 改为 `bp_dim_{slug}.*`，dispatch 记录改为 `bp_dispatch.json`。
+- **IR step 连续重编号**：重编号为连续的 **step1-step8**（原 step2_industry→step1_industry、step_macro→step5_macro 等），统稿从 step8_master 剥离为独立 synthesis 子代理。
+
+> ⚠️ 旧 job 数据的 phase/step 字符串已失效，断点续跑需用新名。
 
 ---
 
@@ -23,8 +36,8 @@
 ├──────────────┬──────────────┬──────────────┬────────────────────────┤
 │   IR 管线     │   BP 管线     │   IC 管线     │     LIT 管线           │
 │  券商研报      │  BP 尽调      │  行业研究      │     文献综述           │
-│  9步+统稿     │  11角色+统稿   │  5原型×16角色  │     7角色             │
-│  4波·28phase  │  4波·35phase  │  18 phase     │     3波·20phase       │
+│  8步+统稿     │  10角色+统稿   │  5原型×16角色  │     7角色             │
+│  3波·28phase  │  3波·31phase  │  18 phase     │     3波·20phase       │
 ├──────────────┴──────────────┴──────────────┴────────────────────────┤
 │                          共享基础设施                                 │
 │  kernel.py（Phase 状态机）· search_gateway（6 层搜索降级链）            │
@@ -39,7 +52,7 @@
 
 ## BP 管线（商业计划书尽调）
 
-**一句话**：BP 文件进来 → OCR 结构化 → Wave 0 投资假说先行 → 4 维度基础采集 → 竞争+估值交叉验证 → 红队风险/共识挑战/催化剂/行业研报 → Fact Store 全局事实库 → 门禁校验 → 不合格自动修复 → 统稿 → 对抗评审 → DOCX 交付。
+**一句话**：BP 文件进来 → OCR 结构化 → 研究计划（含工商核验）→ Wave1 四维基础采集 → Wave3 竞争+估值交叉验证 → Wave4 红队/共识/催化剂/行业研报 → Fact Store 全局事实库 → 门禁校验 → 不合格自动修复 → 统稿 → 对抗评审 → DOCX 交付。
 
 每个分析结论都必须有可追溯的证据（claim → fact → source），没有证据的结论会被门禁拦截并修复。
 
@@ -47,62 +60,57 @@
 BP 文件（PDF/PPTX）
         │
         ▼
-Phase 01-07: 预处理
+Phase 01-08: 预处理
   01  OCR 识别 → 结构化公司数据（无文件时跳过）
-  01b 公司名搜索入库（无 PDF 模式，子代理搜索）
-  02  天眼查工商验证
-  04  研究计划 → 子代理派发（tyc + westock + search_deep 自主搜索）
-  05  共享尽调页初始化
-  06  搜索工单编译
-  07  Fact Store 初始化
-        │
-        ▼
-Wave 0: 投资假说先行者（1 角色）★
-  07b 派发 → 07c 收集 → 07d 共享页刷新
-  bp_investment_hypothesis: 提假说 + 可验证问题
+  02  公司名搜索入库（无 PDF 模式，子代理搜索）
+  03  搜索入库收集
+  04  研究计划 → 子代理派发（tyc 工商核验 + westock + search_deep 自主搜索）
+  05  研究计划收集
+  06  共享尽调页初始化
+  07  搜索工单编译
+  08  Fact Store 初始化
         │
         ▼
 Wave 1: 基础证据采集（4 角色 sequential）
-  08 派发 → 09 收集 → 10 门禁（FAIL → repair → 重跑）
+  09 派发 → 10 收集 → 11 门禁（FAIL → repair → 重跑）→ 12 Fact 合并 → 13 共享页刷新
   团队合规 / 产品商业 / 技术IP / 市场供应链
   每角色产出：.md + facts.json + section.json
         │
         ▼
 Wave 3: 竞争 + 估值（2 角色 sequential）
-  13 派发 → 14 收集 → 15 门禁 → 16 共享页刷新
-  读 Wave 0+1 输出做交叉验证
+  14 派发 → 15 收集 → 16 门禁 → 17 共享页刷新
+  读 Wave 1 输出做交叉验证
         │
         ▼
-Wave 4: 叙事层（4 角色）★
-  17 派发 → 18 收集 → 19 门禁 → 20 共享页刷新
+Wave 4: 叙事层（4 角色）
+  18 派发 → 19 收集 → 20 门禁 → 21 共享页刷新
   红队风险 / 共识挑战 / 催化剂 / 行业研报
   读全量输出做反向论证
         │
         ▼
-Phase 21-23: 全局校验
-  21 Claim 覆盖校验（每个 claim 有证据？）
-  22 跨维度一致性（不同维度引用同一数字？）
-  23 Section Package 校验（格式完整性）
+Phase 22-24: 全局校验
+  22 Claim 覆盖校验（每个 claim 有证据？）
+  23 跨维度一致性（不同维度引用同一数字？）
+  24 Section Package 校验（格式完整性）
         │
         ▼
-Phase 24-25: 统稿（1 个子代理）
-  读 11 维度 .md + Fact Store → 写最终报告
+Phase 25-26: 统稿（1 个子代理）
+  读 10 维度 .md + Fact Store → 写最终报告
   脚注密度不达标 → repair 子代理补脚注
         │
         ▼
-Phase 26-30: 交付
-  26 对抗评审 → 27 最终组装 → 28 可读性审查
-  29 投资判断汇总 → 30 DOCX 生成 + 桌面复制
+Phase 27-31: 交付
+  27 对抗评审 → 28 最终组装 → 29 可读性审查
+  30 投资判断汇总 → 31 DOCX 生成 + 桌面复制
         │
         ▼
   DD 尽调报告.docx + 维度独立 DOCX
 ```
 
-### BP 11 角色 + 统稿
+### BP 10 角色 + 统稿
 
 | 角色 | Wave | 职责 | 核心工具 |
 |------|------|------|---------|
-| `bp_investment_hypothesis` | W0 | 投资假说先行者（提假说 + 可验证问题） | 天眼查 + westock + IMA |
 | `bp_company_team_compliance` | W1 | 团队 / 合规 / 治理 | 天眼查 + westock + IMA |
 | `bp_product_commercial` | W1 | 产品 / 商业化 / 客户 | 天眼查 + westock + IMA |
 | `bp_tech_ip_moat` | W1 | 技术 / IP / 护城河 | 天眼查 + westock + IMA |
@@ -115,45 +123,43 @@ Phase 26-30: 交付
 | `bp_industry_research` | W4 | 行业研报整合（6 大类基准数据） | westock + IMA |
 | `bp_统稿` | — | 读全量维度输出 + Fact Store → 最终报告 | — |
 
-### BP 35 Phase 完整清单
+### BP 31 Phase 完整清单
 
 | # | Phase | 类型 | 说明 |
 |---|-------|------|------|
-| 01 | document_intake | 脚本 | VL OCR 识别 + 结构化抽取（无 input_file 时跳过） |
-| 01b | company_intake | dispatch | 公司名搜索入库（无 PDF 模式） |
-| 01b | company_intake_collect | 收集 | 搜索入库收集 |
-| 02 | company_verify | 脚本 | 天眼查工商 / 风险验证 [heavy_bg, 600s] |
-| 04 | research_plan | dispatch | 研究计划子代理派发（tyc + westock + search_deep 自主搜索） |
-| 04c | research_plan_collect | 收集 | 读子代理输出 → schema 归一化 → 校验落盘 |
-| 05 | bp_shared_page_init | 脚本 | 共享尽调页初始化 |
-| 06 | search_plan_compile | 脚本 | 搜索工单编译 |
-| 07 | bp_fact_store_bootstrap | 脚本 | Fact Store 初始化 |
-| 07b | wave0_prepare | dispatch | Wave 0 投资假说先行者（1 角色） |
-| 07c | wave0_collect | 收集 | Wave 0 收集 |
-| 07d | wave0_shared_page_refresh | 脚本 | 共享页刷新（含假说） |
-| 08 | dispatch_prepare | dispatch | Wave 1 派发（sequential, 4 角色） |
-| 09 | dispatch_collect | 收集 | Wave 1 收集（retry + 三文件检查） |
-| 10 | wave1_evidence_gate | 门禁 | Wave 1 证据校验（repair） |
-| 11 | bp_fact_store_merge | 脚本 | Fact Store 合并 |
-| 12 | wave1_shared_page_refresh | 脚本 | 共享页刷新 |
-| 13 | wave3_prepare | dispatch | Wave 3 派发（2 角色 sequential） |
-| 14 | wave3_collect | 收集 | Wave 3 收集 |
-| 15 | wave3_evidence_gate | 门禁 | Wave 3 证据校验（repair） |
-| 16 | wave3_shared_page_refresh | 脚本 | 共享页刷新 |
-| 17 | wave4_prepare | dispatch | Wave 4 派发（4 角色: dealbreaker + 共识 + 催化剂 + 行业研报） |
-| 18 | wave4_collect | 收集 | Wave 4 收集 |
-| 19 | wave4_evidence_gate | 门禁 | Wave 4 证据校验（repair, 假说类角色跳过 claim 检查） |
-| 20 | wave4_shared_page_refresh | 脚本 | 共享页刷新 |
-| 21 | bp_claim_coverage_validation | 门禁 | Claim 覆盖校验（repair, 最多 2 轮 → 降级放行） |
-| 22 | bp_cross_dimension_gate | 门禁 | 跨维度一致性（HIGH → WARN 放行） |
-| 23 | bp_section_package_validation | 校验 | Section Package 校验 |
-| 24 | synthesis_prepare | dispatch | 统稿派发（7 维度三件套 + 4 叙事角色仅 md） |
-| 25 | synthesis_collect | 收集 | 统稿收集（脚注密度 repair） |
-| 26 | bp_debate_review | 校验 | 对抗评审（HIGH → MEDIUM，仅 BLOCKING 硬阻断） |
-| 27 | bp_final_assembly | 脚本 | 最终组装 |
-| 28 | bp_readability_review | 校验 | 可读性审查 |
-| 29 | bp_investment_judgment | 脚本 | 投资判断汇总 |
-| 30 | delivery | 交付 | DOCX 生成 + 维度独立 DOCX + delivery gate [heavy_bg, 600s] |
+| 01 | phase01_document_intake | 脚本 | VL OCR 识别 + 结构化抽取（无 input_file 时跳过）[heavy_bg] |
+| 02 | phase02_company_intake | dispatch | 公司名搜索入库（无 PDF 模式，子代理搜索）★双入口 |
+| 03 | phase03_company_intake_collect | 收集 | 搜索入库收集（校验产出文件） |
+| 04 | phase04_research_plan | dispatch | 研究计划子代理派发（tyc 工商核验 + westock + search_deep 自主搜索） |
+| 05 | phase05_research_plan_collect | 收集 | 读子代理输出 → schema 归一化 → 校验落盘 |
+| 06 | phase06_bp_shared_page_init | 脚本 | 共享尽调页初始化 |
+| 07 | phase07_search_plan_compile | 脚本 | 搜索工单编译 |
+| 08 | phase08_bp_fact_store_bootstrap | 脚本 | Fact Store 初始化（seed facts 来自 research_plan） |
+| 09 | phase09_dispatch_prepare | dispatch | Wave 1 派发（sequential, 4 角色） |
+| 10 | phase10_dispatch_collect | 收集 | Wave 1 收集（retry + 三文件检查） |
+| 11 | phase11_wave1_evidence_gate | 门禁 | Wave 1 证据校验（repair） |
+| 12 | phase12_bp_fact_store_merge | 脚本 | Fact Store 合并 |
+| 13 | phase13_wave1_shared_page_refresh | 脚本 | 共享页刷新（after W1） |
+| 14 | phase14_wave3_prepare | dispatch | Wave 3 派发（2 角色 sequential） |
+| 15 | phase15_wave3_collect | 收集 | Wave 3 收集 |
+| 16 | phase16_wave3_evidence_gate | 门禁 | Wave 3 证据校验（repair） |
+| 17 | phase17_wave3_shared_page_refresh | 脚本 | 共享页刷新（after W3） |
+| 18 | phase18_wave4_prepare | dispatch | Wave 4 派发（4 角色：dealbreaker + 共识 + 催化剂 + 行业研报） |
+| 19 | phase19_wave4_collect | 收集 | Wave 4 收集 |
+| 20 | phase20_wave4_evidence_gate | 门禁 | Wave 4 证据校验（repair，叙事类角色跳过 claim 检查） |
+| 21 | phase21_wave4_shared_page_refresh | 脚本 | 共享页刷新（after W4） |
+| 22 | phase22_bp_claim_coverage_validation | 门禁 | Claim 覆盖校验（repair，最多 2 轮 → 降级放行） |
+| 23 | phase23_bp_cross_dimension_gate | 门禁 | 跨维度一致性（HIGH → WARN 放行） |
+| 24 | phase24_bp_section_package_validation | 校验 | Section Package 校验 |
+| 25 | phase25_synthesis_prepare | dispatch | 统稿派发（7 维度三件套 + 3 叙事角色仅 md） |
+| 26 | phase26_synthesis_collect | 收集 | 统稿收集（脚注密度 repair） |
+| 27 | phase27_bp_debate_review | 校验 | 对抗评审（HIGH → MEDIUM，仅 BLOCKING 硬阻断） |
+| 28 | phase28_bp_final_assembly | 脚本 | 最终组装 |
+| 29 | phase29_bp_readability_review | 校验 | 可读性审查 |
+| 30 | phase30_bp_investment_judgment | 脚本 | 投资判断汇总 |
+| 31 | phase31_delivery | 交付 | DOCX 生成 + 维度独立 DOCX + delivery gate [heavy_bg, 600s] |
+
+> ⚠️ **子代理输出文件命名（v6.1 起）**：`bp_dim_{slug}.md` / `bp_dim_{slug}-facts.json` / `bp_dim_{slug}-section.json`（不再是 `bp_phase2_*`）。dispatch 记录为 `bp_dispatch.json`；统稿为 `bp_synthesis_brief.md` / `bp_synthesis_manifest.json`。schema 别名 `bp_phase2_section.v1` 仍映射到 `bp_section_package.v1`（历史兼容，勿删）。
 
 ---
 
@@ -161,22 +167,21 @@ Phase 26-30: 交付
 
 **一句话**：标的进来 → 工商核验 → 预搜索 → 研究计划子代理 → 5 维度并行采集 → 估值 → 洞察 + 风险 → 统稿 → 对抗评审 → DOCX 交付。
 
-### IR 9 步 + 统稿
+### IR 8 step + 统稿
 
-| Step | 角色 | Wave | 职责 |
-|------|------|------|------|
-| step2_industry | 投研_主笔_行业分析 | W1 | 行业规模 / 增速 / 格局 |
-| step3_biz | 投研_主笔_商业模式 | W1 | 商业模式 / 单元经济 |
-| step4_finance | 投研_主笔_财务分析 | W1 | 三表分析 / 财务健康度 |
-| step5_mgmt | 投研_主笔_管理层 | W1 | 管理层 / 治理 / 激励 |
-| step_macro | 投研_主笔_宏观分析 | W1 | 宏观 / 政策 / 周期 |
-| step6b_valuation | 投研_主笔_预测与估值 | W2 | 盈利预测 + 估值（依赖 W1 + 宏观） |
-| step6_insight | 投研_主笔_差异化洞察 | W3 | 预期差 / 核心矛盾（依赖行业 + 商业 + 估值 + 宏观） |
-| step7_risk | 投研_主笔_风险催化 | W3 | 风险 + 催化剂（依赖商业 + 财务 + 管理层 + 估值 + 宏观） |
-| step8_master | 投研_主笔_文档汇总 | — | 已剥离为独立统稿子代理（phase13） |
-| synthesis | ir_统稿 | — | 读 9 步输出 + Fact Store → Key Debates 叙事骨架 |
+| Step | 角色 | Wave | 依赖 | 职责 |
+|------|------|------|------|------|
+| step1_industry | 投研_主笔_行业分析 | W1 | — | 行业规模 / 增速 / 格局 |
+| step2_biz | 投研_主笔_商业模式 | W1 | — | 商业模式 / 单元经济 |
+| step3_finance | 投研_主笔_财务分析 | W1 | — | 三表分析 / 财务健康度 |
+| step4_mgmt | 投研_主笔_管理层 | W1 | — | 管理层 / 治理 / 激励 |
+| step5_macro | 投研_主笔_宏观分析 | W1 | — | 宏观 / 政策 / 周期 |
+| step6_valuation | 投研_主笔_预测与估值 | W2 | step1 + step3 + step5 | 盈利预测 + 估值 |
+| step7_insight | 投研_主笔_差异化洞察 | W3 | step1 + step2 + step6 + step5 | 预期差 / 核心矛盾 |
+| step8_risk | 投研_主笔_风险催化 | W3 | step2 + step3 + step4 + step6 + step5 | 风险 + 催化剂 |
+| synthesis | ir_统稿 | — | 全部 step | 读 8 步输出 + Fact Store → 论点驱动叙事 |
 
-> **step1_data（数据收集）已删除**，改用大行研报为骨架。统稿从 step8 剥离为独立 synthesis 子代理。
+> **step1_data（数据收集）已删除**，改用大行研报为骨架。原 step8_master（文档汇总）已剥离为独立 synthesis 子代理（phase13）。
 
 ### IR 行业 Overlay 系统
 
@@ -387,11 +392,11 @@ prepare() → 找第一个未完成 role → 返回 1 个 manifest + has_more: t
 
 | 门禁 | Phase | 最大 repair | 特殊处理 |
 |------|-------|------------|---------|
-| Wave 证据门禁 | P10/P15/P19 | 1 次 | T1/T2 blocking claims 直接降级 WARN |
-| Claim 覆盖 | P21 | 2 次 | 超过后降级 PASS_WITH_DISCLOSURE |
-| 统稿脚注 | P25 | 1 次 | 动态阈值：每 2000 字 ≥ 3 个脚注 |
-| 对抗评审 | P26 | — | 仅 BLOCKING 硬阻断（空维度 / 100% 无 facts / 无 section） |
-| 交付门禁 | P30 | — | 可读性 / 对抗 FAIL → WARN |
+| Wave 证据门禁 | P11 / P16 / P20 | 1 次 | T1/T2 blocking claims 直接降级 WARN |
+| Claim 覆盖 | P22 | 2 次 | 超过后降级 PASS_WITH_DISCLOSURE |
+| 统稿脚注 | P26 | 1 次 | 动态阈值：每 2000 字 ≥ 3 个脚注 |
+| 对抗评审 | P27 | — | 仅 BLOCKING 硬阻断（空维度 / 100% 无 facts / 无 section） |
+| 交付门禁 | P31 | — | 可读性 / 对抗 FAIL → WARN |
 
 **文件锁保护**：repair 子代理写共享文件时用 `bp_file_lock.locked_read_modify_write()`（flock 独占锁），防止并行写丢数据。
 
@@ -442,8 +447,8 @@ ir-bp-workflow/
 ├── runtime/                              # 核心运行时（四线共用）
 │   ├── profiles/                         # 管线 Profile
 │   │   ├── base.py                       # 抽象基类
-│   │   ├── ir_profile.py                 # IR 管线（9 步 + 统稿 + Stage Tier）
-│   │   ├── bp_profile.py                 # BP 管线（35 Phase + 4 波 + 统稿）
+│   │   ├── ir_profile.py                 # IR 管线（8 步 + 统稿 + Stage Tier）
+│   │   ├── bp_profile.py                 # BP 管线（31 Phase + 3 波 + 统稿）
 │   │   ├── bp_constants.py               # BP 共享常量
 │   │   ├── ic_profile.py                 # IC 管线（18 Phase + 5 原型）
 │   │   ├── ic_topic_profile.py           # IC 课题 Profile
@@ -505,10 +510,9 @@ ir-bp-workflow/
 │       ├── neodata_search.py             # NeoData 研报搜索
 │       ├── dedup.py                      # DOI + title 去重
 │       └── rate_limiter.py               # API 限速
-├── instruction_store_bp/                 # BP 角色指令库（11 角色 + 统稿）
+├── instruction_store_bp/                 # BP 角色指令库（10 角色 + 统稿）
 │   ├── index.json                        # 角色 → 文件映射
 │   ├── _common_tool_guide.md             # 通用工具使用指南（含 IMA §3.6）
-│   ├── bp_investment_hypothesis.md       # W0 投资假说
 │   ├── bp_company_team_compliance.md     # W1 团队合规
 │   ├── bp_product_commercial.md          # W1 产品商业
 │   ├── bp_tech_ip_moat.md                # W1 技术 IP
@@ -521,11 +525,11 @@ ir-bp-workflow/
 │   ├── bp_industry_research.md           # W4 行业研报
 │   ├── bp_统稿.md                        # 统稿（唯一中文命名）
 │   └── bp_research_plan_enrichment.md    # 研究计划子代理指令
-├── instruction_store_ir/                 # IR 角色指令库（10 个角色文件）
+├── instruction_store_ir/                 # IR 角色指令库（8 个 step + 统稿）
 │   ├── index.json
 │   ├── _common_tool_guide.md
 │   ├── _shared_output_protocol.md
-│   ├── ir_统稿.md                        # IR 统稿（Key Debates 叙事骨架）
+│   ├── ir_统稿.md                        # IR 统稿（论点驱动叙事）
 │   ├── ir_research_plan_enrichment.md
 │   ├── industry_overlays/                # 行业 Overlay（5 个）
 │   │   ├── semiconductor.md
@@ -533,34 +537,13 @@ ir-bp-workflow/
 │   │   ├── internet.md
 │   │   ├── heavy_asset.md
 │   │   └── financial.md
-│   └── 投研_主笔_*.md                    # 9 个 step 指令文件
+│   └── 投研_主笔_*.md                    # 8 个 step 指令文件
 ├── instruction_store_ic/                 # IC 角色指令库（16 角色）
 │   ├── index.json                        # archetype → role → file 三级映射
 │   ├── _common_tool_guide.md
 │   ├── ic_research_plan_enrichment.md
 │   ├── roles/                            # 16 个角色指令文件
-│   │   ├── ic_executive_hypothesis.md
-│   │   ├── ic_market_overview.md
-│   │   ├── ic_competitive.md
-│   │   ├── ic_tech_product.md
-│   │   ├── ic_supply_chain.md
-│   │   ├── ic_policy_risk.md
-│   │   ├── ic_segment_deep.md
-│   │   ├── ic_tech_landscape.md
-│   │   ├── ic_route_deep.md
-│   │   ├── ic_business_overview.md
-│   │   ├── ic_feasibility.md
-│   │   ├── ic_unit_economics.md
-│   │   ├── ic_catalyst.md
-│   │   ├── ic_consensus.md
-│   │   ├── ic_cross_cutting.md
-│   │   └── ic_report_synthesizer.md
 │   └── archetypes/                       # 5 个原型模板 JSON
-│       ├── chain_scan.json
-│       ├── tech_compare.json
-│       ├── company_deep.json
-│       ├── early_theme.json
-│       └── commercial_mode.json
 ├── instruction_store_lit/                # LIT 角色指令库（7 角色）
 │   ├── index.json
 │   ├── _common_tool_guide.md
@@ -583,9 +566,6 @@ ir-bp-workflow/
 │   ├── ir-reporter/SKILL.md              # 架构文档
 │   └── ir-verifier/SKILL.md              # 架构文档
 ├── search/                               # 搜索引擎适配器
-│   ├── gateway.py
-│   ├── adapters/
-│   └── models/
 ├── content/                              # 内容抓取 + PDF 提取
 ├── routing/                              # 数据源路由
 ├── config/                               # 运行时配置
