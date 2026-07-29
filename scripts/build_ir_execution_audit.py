@@ -46,7 +46,7 @@ def _collect_phase_states(task_id: str, runtime_root: Path) -> list[dict]:
 
 def _collect_step_receipts(task_id: str, tasks_dir: Path) -> list[dict]:
     receipts = []
-    patterns = [f'{task_id}-step*-spawn.json', f'{task_id}-step_macro-spawn.json']
+    patterns = [f'{task_id}-step*-spawn.json', f'{task_id}-step5_macro-spawn.json']
     paths = []
     for pattern in patterns:
         paths.extend(tasks_dir.glob(pattern))
@@ -85,7 +85,7 @@ def _collect_step_receipts(task_id: str, tasks_dir: Path) -> list[dict]:
 
 def _collect_step_manifests(task_id: str, tasks_dir: Path) -> list[dict]:
     manifests = []
-    patterns = [f'{task_id}-step*-manifest.json', f'{task_id}-step_macro-manifest.json']
+    patterns = [f'{task_id}-step*-manifest.json', f'{task_id}-step5_macro-manifest.json']
     paths = []
     for pattern in patterns:
         paths.extend(tasks_dir.glob(pattern))

@@ -38,9 +38,9 @@ def analyze_checkpoint(task_id: str, pipeline: str) -> dict:
 
     if pipeline == 'ir':
         steps = [
-            'step1_data', 'step2_industry', 'step3_biz',
-            'step4_finance', 'step5_mgmt', 'step6_insight',
-            'step7_risk', 'step8_master',
+            'step1_data', 'step1_industry', 'step2_biz',
+            'step3_finance', 'step4_mgmt', 'step7_insight',
+            'step8_risk', 'step8_master',
         ]
         phase_map = {
             'phase0': 'preflight',
@@ -66,13 +66,13 @@ def analyze_checkpoint(task_id: str, pipeline: str) -> dict:
         # 检查各 step 文件
         step_phases = {
             'step1_data': 'phase4',
-            'step2_industry': 'phase4',
-            'step3_biz': 'phase4',
-            'step4_finance': 'phase4',
-            'step5_mgmt': 'phase4',
-            'step6_insight': 'phase4',
-            'step6b_valuation': 'phase4',
-            'step7_risk': 'phase4',
+            'step1_industry': 'phase4',
+            'step2_biz': 'phase4',
+            'step3_finance': 'phase4',
+            'step4_mgmt': 'phase4',
+            'step7_insight': 'phase4',
+            'step6_valuation': 'phase4',
+            'step8_risk': 'phase4',
             'step8_master': 'phase4',
         }
 

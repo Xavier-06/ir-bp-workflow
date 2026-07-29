@@ -41,20 +41,18 @@ REQUIRED_ROLES = [
     '投研_主笔_管理层',
     '投研_主笔_差异化洞察',
     '投研_主笔_风险催化',
-    '投研_主笔_文档汇总',
 ]
 
 # Role → step mapping (for subagent dispatch)
 ROLE_STEP_MAP = {
     '投研_主笔_数据收集': 'step1_data',
-    '投研_主笔_行业分析': 'step2_industry',
-    '投研_主笔_商业模式': 'step3_biz',
-    '投研_主笔_财务分析': 'step4_finance',
-    '投研_主笔_管理层': 'step5_mgmt',
-    '投研_主笔_差异化洞察': 'step6_insight',
-    '投研_主笔_预测与估值': 'step6b_valuation',
-    '投研_主笔_风险催化': 'step7_risk',
-    '投研_主笔_文档汇总': 'step8_master',
+    '投研_主笔_行业分析': 'step1_industry',
+    '投研_主笔_商业模式': 'step2_biz',
+    '投研_主笔_财务分析': 'step3_finance',
+    '投研_主笔_管理层': 'step4_mgmt',
+    '投研_主笔_差异化洞察': 'step7_insight',
+    '投研_主笔_预测与估值': 'step6_valuation',
+    '投研_主笔_风险催化': 'step8_risk',
 }
 
 
@@ -237,8 +235,8 @@ def ensure_task_package(task_id: str, entity: str = '', query: str = '', market:
         'runtime_memory': {},
         'execution_plan': {
             'mode': 'subagent-8-step-serial',
-            'steps': ['step1_data', 'step2_industry', 'step3_biz', 'step4_finance',
-                      'step5_mgmt', 'step6_insight', 'step6b_valuation', 'step7_risk', 'step8_master'],
+            'steps': ['step1_data', 'step1_industry', 'step2_biz', 'step3_finance',
+                      'step4_mgmt', 'step7_insight', 'step6_valuation', 'step8_risk', 'step8_master'],
         },
         'model_route': {
             'controller': 'main orchestrator',

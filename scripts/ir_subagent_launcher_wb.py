@@ -122,15 +122,14 @@ STEP_QUALITY_THRESHOLD = 3
 # v3.0 (2026-07-28): 删除 step1_data，数据收集合并到 phase04 research plan
 # 下游 step 不再依赖 step1_data，改为读取 research plan 阶段产出的 enriched_data_pack.json
 STEP_ROLE = {
-    'step2_industry': '投研_主笔_行业分析',
-    'step3_biz': '投研_主笔_商业模式',
-    'step4_finance': '投研_主笔_财务分析',
-    'step5_mgmt': '投研_主笔_管理层',
-    'step_macro': '投研_主笔_宏观分析',
-    'step6_insight': '投研_主笔_差异化洞察',
-    'step6b_valuation': '投研_主笔_预测与估值',
-    'step7_risk': '投研_主笔_风险催化',
-    'step8_master': '投研_主笔_文档汇总',
+    'step1_industry': '投研_主笔_行业分析',
+    'step2_biz': '投研_主笔_商业模式',
+    'step3_finance': '投研_主笔_财务分析',
+    'step4_mgmt': '投研_主笔_管理层',
+    'step5_macro': '投研_主笔_宏观分析',
+    'step7_insight': '投研_主笔_差异化洞察',
+    'step6_valuation': '投研_主笔_预测与估值',
+    'step8_risk': '投研_主笔_风险催化',
 }
 
 # IR 子代理可调用的数据源 connector（仅限实际可用、已验证的源）
@@ -145,98 +144,93 @@ IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp', 'ima-mcp']
 # v3.0 (2026-07-28): 删除 step1_data，下游 step 不再依赖它
 # 数据收集在 phase04 research plan 完成，产出 enriched_data_pack.json 供所有 step 引用
 STEP_DEPS = {
-    'step2_industry': [],
-    'step3_biz': [],
-    'step4_finance': [],
-    'step5_mgmt': [],
-    'step_macro': [],
-    'step6_insight': ['step2_industry', 'step3_biz', 'step6b_valuation', 'step_macro'],
-    'step6b_valuation': ['step2_industry', 'step4_finance', 'step_macro'],
-    'step7_risk': ['step3_biz', 'step4_finance', 'step5_mgmt', 'step6b_valuation', 'step_macro'],
-    'step8_master': ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro', 'step6_insight', 'step6b_valuation', 'step7_risk'],
+    'step1_industry': [],
+    'step2_biz': [],
+    'step3_finance': [],
+    'step4_mgmt': [],
+    'step5_macro': [],
+    'step7_insight': ['step1_industry', 'step2_biz', 'step6_valuation', 'step5_macro'],
+    'step6_valuation': ['step1_industry', 'step3_finance', 'step5_macro'],
+    'step8_risk': ['step2_biz', 'step3_finance', 'step4_mgmt', 'step6_valuation', 'step5_macro'],
 }
 
 # 并行发射波次
 # v3.0: Wave0 删除（原 step1_data），直接从 5 维度并行开始
 LAUNCH_WAVES = [
-    ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro'],
-    ['step6b_valuation'],
-    ['step6_insight', 'step7_risk'],
+    ['step1_industry', 'step2_biz', 'step3_finance', 'step4_mgmt', 'step5_macro'],
+    ['step6_valuation'],
+    ['step7_insight', 'step8_risk'],
     # step8_master 已剥离为独立 synthesis 子代理（phase13）
 ]
 
 # 超时
 STEP_TIMEOUTS = {
-    'step2_industry': 900,
-    'step3_biz': 900,
-    'step4_finance': 900,
-    'step5_mgmt': 900,
-    'step_macro': 900,
-    'step6_insight': 900,
-    'step6b_valuation': 900,
-    'step7_risk': 900,
-    'step8_master': 1800,
+    'step1_industry': 900,
+    'step2_biz': 900,
+    'step3_finance': 900,
+    'step4_mgmt': 900,
+    'step5_macro': 900,
+    'step7_insight': 900,
+    'step6_valuation': 900,
+    'step8_risk': 900,
 }
 
 # Step 查询关键词（用于自动补搜）
-# v3.0: 删除 step1_data 条目
 _STEP_KEYWORDS = {
-    'step2_industry': 'industry market size market share growth rate TAM penetration competitive landscape 行业规模 竞争格局',
-    'step3_biz': 'business model product revenue customer supply chain 商业模式 产品线 客户 收入结构',
-    'step4_finance': 'financial report revenue profit margin cash flow ROE debt 财报 营收 毛利率 净利润 现金流',
-    'step5_mgmt': 'management board governance ownership ESG compensation 管理层 董事会 股权结构 治理',
-    'step_macro': 'CPI PMI interest rate LPR GDP inflation monetary policy 宏观 利率 通胀 PMI 社融',
-    'step6_insight': 'catalyst valuation target price investment thesis risk-reward 催化剂 估值 目标价 投资亮点',
-    'step6b_valuation': 'DCF valuation PE PB PS EV/EBITDA target price WACC comparable company valuation model 目标价 估值',
-    'step7_risk': 'risk regulatory litigation competition macro threat 风险 监管 诉讼 竞争威胁 宏观',
-    'step8_master': '',
+    'step1_industry': 'industry market size market share growth rate TAM penetration competitive landscape 行业规模 竞争格局',
+    'step2_biz': 'business model product revenue customer supply chain 商业模式 产品线 客户 收入结构',
+    'step3_finance': 'financial report revenue profit margin cash flow ROE debt 财报 营收 毛利率 净利润 现金流',
+    'step4_mgmt': 'management board governance ownership ESG compensation 管理层 董事会 股权结构 治理',
+    'step5_macro': 'CPI PMI interest rate LPR GDP inflation monetary policy 宏观 利率 通胀 PMI 社融',
+    'step7_insight': 'catalyst valuation target price investment thesis risk-reward 催化剂 估值 目标价 投资亮点',
+    'step6_valuation': 'DCF valuation PE PB PS EV/EBITDA target price WACC comparable company valuation model 目标价 估值',
+    'step8_risk': 'risk regulatory litigation competition macro threat 风险 监管 诉讼 竞争威胁 宏观',
 }
 
 _STEP_QUERY_TEMPLATES = {
-    'step2_industry': [
+    'step1_industry': [
         '"{entity}" industry market size competitive landscape',
         '"{entity}" market share industry report',
         '"{entity}" 行业 竞争格局 市场规模',
     ],
-    'step3_biz': [
+    'step2_biz': [
         '"{entity}" business model revenue segments',
         '"{entity}" products services overview',
         '"{entity}" 商业模式 收入结构 产品',
     ],
-    'step4_finance': [
+    'step3_finance': [
         '"{entity}" financial report revenue profit margin cash flow ROE debt',
         '"{entity}" annual report results announcement revenue profit',
         'site:hkexnews.hk "{entity}" annual report',
         'site:hkexnews.hk "{entity}" results announcement',
         '"{entity}" 财报 营收 毛利率 净利润 现金流',
     ],
-    'step5_mgmt': [
+    'step4_mgmt': [
         '"{entity}" CEO management team leadership governance',
         '"{entity}" executive changes board ownership',
         '"{entity}" 管理层 董事会 股权结构 治理',
     ],
-    'step_macro': [
+    'step5_macro': [
         '"{entity}" sector macro impact CPI PMI interest rate',
         'China macro economy GDP inflation monetary policy latest',
         '宏观 利率 通胀 PMI 社融 最新数据',
     ],
-    'step6_insight': [
+    'step7_insight': [
         '"{entity}" investment thesis valuation target price catalyst',
         '"{entity}" analyst report target price catalyst',
         '"{entity}" 投资逻辑 估值 催化剂',
     ],
-    'step7_risk': [
+    'step8_risk': [
         '"{entity}" risks regulatory litigation competition macro',
         '"{entity}" risk analysis report',
         '"{entity}" 风险 监管 诉讼 竞争',
     ],
-    'step6b_valuation': [
+    'step6_valuation': [
         '"{entity}" DCF valuation target price WACC',
         '"{entity}" comparable company valuation PE PB PS EV/EBITDA',
         '"{entity}" analyst consensus target price',
         '"{entity}" 估值 目标价 可比公司',
     ],
-    'step8_master': [],
 }
 
 
@@ -585,7 +579,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
 
     # Industry KPI checklist — 对 step1~step4 注入行业特定 KPI 指引
     kpi_checklist_path = REFS_DIR / 'industry-kpi-checklist.md'
-    if step in ('step2_industry', 'step3_biz', 'step4_finance') and kpi_checklist_path.exists():
+    if step in ('step1_industry', 'step2_biz', 'step3_finance') and kpi_checklist_path.exists():
         brief_lines.append(f'')
         brief_lines.append(f'## Industry-Specific KPI Checklist')
         brief_lines.append(f'')
@@ -652,7 +646,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
 
     # 角色专属 ANTI-DEFECT RULES
     step_rules = {
-        'step2_industry': (
+        'step1_industry': (
             'ANTI-DEFECT RULES:\n'
             '1. COMPETITOR STATUS VERIFICATION: For every competitor listed, search-verify their current '
             'financing/IPO status. A competitor marked as "private, B轮" may have since IPO\'d. '
@@ -668,7 +662,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             'If a newer version exists, use the newer data. '
             'NEVER cite an older model/version when a newer one has been released.\n'
         ),
-        'step3_biz': (
+        'step2_biz': (
             'ANTI-DEFECT RULES:\n'
             '1. COMPETITOR MOAT VERIFICATION: When scoring competitor moat dimensions, each score must be '
             'based on SEARCH-VERIFIED current data, not model training data. A competitor\'s capability '
@@ -678,7 +672,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             'search_deep(Bash, "{product} latest {year}") for breaking news. '
             'Deprecated or superseded products must be noted as such.\n'
         ),
-        'step4_finance': (
+        'step3_finance': (
             'ANTI-DEFECT RULES:\n'
             '1. LATEST FILING VERIFICATION: Before citing annual report data, verify it is the LATEST filing. '
             'Search "{company} 最新年报 {year}" and check HKEX/SEC for recent filings. '
@@ -686,7 +680,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             '2. AUDIT OPINION CHECK: Note the audit opinion for each year cited. A change in audit opinion '
             '(e.g., from "unqualified" to "qualified") is a significant red flag that must be highlighted.\n'
         ),
-        'step5_mgmt': (
+        'step4_mgmt': (
             'ANTI-DEFECT RULES:\n'
             '1. PERSON EXISTENCE VERIFICATION (CRITICAL): EVERY person name mentioned in the management '
             'team section MUST be verified to actually exist at this company. Search "{person name} '
@@ -699,7 +693,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             '3. MANAGEMENT LEGAL STATUS: For key management members, search for recent legal/regulatory '
             'issues: "{person name} 处罚 调查 诉讼". Recent issues are material to governance assessment.\n'
         ),
-        'step6_insight': (
+        'step7_insight': (
             'ANTI-DEFECT RULES:\n'
             '1. COMPETITOR DATA CURRENCY: When citing competitor data from prior steps, verify it is current. '
             'If prior steps used stale competitor data, note this as a limitation.\n'
@@ -709,7 +703,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             'A catalyst based on outdated product info (e.g. citing model v1 when v3 exists) '
             'invalidates the entire investment thesis.\n'
         ),
-        'step6b_valuation': (
+        'step6_valuation': (
             'ANTI-DEFECT RULES:\n'
             '1. COMPARABLE COMPANY STATUS VERIFICATION (CRITICAL): For EVERY comparable company in the '
             'comps table, search-verify their CURRENT status: (a) If currently listed: use yfinance to '
@@ -723,7 +717,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             '2. VALUATION DATA TIMELINESS: All financial data (revenue, PE, PS, etc.) must be verified '
             'as current within 6 months. Data >12 months old must be labeled with ⚠ warning.\n'
         ),
-        'step7_risk': (
+        'step8_risk': (
             'ANTI-DEFECT RULES:\n'
             '1. REGULATORY STATUS CURRENCY: Every regulatory risk cited must be search-verified for CURRENT '
             'status. A regulation described as "即将出台" in older sources may have been enacted, revised, '
@@ -731,7 +725,7 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             '2. COMPETITOR COMPLIANCE EVENTS: For competition-related risks, search whether major competitors '
             'have recent regulatory penalties — this may reduce competitive pressure on the target.\n'
         ),
-        'step_macro': (
+        'step5_macro': (
             'ANTI-DEFECT RULES:\n'
             '1. MACRO DATA TIMELINESS: Every macro indicator cited (CPI, PMI, LPR, GDP, etc.) must have '
             'a publication date. Indicators older than 60 days must be marked with "⚠ 数据滞后 X 天". '
@@ -746,12 +740,6 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             'explain HOW (e.g., "降息→融资成本下降→资本密集型行业受益").\n'
             '5. CONFIDENCE CALIBRATION: If a key indicator (e.g. PMI) is from a single source with no '
             'cross-verification, set confidence to "medium" max. "high" requires ≥2 independent sources.\n'
-        ),
-        'step8_master': (
-            'ANTI-DEFECT RULES:\n'
-            '1. FINANCING STATUS CONSISTENCY: Check that the same entity\'s financing/IPO status is consistent '
-            'across all steps. If step1 describes a competitor as "private" but step6b uses listed-company '
-            'multiples for it, this is a critical inconsistency that must be resolved by search verification.\n'
         ),
     }
 
@@ -998,37 +986,35 @@ def _check_step_quality(task_id: str, step: str) -> dict:
         issues.append(f'章节不足 ({sections} 个)')
     
     # ── 搜索深度门禁（对齐 BP 管线 bp_section_package.v2 的 search_audit 标准）──
-    # step8_master 是统稿 step，不做搜索深度校验
     search_audit_issues = []
-    if step != 'step8_master':
-        audit = _parse_search_audit(text)
-        n_queries = len(audit['queries'])
-        n_fetched = len(audit['fetched_urls'])
-        n_domains = len(set(audit['source_domains']))
-        
-        if n_queries < 8:
-            search_audit_issues.append(f'search_audit.queries={n_queries} (需≥8)')
-        if n_fetched < 3:
-            search_audit_issues.append(f'search_audit.fetched_urls={n_fetched} (需≥3)')
-        if n_domains < 3:
-            search_audit_issues.append(f'search_audit.source_domains={n_domains} (需≥3独立域名)')
-        
-        if search_audit_issues:
-            score = max(0, score - 1)
-            issues.extend(search_audit_issues)
-    
+    audit = _parse_search_audit(text)
+    n_queries = len(audit['queries'])
+    n_fetched = len(audit['fetched_urls'])
+    n_domains = len(set(audit['source_domains']))
+
+    if n_queries < 8:
+        search_audit_issues.append(f'search_audit.queries={n_queries} (需≥8)')
+    if n_fetched < 3:
+        search_audit_issues.append(f'search_audit.fetched_urls={n_fetched} (需≥3)')
+    if n_domains < 3:
+        search_audit_issues.append(f'search_audit.source_domains={n_domains} (需≥3独立域名)')
+
+    if search_audit_issues:
+        score = max(0, score - 1)
+        issues.extend(search_audit_issues)
+
     threshold = STEP_QUALITY_THRESHOLD
-    
+
     return {
         'score': score,
         'content_length': content_len,
         'url_count': urls,
         'section_count': sections,
         'search_audit': {
-            'queries': len(audit['queries']) if step != 'step8_master' else None,
-            'fetched_urls': len(audit['fetched_urls']) if step != 'step8_master' else None,
-            'source_domains': len(set(audit['source_domains'])) if step != 'step8_master' else None,
-        } if step != 'step8_master' else None,
+            'queries': len(audit['queries']),
+            'fetched_urls': len(audit['fetched_urls']),
+            'source_domains': len(set(audit['source_domains'])),
+        },
         'threshold': threshold,
         'verdict': 'pass' if score >= threshold else 'fail',
         'issues': issues,
@@ -1405,11 +1391,6 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
 
     dispatched = [r for r in results if r.get('status') == 'dispatched']
 
-    # 构建主 AI 的精确执行指令
-    # step8_master 的前序 step 列表（需要读取它们的完整输出）
-    # v3.0: 删除 step1_data，数据通过 enriched_data_pack.json 提供
-    _STEP8_PRIOR_STEPS = ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step_macro', 'step6_insight', 'step6b_valuation', 'step7_risk']
-
     task_instructions = []
     for r in dispatched:
         step = r['step']
@@ -1454,32 +1435,22 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'\n'
             )
 
-        # step6b_valuation 额外提醒
-        if step == 'step6b_valuation':
+        # step6_valuation 额外提醒
+        if step == 'step6_valuation':
             prompt_body += (
-                f'💡 估值提示：step2_industry 中的竞争格局和 step_macro 中的利率/通胀数据对 WACC 和增长假设至关重要，务必在估值前完整阅读。\n\n'
+                f'💡 估值提示：step1_industry 中的竞争格局和 step5_macro 中的利率/通胀数据对 WACC 和增长假设至关重要，务必在估值前完整阅读。\n\n'
             )
 
-        # step6_insight 额外提醒
-        if step == 'step6_insight':
+        # step7_insight 额外提醒
+        if step == 'step7_insight':
             prompt_body += (
-                f'💡 洞察提示：step6b_valuation 的估值结论和 step_macro 的宏观环境判断是形成投资洞察的核心输入，务必完整阅读后再下判断。\n\n'
+                f'💡 洞察提示：step6_valuation 的估值结论和 step5_macro 的宏观环境判断是形成投资洞察的核心输入，务必完整阅读后再下判断。\n\n'
             )
 
-        # step7_risk 额外提醒
-        if step == 'step7_risk':
+        # step8_risk 额外提醒
+        if step == 'step8_risk':
             prompt_body += (
-                f'💡 风险提示：step5_mgmt 的管理层评估、step6b_valuation 的估值敏感性和 step_macro 的政策/宏观风险是风险分析的核心输入，务必完整阅读。\n\n'
-            )
-
-        # step8_master 统稿硬约束
-        if step == 'step8_master':
-            prompt_body += (
-                f'⚠️ 统稿保留硬约束（最高优先级，违反任一条即视为统稿失败）：\n\n'
-                f'【规则1】核心对比表必须原文保留：行业技术路线全景对比表、产品级竞品参数对比表、现有方案深度对比大表、核心组件拆解表——不得删除或压缩为文字叙述。如果某个step有5张竞品对比表，统稿必须保留5张，不能合并成1张。\n\n'
-                f'【规则2】市占率/份额/渗透率数据必须完整保留：TAM/SAM/SOM分层推算及每层具体数字、各细分市场渗透率及驱动力、竞品市占率（具体数字和百分比，不能只写"垄断竞争"等模糊表述）、标的公司渗透率——这些是判断市场空间的核心依据。\n\n'
-                f'【规则3】去重只做跨step，不做step内压缩：跨step重复内容可合并，但单个step内部的表格、数据、分析段落不得删除或压缩。\n\n'
-                f'【规则4】来源合并不得丢来源：所有step的来源索引表/脚注列表都必须合并到统稿末尾"来源附录"章节；不能因格式不同（[^N]脚注/编号表格/URL直接引用/评级格式）就丢弃；非[^N]格式的来源必须转换为[^N]脚注格式纳入统一编号；目标：统稿来源总数 ≥ 各step来源去重后总数。统稿完成后必须自检：数末尾来源附录条目数，对比各step来源总数，显著减少则说明有来源丢失，必须补回。\n\n'
+                f'💡 风险提示：step4_mgmt 的管理层评估、step6_valuation 的估值敏感性和 step5_macro 的政策/宏观风险是风险分析的核心输入，务必完整阅读。\n\n'
             )
 
         # ── 行业 Overlay（轻量版 archetype，v2.0 新增）──
@@ -1498,15 +1469,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'1. 读取 brief 文件：{brief_path}\n'
         )
 
-        if step == 'step8_master':
-            prompt_body += (
-                f'2. 逐一读取上方列出的前序 step 完整输出文件\n'
-                f'3. 根据 brief 中的统稿规则，将 step1~step7 的内容汇总为一份完整研报\n'
-                f'   （step_macro 宏观判断需纳入投资摘要和风险章节）\n'
-                f'4. 如发现数据缺口或矛盾，用以下结构化源补搜（search_deep(Bash) 仅作兜底，最多 3 轮）\n'
-                f'5. 将完整 Markdown 报告写入上方指定的输出路径\n\n'
-            )
-        elif step_deps_list:
+        if step_deps_list:
             prompt_body += (
                 f'2. 逐一读取上方列出的前序 step 完整输出文件（不是跳过，是强制）\n'
                 f'3. 根据 brief 中的角色指令执行分析，前序 step 的完整数据是你的核心输入\n'
@@ -1632,8 +1595,7 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
         _OFFICIAL = ['sec.gov','hkexnews.hk','cninfo.com.cn','szse.cn','sse.com.cn','ir.','investor.']
         _REPUTABLE = ['reuters.com','bloomberg.com','wsj.com','ft.com','economist.com','scmp.com','caixin.com','36kr.com','cls.cn','eastmoney.com','xueqiu.com']
         _REDFLAGS = ['待补','待填','TODO','无法验证','无法获取','需要进一步']
-        # v3.0: 删除 step1_data，数据在 phase04 完成
-        _STEP_ORDER = ['step2_industry','step3_biz','step4_finance','step5_mgmt','step_macro','step6_insight','step6b_valuation','step7_risk','step8_master']
+        _STEP_ORDER = ['step1_industry','step2_biz','step3_finance','step4_mgmt','step5_macro','step7_insight','step6_valuation','step8_risk']
         scores, issues = {}, []
         for step in _STEP_ORDER:
             f = TASKS_DIR / f'{task_id}-{step}.md'
@@ -1691,10 +1653,11 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
     else:
         result['docx_error'] = f"build script not found: {build_script}"
 
-    # 如果 DOCX 失败，用 markdown 兜底
-    master_md = TASKS_DIR / f'{task_id}-step8_master.md'
-    if not docx_path and master_md.exists():
-        result['markdown_path'] = str(master_md)
+    # 如果 DOCX 失败，用 markdown 兜底（phase13 产出 synthesis.md，step8_master.md 为兼容副本）
+    synthesis_md = TASKS_DIR / f'{task_id}-synthesis.md'
+    fallback_md = synthesis_md if synthesis_md.exists() else TASKS_DIR / f'{task_id}-step8_master.md'
+    if not docx_path and fallback_md.exists():
+        result['markdown_path'] = str(fallback_md)
         result['docx_fallback'] = True
 
     # 复制到桌面
@@ -1708,11 +1671,11 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
             deliver_path = str(dst)
             result['desktop_path'] = deliver_path
             print(f"  📄 已复制到桌面: {dst.name}")
-        elif master_md.exists():
+        elif fallback_md.exists():
             entity_clean = entity.replace(' ', '_').replace('/', '_') or task_id
             dst = desktop / f'{entity_clean}_投资研报.md'
             import shutil
-            shutil.copy2(master_md, dst)
+            shutil.copy2(fallback_md, dst)
             deliver_path = str(dst)
             result['desktop_path'] = deliver_path
             print(f"  📄 已复制到桌面: {dst.name}")

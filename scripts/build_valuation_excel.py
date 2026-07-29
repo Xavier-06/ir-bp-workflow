@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 估值 Excel 模型生成脚本
-IR step6b_valuation 和 BP bp_估值 共用
+IR step6_valuation 和 BP bp_估值 共用
 
 用法（IR）:
   python3 build_valuation_excel.py --pipeline ir --task-id TASK-XXXXX

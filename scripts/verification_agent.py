@@ -130,9 +130,9 @@ def load_bp_content(task_id: str, tasks_dir: Path = TASKS_DIR) -> Optional[str]:
 def load_ir_steps(task_id: str, tasks_dir: Path = TASKS_DIR) -> dict[str, str]:
     """加载 IR 管线各 step 内容"""
     steps = {}
-    step_names = ['step1_data', 'step2_industry', 'step3_biz',
-                  'step4_finance', 'step5_mgmt', 'step6_insight', 'step6b_valuation',
-                  'step7_risk', 'step8_master']
+    step_names = ['step1_data', 'step1_industry', 'step2_biz',
+                  'step3_finance', 'step4_mgmt', 'step7_insight', 'step6_valuation',
+                  'step8_risk', 'step8_master']
     for s in step_names:
         f = tasks_dir / f'{task_id}-{s}.md'
         if f.exists():
@@ -148,7 +148,7 @@ def load_report_content(task_id: str = None, docx_path: str = None,
             return load_bp_content(task_id, tasks_dir)
         else:
             steps = load_ir_steps(task_id, tasks_dir)
-            return steps.get('step8_master', steps.get('step7_risk', ''))
+            return steps.get('step8_master', steps.get('step8_risk', ''))
     return None
 
 

@@ -49,7 +49,7 @@
   "facts_used": ["F-0001"],
   "counter_evidence": ["反向证据或不确定性"],
   "data_gaps": ["仍缺什么事实或来源"],
-  "investment_implication": "本节对投资判断的具体含义。仅投资结论类 step（step6_insight 差异化洞察 / step6b_valuation 预测与估值 / step7_risk 风险催化）必填且要落到买卖判断+置信度+反转条件；其余数据/事实类 step（数据/行业/商业模式/财务/管理层/宏观）此字段可留空或一句话带过，不必硬凑投资含义",
+  "investment_implication": "本节对投资判断的具体含义。仅投资结论类 step（step7_insight 差异化洞察 / step6_valuation 预测与估值 / step8_risk 风险催化）必填且要落到买卖判断+置信度+反转条件；其余数据/事实类 step（数据/行业/商业模式/财务/管理层/宏观）此字段可留空或一句话带过，不必硬凑投资含义",
   "markdown_draft": "可进入最终报告的章节草稿"
 }
 ```

@@ -39,8 +39,8 @@ from cleanup_registry import PipelineCleanup
 
 PIPELINE_TIMEOUT = 3600  # 60 min (was 30, Dongjiang timeout 2026-04-05)
 
-STEP_ORDER = ['step1_data','step2_industry','step3_biz','step4_finance','step5_mgmt','step6_insight','step6b_valuation','step7_risk','step8_master']
-STEP_NAMES = {'step1_data':'行情与基础数据','step2_industry':'行业与市场格局','step3_biz':'业务模式','step4_finance':'财务分析','step5_mgmt':'管理与治理','step6_insight':'投资洞察','step6b_valuation':'预测与估值','step7_risk':'风险提示','step8_master':'统稿'}
+STEP_ORDER = ['step1_data','step1_industry','step2_biz','step3_finance','step4_mgmt','step7_insight','step6_valuation','step8_risk','step8_master']
+STEP_NAMES = {'step1_data':'行情与基础数据','step1_industry':'行业与市场格局','step2_biz':'业务模式','step3_finance':'财务分析','step4_mgmt':'管理与治理','step7_insight':'投资洞察','step6_valuation':'预测与估值','step8_risk':'风险提示','step8_master':'统稿'}
 
 def _log(phase, msg):
     print(f"\n{'='*60}\n  {phase}: {msg}\n{'='*60}")
@@ -162,7 +162,7 @@ def _self_review(tid, entity='', rounds=2):
         if not weak:
             log.append({'iter':i,'action':'no_weak','score':q['total']}); break
         print(f"  🔍 第{i}轮: 薄弱 {', '.join(STEP_NAMES.get(s,s) for s in weak[:3])}")
-        kw = {'step1_data':'股价 市值 市盈率 EPS 分析师评级','step2_industry':'行业规模 市场份额 竞争格局','step3_biz':'商业模式 产品线 客户 收入结构','step4_finance':'财报 营收 毛利率 现金流 ROE','step5_mgmt':'管理层 董事会 股权结构 治理','step6_insight':'催化剂 估值 目标价 投资','step6b_valuation':'DCF 估值 目标价 WACC 可比公司 PE PB PS','step7_risk':'风险 监管 诉讼 竞争'}
+        kw = {'step1_data':'股价 市值 市盈率 EPS 分析师评级','step1_industry':'行业规模 市场份额 竞争格局','step2_biz':'商业模式 产品线 客户 收入结构','step3_finance':'财报 营收 毛利率 现金流 ROE','step4_mgmt':'管理层 董事会 股权结构 治理','step7_insight':'催化剂 估值 目标价 投资','step6_valuation':'DCF 估值 目标价 WACC 可比公司 PE PB PS','step8_risk':'风险 监管 诉讼 竞争'}
         for ws in weak[:3]:
             q_ = kw.get(ws,''); q_ = f"{entity} {q_}".strip()
             if not q_: continue

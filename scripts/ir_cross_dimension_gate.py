@@ -142,15 +142,15 @@ def _check_valuation_vs_finance(
     issues: list[dict[str, Any]],
 ) -> None:
     """检查估值假设是否与财务数据一致。"""
-    val_facts = all_step_facts.get("step6b_valuation", [])
-    fin_facts = all_step_facts.get("step4_finance", [])
+    val_facts = all_step_facts.get("step6_valuation", [])
+    fin_facts = all_step_facts.get("step3_finance", [])
 
     if not val_facts or not fin_facts:
         return
 
     # 检查：估值中使用的增长率假设 vs 财务数据中的历史增长率
-    val_text = step_texts.get("step6b_valuation", "").lower()
-    fin_text = step_texts.get("step4_finance", "").lower()
+    val_text = step_texts.get("step6_valuation", "").lower()
+    fin_text = step_texts.get("step3_finance", "").lower()
 
     # 高增长假设但历史低增长
     high_growth_markers = ("高增长", "快速增长", "高速增长", "high growth", "加速增长")
@@ -194,10 +194,10 @@ def _check_logic_contradictions(
     issues: list[dict[str, Any]],
 ) -> None:
     """检测跨 step 逻辑矛盾。"""
-    industry_text = step_texts.get("step2_industry", "").lower()
-    business_text = step_texts.get("step3_biz", "").lower()
-    risk_text = step_texts.get("step7_risk", "").lower()
-    insight_text = step_texts.get("step6_insight", "").lower()
+    industry_text = step_texts.get("step1_industry", "").lower()
+    business_text = step_texts.get("step2_biz", "").lower()
+    risk_text = step_texts.get("step8_risk", "").lower()
+    insight_text = step_texts.get("step7_insight", "").lower()
 
     # 矛盾1: 行业分析说"红海/高度竞争"，但差异化洞察说"蓝海/无竞争"
     red_ocean = ("红海", "激烈竞争", "高度竞争", "red ocean", "fiercely competitive")
@@ -217,7 +217,7 @@ def _check_logic_contradictions(
     asset_heavy = ("重资产", "高资本开支", "高固定资产", "asset heavy", "capex")
 
     biz_light = any(m in business_text for m in asset_light)
-    fin_heavy = any(m in step_texts.get("step4_finance", "").lower() for m in asset_heavy)
+    fin_heavy = any(m in step_texts.get("step3_finance", "").lower() for m in asset_heavy)
     if biz_light and fin_heavy:
         issues.append({
             "severity": "MEDIUM",
@@ -229,7 +229,7 @@ def _check_logic_contradictions(
     mgmt_positive = ("优秀", "卓越", "经验丰富", "杰出", "outstanding", "excellent")
     governance_risk = ("治理风险", "关联交易", "利益输送", "管理层动荡", "governance risk", "related party")
 
-    mgmt_text = step_texts.get("step5_mgmt", "").lower()
+    mgmt_text = step_texts.get("step4_mgmt", "").lower()
     mgmt_good = any(m in mgmt_text for m in mgmt_positive)
     risk_governance = any(m in risk_text for m in governance_risk)
     if mgmt_good and risk_governance:
@@ -249,8 +249,8 @@ def evaluate_ir_cross_dimension_gate(task_dir: Path) -> dict[str, Any]:
     step_texts: dict[str, str] = {}
 
     step_names = [
-        "step1_data", "step2_industry", "step3_biz", "step4_finance",
-        "step5_mgmt", "step_macro", "step6b_valuation", "step6_insight", "step7_risk",
+        "step1_data", "step1_industry", "step2_biz", "step3_finance",
+        "step4_mgmt", "step5_macro", "step6_valuation", "step7_insight", "step8_risk",
     ]
 
     for step_name in step_names:

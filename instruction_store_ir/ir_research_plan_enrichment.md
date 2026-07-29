@@ -59,8 +59,8 @@
 - 聚焦**最可能改变投资结论的变量**（如"海外收入增长是铺货驱动还是品牌复购驱动"）
 - 优先从 structured 数据中的异常设计问题（如 PE 显著偏离行业均值）
 - 每条问题必须指定 owner_section（必须是以下 9 个 step 之一）:
-  - step2_industry, step3_biz, step4_finance, step5_mgmt
-  - step_macro, step6b_valuation, step6_insight, step7_risk, step8_master
+  - step1_industry, step2_biz, step3_finance, step4_mgmt
+  - step5_macro, step6_valuation, step7_insight, step8_risk, step8_master
 - 每条问题必须指定 required_fact_keys（必须是骨架计划 fact_requirements 中已有的 fact_key）
 - 问题 ID 格式: ESQ1-ESQ5
 
@@ -81,7 +81,7 @@
 ### 4. Section focus 补充 (section_focus_deltas)（可选）
 
 如果某个 step 的 must_answer 不够聚焦，可以补充：
-- 格式: `{"step": "step2_industry", "additional_must_answer": ["行业政策变化对供需的影响"]}`
+- 格式: `{"step": "step1_industry", "additional_must_answer": ["行业政策变化对供需的影响"]}`
 - 最多补充 3 个 step
 
 ## 输出格式
@@ -95,8 +95,8 @@
       "question_id": "ESQ1",
       "question": "...",
       "priority": "high",
-      "owner_section": "step3_biz",
-      "supporting_sections": ["step2_industry"],
+      "owner_section": "step2_biz",
+      "supporting_sections": ["step1_industry"],
       "required_fact_keys": ["business_model", "customer_base"],
       "decision_relevance": "..."
     }
@@ -108,7 +108,7 @@
     {"fact_key": "incentives", "reason": "宏观行业研究不涉及个股管理层薪酬"}
   ],
   "section_focus_deltas": [
-    {"step": "step2_industry", "additional_must_answer": ["政策变化对行业供需的影响路径"]}
+    {"step": "step1_industry", "additional_must_answer": ["政策变化对行业供需的影响路径"]}
   ]
 }
 ```

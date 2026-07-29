@@ -28,19 +28,19 @@ WORKSPACE = Path(__file__).resolve().parent.parent
 TASKS_DIR = WORKSPACE / 'data' / 'tasks'
 
 STEP_ORDER = [
-    'step1_data', 'step2_industry', 'step3_biz', 'step4_finance',
-    'step5_mgmt', 'step6_insight', 'step7_risk', 'step8_master',
+    'step1_data', 'step1_industry', 'step2_biz', 'step3_finance',
+    'step4_mgmt', 'step7_insight', 'step8_risk', 'step8_master',
 ]
 
 STEP_NAMES = {
     'step1_data': '行情与基础数据',
-    'step2_industry': '行业与市场格局',
-    'step3_biz': '业务模式',
-    'step4_finance': '财务分析',
-    'step5_mgmt': '管理与治理',
-    'step6_insight': '投资洞察',
-    'step6b_valuation': '预测与估值',
-    'step7_risk': '风险提示',
+    'step1_industry': '行业与市场格局',
+    'step2_biz': '业务模式',
+    'step3_finance': '财务分析',
+    'step4_mgmt': '管理与治理',
+    'step7_insight': '投资洞察',
+    'step6_valuation': '预测与估值',
+    'step8_risk': '风险提示',
     'step8_master': '统稿',
 }
 
@@ -277,21 +277,21 @@ def run_contradiction_check(task_id: str) -> dict:
 
     # 2. 财务对账
     contradictions = []
-    if 'step1_data' in step_numbers and 'step4_finance' in step_numbers:
+    if 'step1_data' in step_numbers and 'step3_finance' in step_numbers:
         contradictions.extend(check_financial_contradiction(
-            step_numbers['step1_data'], step_numbers['step4_finance']
+            step_numbers['step1_data'], step_numbers['step3_finance']
         ))
 
     # 3. 行业交叉
-    if 'step2_industry' in step_numbers and 'step5_mgmt' in step_numbers:
+    if 'step1_industry' in step_numbers and 'step4_mgmt' in step_numbers:
         contradictions.extend(check_industry_contradiction(
-            step_numbers['step2_industry'], step_numbers['step5_mgmt']
+            step_numbers['step1_industry'], step_numbers['step4_mgmt']
         ))
 
     # 4. 估值一致性
-    if 'step4_finance' in step_numbers and 'step6_insight' in step_numbers:
+    if 'step3_finance' in step_numbers and 'step7_insight' in step_numbers:
         contradictions.extend(check_valuation_contradiction(
-            step_numbers['step4_finance'], step_numbers['step6_insight']
+            step_numbers['step3_finance'], step_numbers['step7_insight']
         ))
 
     # 5. 时效性检查

@@ -43,27 +43,26 @@ STEP_QUALITY_THRESHOLD = 3
 # Step 角色名
 STEP_ROLE = {
     'step1_data': '投研_主笔_数据收集',
-    'step2_industry': '投研_主笔_行业分析',
-    'step3_biz': '投研_主笔_商业模式',
-    'step4_finance': '投研_主笔_财务分析',
-    'step5_mgmt': '投研_主笔_管理层',
-    'step6_insight': '投研_主笔_差异化洞察',
-    'step6b_valuation': '投研_主笔_预测与估值',
-    'step7_risk': '投研_主笔_风险催化',
-    'step8_master': '投研_主笔_文档汇总',
+    'step1_industry': '投研_主笔_行业分析',
+    'step2_biz': '投研_主笔_商业模式',
+    'step3_finance': '投研_主笔_财务分析',
+    'step4_mgmt': '投研_主笔_管理层',
+    'step7_insight': '投研_主笔_差异化洞察',
+    'step6_valuation': '投研_主笔_预测与估值',
+    'step8_risk': '投研_主笔_风险催化',
 }
 
 # 步间依赖关系（实际图结构）
 STEP_DEPS = {
     'step1_data': [],
-    'step2_industry': ['step1_data'],
-    'step3_biz': ['step1_data'],
-    'step4_finance': ['step1_data'],
-    'step5_mgmt': ['step1_data'],
-    'step6_insight': ['step1_data', 'step2_industry', 'step3_biz', 'step6b_valuation'],
-    'step6b_valuation': ['step1_data', 'step2_industry', 'step4_finance'],
-    'step7_risk': ['step1_data', 'step3_biz', 'step4_finance', 'step6b_valuation'],
-    'step8_master': ['step1_data', 'step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step6_insight', 'step6b_valuation', 'step7_risk'],
+    'step1_industry': ['step1_data'],
+    'step2_biz': ['step1_data'],
+    'step3_finance': ['step1_data'],
+    'step4_mgmt': ['step1_data'],
+    'step7_insight': ['step1_data', 'step1_industry', 'step2_biz', 'step6_valuation'],
+    'step6_valuation': ['step1_data', 'step1_industry', 'step3_finance'],
+    'step8_risk': ['step1_data', 'step2_biz', 'step3_finance', 'step6_valuation'],
+    'step8_master': ['step1_data', 'step1_industry', 'step2_biz', 'step3_finance', 'step4_mgmt', 'step7_insight', 'step6_valuation', 'step8_risk'],
 }
 
 # 并行发射波次（按依赖拓扑排序）
@@ -73,35 +72,35 @@ STEP_DEPS = {
 # Wave 4: step8（依赖全部 → 串行）
 LAUNCH_WAVES = [
     ['step1_data'],
-    ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt'],
-    ['step6b_valuation'],
-    ['step6_insight', 'step7_risk'],
+    ['step1_industry', 'step2_biz', 'step3_finance', 'step4_mgmt'],
+    ['step6_valuation'],
+    ['step7_insight', 'step8_risk'],
     ['step8_master'],
 ]
 
 # 超时
 STEP_TIMEOUTS = {
     'step1_data': 900,
-    'step2_industry': 900,
-    'step3_biz': 900,
-    'step4_finance': 900,
-    'step5_mgmt': 900,
-    'step6_insight': 900,
-    'step6b_valuation': 900,
-    'step7_risk': 900,
+    'step1_industry': 900,
+    'step2_biz': 900,
+    'step3_finance': 900,
+    'step4_mgmt': 900,
+    'step7_insight': 900,
+    'step6_valuation': 900,
+    'step8_risk': 900,
     'step8_master': 1800,
 }
 
 # Step 查询关键词（用于自动补搜）
 _STEP_KEYWORDS = {
     'step1_data': 'stock price market cap PE ratio EPS dividend analyst rating 市值 股价 市盈率',
-    'step2_industry': 'industry market size market share growth rate TAM penetration competitive landscape 行业规模 竞争格局',
-    'step3_biz': 'business model product revenue customer supply chain 商业模式 产品线 客户 收入结构',
-    'step4_finance': 'financial report revenue profit margin cash flow ROE debt 财报 营收 毛利率 净利润 现金流',
-    'step5_mgmt': 'management board governance ownership ESG compensation 管理层 董事会 股权结构 治理',
-    'step6_insight': 'catalyst valuation target price investment thesis risk-reward 催化剂 估值 目标价 投资亮点',
-    'step6b_valuation': 'DCF valuation PE PB PS EV/EBITDA target price WACC comparable company valuation model 目标价 估值',
-    'step7_risk': 'risk regulatory litigation competition macro threat 风险 监管 诉讼 竞争威胁 宏观',
+    'step1_industry': 'industry market size market share growth rate TAM penetration competitive landscape 行业规模 竞争格局',
+    'step2_biz': 'business model product revenue customer supply chain 商业模式 产品线 客户 收入结构',
+    'step3_finance': 'financial report revenue profit margin cash flow ROE debt 财报 营收 毛利率 净利润 现金流',
+    'step4_mgmt': 'management board governance ownership ESG compensation 管理层 董事会 股权结构 治理',
+    'step7_insight': 'catalyst valuation target price investment thesis risk-reward 催化剂 估值 目标价 投资亮点',
+    'step6_valuation': 'DCF valuation PE PB PS EV/EBITDA target price WACC comparable company valuation model 目标价 估值',
+    'step8_risk': 'risk regulatory litigation competition macro threat 风险 监管 诉讼 竞争威胁 宏观',
     'step8_master': '',
 }
 

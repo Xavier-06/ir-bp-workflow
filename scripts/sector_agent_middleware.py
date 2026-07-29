@@ -9,17 +9,17 @@ Section 3.2: Sector Agent Architecture
    sector-specific adjustments before passing to the PM Agent."
 
 功能:
-  1. 聚合 Level 1 Agent 输出（step2_industry, step3_biz, step4_finance, step7_risk）
+  1. 聚合 Level 1 Agent 输出（step1_industry, step2_biz, step3_finance, step8_risk）
   2. 应用行业基准对标（调用 sector_benchmarks_v2）
   3. 生成细粒度子问题分解（对标论文 Fine-grained decomposition）
   4. 产出行业调整分 (Sector Adjustment Score)
   5. 输出结构化 Sector View → 供 step8_master 合成
 
 与牛津论文映射:
-  IR 管线 step2_industry → 论文 Qualitative Agent (行业感知)
-  IR 管线 step4_finance → 论文 Quantitative Agent (量化数据)
-  IR 管线 step3_biz     → 论文 Qualitative Agent (商业模式)
-  IR 管线 step7_risk    → 论文 News Agent (风险事件)
+  IR 管线 step1_industry → 论文 Qualitative Agent (行业感知)
+  IR 管线 step3_finance → 论文 Quantitative Agent (量化数据)
+  IR 管线 step2_biz     → 论文 Qualitative Agent (商业模式)
+  IR 管线 step8_risk    → 论文 News Agent (风险事件)
   Sector Agent          → 论文 Sector Agent (本脚本)
 
 用法:
@@ -46,22 +46,22 @@ from dataclasses import dataclass, field
 
 # Level 1 → Sector 输入映射（对标论文 Table 1）
 AGENT_INPUTS = {
-    "step2_industry": {
+    "step1_industry": {
         "label": "行业分析 Agent (Qualitative)",
         "paper_role": "Qualitative Agent",
         "extract_dimensions": ["industry_growth", "market_size", "competitive_landscape", "regulatory_env"],
     },
-    "step3_biz": {
+    "step2_biz": {
         "label": "商业模式 Agent (Qualitative)",
         "paper_role": "Qualitative Agent",
         "extract_dimensions": ["moat_depth", "revenue_model", "customer_concentration", "unit_economics"],
     },
-    "step4_finance": {
+    "step3_finance": {
         "label": "财务分析 Agent (Quantitative)",
         "paper_role": "Quantitative Agent",
         "extract_dimensions": ["revenue_growth", "margin_profile", "roe_roic", "fcf_quality", "leverage"],
     },
-    "step7_risk": {
+    "step8_risk": {
         "label": "风险分析 Agent (News/Risk)",
         "paper_role": "News Agent",
         "extract_dimensions": ["regulatory_risk", "competitive_risk", "tech_obsolescence", "macro_exposure"],
@@ -387,9 +387,9 @@ def run_sector_agent(
         if key in PROPAGATION_BASELINE:
             # 用信号 confidence 均值作为传导质量的代理
             agent_signals = [s for s in signals if agent_type.lower() in s.source_step.lower() or
-                             (agent_type == "Qualitative" and s.source_step in ("step2_industry", "step3_biz")) or
-                             (agent_type == "Quantitative" and s.source_step == "step4_finance") or
-                             (agent_type == "News" and s.source_step == "step7_risk")]
+                             (agent_type == "Qualitative" and s.source_step in ("step1_industry", "step2_biz")) or
+                             (agent_type == "Quantitative" and s.source_step == "step3_finance") or
+                             (agent_type == "News" and s.source_step == "step8_risk")]
             if agent_signals:
                 mean_conf = statistics.mean([s.confidence for s in agent_signals])
                 prop_scores.append(mean_conf)
@@ -505,13 +505,13 @@ def format_report(view: SectorView) -> str:
         # 计算当前传导（按 agent 类型分组信号的均值 confidence）
         if "Qualitative" in path:
             agent_signals = [s for s in view.signals
-                             if s.source_step in ("step2_industry", "step3_biz")]
+                             if s.source_step in ("step1_industry", "step2_biz")]
         elif "Quantitative" in path:
             agent_signals = [s for s in view.signals
-                             if s.source_step == "step4_finance"]
+                             if s.source_step == "step3_finance"]
         elif "News" in path:
             agent_signals = [s for s in view.signals
-                             if s.source_step == "step7_risk"]
+                             if s.source_step == "step8_risk"]
         else:
             agent_signals = []
 

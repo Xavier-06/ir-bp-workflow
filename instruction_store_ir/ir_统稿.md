@@ -12,20 +12,20 @@
 |------|------|------|
 | enriched_data_pack.json | `{JOB_ID}-enriched_data_pack.json` | 数据包（行情/财务/研报/行业/工商） |
 | benchmark_skeleton.json | `{JOB_ID}-benchmark_skeleton.json`（如有） | 大行研报骨架（key_debates/估值/预测） |
-| step2_industry | `{JOB_ID}-step2_industry.md` | 行业与市场格局 |
-| step3_biz | `{JOB_ID}-step3_biz.md` | 业务模式与护城河 |
-| step4_finance | `{JOB_ID}-step4_finance.md` | 财务分析 |
-| step5_mgmt | `{JOB_ID}-step5_mgmt.md` | 管理与治理 |
-| step_macro | `{JOB_ID}-step_macro.md` | 宏观分析 |
-| step6b_valuation | `{JOB_ID}-step6b_valuation.md` | 预测与估值 |
-| step6_insight | `{JOB_ID}-step6_insight.md` | 投资洞察与催化剂 |
-| step7_risk | `{JOB_ID}-step7_risk.md` | 风险提示 |
+| step1_industry | `{JOB_ID}-step1_industry.md` | 行业与市场格局 |
+| step2_biz | `{JOB_ID}-step2_biz.md` | 业务模式与护城河 |
+| step3_finance | `{JOB_ID}-step3_finance.md` | 财务分析 |
+| step4_mgmt | `{JOB_ID}-step4_mgmt.md` | 管理与治理 |
+| step5_macro | `{JOB_ID}-step5_macro.md` | 宏观分析 |
+| step6_valuation | `{JOB_ID}-step6_valuation.md` | 预测与估值 |
+| step7_insight | `{JOB_ID}-step7_insight.md` | 投资洞察与催化剂 |
+| step8_risk | `{JOB_ID}-step8_risk.md` | 风险提示 |
 
 ## 统稿叙事骨架（v3.0 — Key Debates 驱动）
 
 **⚠️ 核心原则：研报不是 10 个章节的机械拼接，而是围绕 3-5 个核心投资辩论（Key Debates）展开的叙事。**
 
-如果 `benchmark_skeleton.json` 存在且含 `key_debates`，以其中的 debates 为骨架；否则从 step6_insight（差异化洞察）和 step7_risk（风险催化）中提炼 3-5 个 Key Debates。
+如果 `benchmark_skeleton.json` 存在且含 `key_debates`，以其中的 debates 为骨架；否则从 step7_insight（差异化洞察）和 step8_risk（风险催化）中提炼 3-5 个 Key Debates。
 
 **Key Debates 提炼标准**（每个 debate 必须）：
 1. 是一个**有争议、有分歧、能改变投资结论**的核心问题（不是简单的事实陈述）
@@ -76,12 +76,12 @@
 ### 辩论三：……
 
 ## 估值与目标价
-（来自 step6b_valuation：方法选择理由 + 核心假设 + 目标价三档 + 敏感性。
+（来自 step6_valuation：方法选择理由 + 核心假设 + 目标价三档 + 敏感性。
  估值方法随标的变——成熟消费股一句话倍数即可，业务混合体才上 SOTP/DCF。
  如有 benchmark_skeleton，对标大行方法论，解释我方假设差异。）
 
 ## 催化剂与风险
-（来自 step6_insight + step7_risk：上行催化（时间窗 + 量级）+ 下行风险（具体到指标和阈值）。
+（来自 step7_insight + step8_risk：上行催化（时间窗 + 量级）+ 下行风险（具体到指标和阈值）。
  风险只列最致命的 3-5 条，每条带触发条件，不堆「政策风险/市场风险」式万能清单。）
 
 ## 附录：基本面明细（供查阅，非必读）
@@ -98,7 +98,7 @@
 
 ### 脚注规则（最高优先级）
 - **保留所有 [^N] 脚注标记**，不得删除任何子代理的脚注
-- 各 step 的脚注编号可能冲突（如 step2_industry 有 [^1]-[^5]，step3_biz 也有 [^1]-[^3]），你需要**重新编号**为全局唯一
+- 各 step 的脚注编号可能冲突（如 step1_industry 有 [^1]-[^5]，step2_biz 也有 [^1]-[^3]），你需要**重新编号**为全局唯一
 - 重编号后，正文中的引用和末尾"来源与参考"章节的定义必须一致
 - 来源合并不得丢来源：所有 step 的来源索引表/脚注列表都必须合并到末尾"来源与参考"章节
 

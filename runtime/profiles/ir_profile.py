@@ -396,7 +396,7 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 5. **Section Requirements (9个)**: 分配到 IR 9步骤
 
 ## Step 分配规则（v3.0: 删除 step1_data，9 步）
-step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro, step6b_valuation, step6_insight, step7_risk, step8_master
+step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuation, step7_insight, step8_risk, step8_master
 
 ## 输出
 写入 `{tasks_dir / f'{job_ctx.job_id}-ir_research_plan.json'}`:
@@ -542,7 +542,7 @@ def _run_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dict[s
 def _run_precompute(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     """Phase 1.2: 运行预计算引擎（财务指标 / 行业对标）。
 
-    输出写入 data/tasks/ 供子代理（step4_finance/step6b_valuation 等）使用。
+    输出写入 data/tasks/ 供子代理（step3_finance/step6_valuation 等）使用。
     预计算引擎需要股票代码（ticker），如果 metadata 没有则尝试解析。
     """
     import subprocess
@@ -1493,8 +1493,8 @@ def _run_debate_review_phase(runtime_root: Path, job_ctx: JobContext) -> dict[st
 # ═══════════════════════════════════════════════════════════
 
 _SYNTHESIS_STEPS = [
-    "step2_industry", "step3_biz", "step4_finance",
-    "step5_mgmt", "step_macro", "step6b_valuation", "step6_insight", "step7_risk",
+    "step1_industry", "step2_biz", "step3_finance",
+    "step4_mgmt", "step5_macro", "step6_valuation", "step7_insight", "step8_risk",
 ]
 
 
@@ -2288,13 +2288,13 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 # Per-step DOCX 独立导出（P2）
 # ═══════════════════════════════════════════════
 _STEP_DOCX_STEPS = (
-    "step2_industry", "step3_biz", "step4_finance",
-    "step5_mgmt", "step_macro", "step6_insight", "step6b_valuation", "step7_risk",
+    "step1_industry", "step2_biz", "step3_finance",
+    "step4_mgmt", "step5_macro", "step7_insight", "step6_valuation", "step8_risk",
 )
 _STEP_DOCX_LABELS = {
-    "step2_industry": "行业分析", "step3_biz": "商业模式",
-    "step4_finance": "财务分析", "step5_mgmt": "管理层与治理", "step_macro": "宏观分析",
-    "step6_insight": "差异化洞察", "step6b_valuation": "预测与估值", "step7_risk": "风险与催化",
+    "step1_industry": "行业分析", "step2_biz": "商业模式",
+    "step3_finance": "财务分析", "step4_mgmt": "管理层与治理", "step5_macro": "宏观分析",
+    "step7_insight": "差异化洞察", "step6_valuation": "预测与估值", "step8_risk": "风险与催化",
 }
 
 
@@ -2426,9 +2426,9 @@ class IRProfile(PipelineProfile):
             "phase08_dispatch_prepare": [],
             "phase09_dispatch_collect": [],
             "phase09_wave_evidence_gate": [],
-            "phase09_wave1_evidence_gate": ["{task_id}-step2_industry-facts.json", "{task_id}-step3_biz-facts.json", "{task_id}-step4_finance-facts.json", "{task_id}-step5_mgmt-facts.json", "{task_id}-step_macro-facts.json"],
-            "phase09_wave2_evidence_gate": ["{task_id}-step6b_valuation-facts.json"],
-            "phase09_wave3_evidence_gate": ["{task_id}-step6_insight-facts.json", "{task_id}-step7_risk-facts.json"],
+            "phase09_wave1_evidence_gate": ["{task_id}-step1_industry-facts.json", "{task_id}-step2_biz-facts.json", "{task_id}-step3_finance-facts.json", "{task_id}-step4_mgmt-facts.json", "{task_id}-step5_macro-facts.json"],
+            "phase09_wave2_evidence_gate": ["{task_id}-step6_valuation-facts.json"],
+            "phase09_wave3_evidence_gate": ["{task_id}-step7_insight-facts.json", "{task_id}-step8_risk-facts.json"],
             "phase10_fact_store_merge": ["{task_id}-fact_store.json", "{task_id}-fact_store_index.json"],
             "phase10_shared_state_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
             "phase10_wave1_shared_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],

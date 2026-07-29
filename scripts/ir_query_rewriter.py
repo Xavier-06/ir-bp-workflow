@@ -119,7 +119,7 @@ STRATEGY_TEMPLATES = {
         '{entity} 分析师 目标价 买入 卖出 评级 数量',
         '{entity} 分红 回购 金额 {year} {prev_year}',
     ],
-    'step2_industry': [
+    'step1_industry': [
         '{entity} 行业 市场规模 增速 预测 {year}',
         '{entity} 竞争对手 市占率 对比',
         '{entity} peer comparison market share ranking',
@@ -131,31 +131,31 @@ STRATEGY_TEMPLATES = {
         '{entity} 客户 集中度 前五大 依赖',
         '{entity} pricing power gross margin trend',
     ],
-    'step4_finance': [
+    'step3_finance': [
         '{entity} 年报 营收 净利润 现金流 {prev_year} {year}',
         '{entity} free cash flow ROE ROIC trend 3 year',
         '{entity} 资产负债率 债务 短期 长期 {prev_year}',
         '{entity} 财务造假 质疑 审计 保留意见',
     ],
-    'step5_mgmt': [
+    'step4_mgmt': [
         '{entity} 管理层 变动 CEO CFO 离职',
         '{entity} 大股东 减持 增持 限售 解禁',
         '{entity} 股权激励 RSU 期权 员工持股',
         '{entity} corporate governance board independence',
     ],
-    'step6_insight': [
+    'step7_insight': [
         '{entity} 被低估 催化剂 非共识 看多',
         '{entity} short interest 做空 比例 {year}',
         '{entity} market blind spot overlooked',
         '{entity} 机构 持仓 变化 北向 南向',
     ],
-    'step6b_valuation': [
+    'step6_valuation': [
         '{entity} DCF 估值 WACC 终值 敏感性分析',
         '{entity} 可比公司 PE PB PS EV/EBITDA 估值倍数',
         '{entity} analyst consensus target price {year}',
         '{entity} 估值 目标价 盈利预测 收入预测',
     ],
-    'step7_risk': [
+    'step8_risk': [
         '{entity} 风险 监管 诉讼 处罚 调查',
         '{entity} 竞争 威胁 替代 降价',
         '{entity} 解禁 减持 稀释 配股',

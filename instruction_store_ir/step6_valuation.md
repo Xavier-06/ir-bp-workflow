@@ -1,18 +1,18 @@
-# 预测与估值主笔 (step6b_valuation)
+# 预测与估值主笔 (step6_valuation)
 
 ## 角色
 投研主笔 - 预测与估值
 
 ## Step 编号
-`step6b_valuation` — 在 Wave 3 执行，为 step6_insight 和 step7_risk 提供估值锚点
+`step6_valuation` — 在 Wave 3 执行，为 step7_insight 和 step8_risk 提供估值锚点
 
-**强制依赖**：enriched_data_pack.json + step2_industry + step3_biz + step4_finance + precompute_financial_metrics
+**强制依赖**：enriched_data_pack.json + step1_industry + step2_biz + step3_finance + precompute_financial_metrics
 
 **必读**：开始估值前，必须完整读取以下前序step输出（不是可选，是强制）：
 1. enriched_data_pack.json → 公司基本面/估值指标/最新市值（phase04 数据包，替代原 step1_data）
-2. step2_industry → 行业竞争格局/市场份额/行业增速（决定各业务线增长假设）
-3. step3_biz → 商业模式/分业务收入构成/毛利率结构/护城河评分（决定SOTP拆分逻辑）
-4. step4_finance → 深度财务分析/ROE/现金流（决定盈利状态判定）
+2. step1_industry → 行业竞争格局/市场份额/行业增速（决定各业务线增长假设）
+3. step2_biz → 商业模式/分业务收入构成/毛利率结构/护城河评分（决定SOTP拆分逻辑）
+4. step3_finance → 深度财务分析/ROE/现金流（决定盈利状态判定）
 5. precompute_financial_metrics.json → 预计算财务指标
 
 ---
@@ -657,7 +657,7 @@ cp /tmp/{TASK_ID}_valuation.xlsx ~/Desktop/
 | 独立投入足够大 | 研发/资本开支占总营收比 ≥ 10% **或** 绝对金额 ≥ 5亿元 | NeoData 利润表 |
 | 产品已成型 | 有公开可验证的产品版本/交付案例 | WebSearch / 公司公告 |
 | 商业化已起步 | 该业务年收入 ≥ 1亿元 **或** 有明确的付费客户/变现路径 | WebSearch / 财报披露 |
-| 生态承接场景清晰 | 可嵌入现有业务的 3 个以上场景（需列明场景名称） | step3_biz 输出 |
+| 生态承接场景清晰 | 可嵌入现有业务的 3 个以上场景（需列明场景名称） | step2_biz 输出 |
 
 **判定结果绑定**：
 - 四个条件**全部满足** → 必须启用第三层新兴业务独立估值 → 变为 **(F)** 强制

@@ -166,9 +166,9 @@ def analyze_pipeline_task(task_id: str, pipeline: str = 'ir') -> list[dict]:
     """
     if pipeline == 'ir':
         tasks_dir = WORKSPACE / 'data' / 'tasks'
-        step_names = ['step1_data', 'step2_industry', 'step3_biz',
-                      'step4_finance', 'step5_mgmt', 'step6_insight',
-                      'step6b_valuation', 'step7_risk', 'step8_master']
+        step_names = ['step1_data', 'step1_industry', 'step2_biz',
+                      'step3_finance', 'step4_mgmt', 'step7_insight',
+                      'step6_valuation', 'step8_risk', 'step8_master']
         files = [(tasks_dir / f'{task_id}-{s}.md') for s in step_names]
     else:
         # BP pipeline

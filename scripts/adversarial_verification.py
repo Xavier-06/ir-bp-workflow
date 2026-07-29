@@ -84,7 +84,7 @@ def run_ir_verification(task_id: str, tasks_dir: Path = None) -> dict:
         tasks_dir = TASKS_DIR
 
     steps = load_ir_steps(task_id, tasks_dir)
-    text = steps.get('step8_master', steps.get('step7_risk', ''))
+    text = steps.get('step8_master', steps.get('step8_risk', ''))
 
     if not text:
         return {

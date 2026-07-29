@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """IR 管线 — 投资判断汇总（phase14_investment_judgment）。
 
-读取所有 step 输出（step1_data ... step7_risk）与最终报告，提取每个维度/步骤的
+读取所有 step 输出（step1_data ... step8_risk）与最终报告，提取每个维度/步骤的
 结论、置信度、关键风险标记与数据缺口，综合给出明确的投资建议
 （买入/增持 · 观望 · 回避）及逻辑与风险提示。
 
@@ -20,21 +20,20 @@ from typing import Any
 # ── IR step → 中文标签（与 ir_subagent_launcher_wb.STEP_ROLE 对齐）──
 IR_STEP_LABELS = {
     "step1_data": "数据收集",
-    "step2_industry": "行业分析",
-    "step3_biz": "商业模式",
-    "step4_finance": "财务分析",
-    "step5_mgmt": "管理层与治理",
-    "step_macro": "宏观分析",
-    "step6_insight": "差异化洞察",
-    "step6b_valuation": "预测与估值",
-    "step7_risk": "风险与催化",
-    "step8_master": "文档汇总",
+    "step1_industry": "行业分析",
+    "step2_biz": "商业模式",
+    "step3_finance": "财务分析",
+    "step4_mgmt": "管理层与治理",
+    "step5_macro": "宏观分析",
+    "step7_insight": "差异化洞察",
+    "step6_valuation": "预测与估值",
+    "step8_risk": "风险与催化",
 }
 
-# 参与判断的核心 step（step8_master 为汇总稿，不单独参与维度评分）
+# 参与判断的核心 step（统稿由 phase13 synthesis 独立处理，不参与维度评分）
 _JUDGE_STEPS = (
-    "step1_data", "step2_industry", "step3_biz", "step4_finance",
-    "step5_mgmt", "step_macro", "step6_insight", "step6b_valuation", "step7_risk",
+    "step1_data", "step1_industry", "step2_biz", "step3_finance",
+    "step4_mgmt", "step5_macro", "step7_insight", "step6_valuation", "step8_risk",
 )
 
 

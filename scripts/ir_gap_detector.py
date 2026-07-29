@@ -48,7 +48,7 @@ REPORT_DIMENSIONS = {
         ],
         'required_count': 3,
     },
-    'step2_industry': {
+    'step1_industry': {
         'name': '行业与市场格局',
         'keywords': [
             'industry', 'market size', 'market share', 'growth rate',
@@ -68,7 +68,7 @@ REPORT_DIMENSIONS = {
         ],
         'required_count': 3,
     },
-    'step4_finance': {
+    'step3_finance': {
         'name': '财务分析与趋势',
         'keywords': [
             'revenue', 'net profit', 'operating cash flow', 'free cash flow',
@@ -78,7 +78,7 @@ REPORT_DIMENSIONS = {
         ],
         'required_count': 3,
     },
-    'step5_mgmt': {
+    'step4_mgmt': {
         'name': '管理层与股权结构',
         'keywords': [
             'CEO', 'management team', 'governance', 'ownership',
@@ -88,7 +88,7 @@ REPORT_DIMENSIONS = {
         ],
         'required_count': 2,
     },
-    'step6_insight': {
+    'step7_insight': {
         'name': '差异化洞察与非共识',
         'keywords': [
             'catalyst', 'bull case', 'non-consensus', 'undervalued',
@@ -97,7 +97,7 @@ REPORT_DIMENSIONS = {
         ],
         'required_count': 1,
     },
-    'step6b_valuation': {
+    'step6_valuation': {
         'name': '预测与估值',
         'keywords': [
             'DCF', 'valuation', 'WACC', 'terminal value', 'sensitivity',
@@ -107,7 +107,7 @@ REPORT_DIMENSIONS = {
         ],
         'required_count': 2,
     },
-    'step7_risk': {
+    'step8_risk': {
         'name': '风险与催化剂',
         'keywords': [
             'risk', 'downside', 'regulatory', 'competition threat',

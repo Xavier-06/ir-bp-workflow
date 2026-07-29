@@ -11,20 +11,20 @@ WORKSPACE = Path(__file__).resolve().parent.parent
 TASKS_DIR_IR = WORKSPACE / 'data' / 'tasks'
 
 STEP_ORDER = [
-    'step1_data', 'step2_industry', 'step3_biz',
-    'step4_finance', 'step5_mgmt', 'step6_insight',
-    'step6b_valuation', 'step7_risk', 'step8_master',
+    'step1_data', 'step1_industry', 'step2_biz',
+    'step3_finance', 'step4_mgmt', 'step7_insight',
+    'step6_valuation', 'step8_risk', 'step8_master',
 ]
 
 STEP_NAMES = {
     'step1_data': '行情与基础数据',
-    'step2_industry': '行业与市场格局',
-    'step3_biz': '业务模式',
-    'step4_finance': '财务分析',
-    'step5_mgmt': '管理与治理',
-    'step6_insight': '投资洞察',
-    'step6b_valuation': '预测与估值',
-    'step7_risk': '风险提示',
+    'step1_industry': '行业与市场格局',
+    'step2_biz': '业务模式',
+    'step3_finance': '财务分析',
+    'step4_mgmt': '管理与治理',
+    'step7_insight': '投资洞察',
+    'step6_valuation': '预测与估值',
+    'step8_risk': '风险提示',
     'step8_master': '统稿',
 }
 

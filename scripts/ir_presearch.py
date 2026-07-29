@@ -60,7 +60,7 @@ STEP_QUERIES = {
         '{entity} employee count headcount R&D staff {prev_year}',
         '{entity} 员工 人数 研发 占比 {prev_year}',
     ],
-    'step2_industry': [
+    'step1_industry': [
         '{entity} industry market size growth rate {year}',
         '{entity} industry market size TAM SAM {year}',
         '{entity} competitors market share competitive landscape {year}',
@@ -70,7 +70,7 @@ STEP_QUERIES = {
         '{entity} 竞争对手 出货量 产量 融资 {year}',
         '{entity} industry policy government support subsidy',
     ],
-    'step3_biz': [
+    'step2_biz': [
         '{entity} business model revenue breakdown segments {prev_year}',
         '{entity} revenue by product line segment {prev_year} annual report',
         '{entity} 收入构成 业务线 分部收入 {prev_year}',
@@ -80,7 +80,7 @@ STEP_QUERIES = {
         '{entity} production capacity target output volume {year}',
         '{entity} key customers order backlog pipeline {year}',
     ],
-    'step4_finance': [
+    'step3_finance': [
         '{entity} financial results revenue profit cash flow 3 year trend',
         '{entity} {prev_year} annual report income statement balance sheet cash flow',
         '{entity} valuation PE PB PS DCF target price {year}',
@@ -91,7 +91,7 @@ STEP_QUERIES = {
         '{entity} ROE ROIC return on equity invested capital {prev_year}',
         '{entity} revenue quality core profit excluding subsidies',
     ],
-    'step5_mgmt': [
+    'step4_mgmt': [
         '{entity} CEO management team background experience',
         '{entity} corporate governance board directors ownership structure',
         '{entity} share buyback amount repurchase plan {year}',
@@ -103,21 +103,21 @@ STEP_QUERIES = {
         '{entity} stock option RSU employee incentive plan',
         '{entity} related party transaction connected transaction {prev_year}',
     ],
-    'step6_insight': [
+    'step7_insight': [
         '{entity} non-consensus bull case contrarian view {year}',
         '{entity} undervalued catalyst upcoming events {year}',
         '{entity} market blind spot overlooked positive factor',
         '{entity} 被低估 催化剂 非共识 {year}',
         '{entity} short interest short selling ratio {year}',
     ],
-    'step6b_valuation': [
+    'step6_valuation': [
         '{entity} DCF valuation WACC discount rate terminal value',
         '{entity} comparable company PE PB PS EV/EBITDA valuation',
         '{entity} analyst consensus target price {year}',
         '{entity} 估值 目标价 可比公司 敏感性分析',
         '{entity} revenue growth forecast earnings projection {year}',
     ],
-    'step7_risk': [
+    'step8_risk': [
         '{entity} key risks bear case downside scenario {year}',
         '{entity} competition threat regulatory risk',
         '{entity} catalyst timeline upcoming events earnings date {year}',

@@ -15,47 +15,42 @@
     {
       "key": "投研_主笔_行业分析",
       "name": "行业分析 Agent",
-      "file": "投研_主笔_行业分析.md"
+      "file": "step1_industry.md"
     },
     {
       "key": "投研_主笔_商业模式",
       "name": "商业模式 Agent",
-      "file": "投研_主笔_商业模式.md"
+      "file": "step2_biz.md"
     },
     {
       "key": "投研_主笔_财务分析",
       "name": "财务分析 Agent",
-      "file": "投研_主笔_财务分析.md"
+      "file": "step3_finance.md"
     },
     {
       "key": "投研_主笔_预测与估值",
       "name": "预测与估值主笔",
-      "file": "投研_主笔_预测与估值.md"
+      "file": "step6_valuation.md"
     },
     {
       "key": "投研_主笔_管理层",
       "name": "管理层 Agent",
-      "file": "投研_主笔_管理层.md"
+      "file": "step4_mgmt.md"
     },
     {
       "key": "投研_主笔_差异化洞察",
       "name": "差异化洞察 Agent",
-      "file": "投研_主笔_差异化洞察.md"
+      "file": "step7_insight.md"
     },
     {
       "key": "投研_主笔_风险催化",
       "name": "风险催化 Agent",
-      "file": "投研_主笔_风险催化.md"
+      "file": "step8_risk.md"
     },
     {
       "key": "投研_主笔_宏观分析",
       "name": "宏观分析 Agent",
-      "file": "投研_主笔_宏观分析.md"
-    },
-    {
-      "key": "投研_主笔_文档汇总",
-      "name": "文档汇总 Agent",
-      "file": "投研_主笔_文档汇总.md"
+      "file": "step5_macro.md"
     },
     {
       "key": "_shared_output_protocol",
@@ -65,15 +60,15 @@
   ],
   "pipeline_bindings": {
     "ir": {
-      "step2_industry": "投研_主笔_行业分析",
-      "step3_biz": "投研_主笔_商业模式",
-      "step4_finance": "投研_主笔_财务分析",
-      "step5_mgmt": "投研_主笔_管理层",
-      "step_macro": "投研_主笔_宏观分析",
-      "step6_insight": "投研_主笔_差异化洞察",
-      "step6b_valuation": "投研_主笔_预测与估值",
-      "step7_risk": "投研_主笔_风险催化",
-      "step8_master": "投研_主笔_文档汇总"
+      "step1_data": "投研_主笔_数据收集",
+      "step1_industry": "step1_industry",
+      "step2_biz": "step2_biz",
+      "step3_finance": "step3_finance",
+      "step4_mgmt": "step4_mgmt",
+      "step5_macro": "step5_macro",
+      "step6_valuation": "step6_valuation",
+      "step7_insight": "step7_insight",
+      "step8_risk": "step8_risk"
     }
   }
 }

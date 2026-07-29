@@ -25,21 +25,21 @@ RUNTIME = ROOT / 'ir_runtime.py'
 
 STEP_DEPS = {
     'step1_data': [],
-    'step2_industry': ['step1_data'],
-    'step3_biz': ['step1_data'],
-    'step4_finance': ['step1_data'],
-    'step5_mgmt': ['step1_data'],
-    'step6_insight': ['step1_data', 'step2_industry', 'step3_biz', 'step6b_valuation'],
-    'step6b_valuation': ['step1_data', 'step2_industry', 'step4_finance'],
-    'step7_risk': ['step1_data', 'step3_biz', 'step4_finance', 'step6b_valuation'],
-    'step8_master': ['step1_data', 'step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt', 'step6_insight', 'step6b_valuation', 'step7_risk'],
+    'step1_industry': ['step1_data'],
+    'step2_biz': ['step1_data'],
+    'step3_finance': ['step1_data'],
+    'step4_mgmt': ['step1_data'],
+    'step7_insight': ['step1_data', 'step1_industry', 'step2_biz', 'step6_valuation'],
+    'step6_valuation': ['step1_data', 'step1_industry', 'step3_finance'],
+    'step8_risk': ['step1_data', 'step2_biz', 'step3_finance', 'step6_valuation'],
+    'step8_master': ['step1_data', 'step1_industry', 'step2_biz', 'step3_finance', 'step4_mgmt', 'step7_insight', 'step6_valuation', 'step8_risk'],
 }
 
 LAUNCH_WAVES = [
     ['step1_data'],
-    ['step2_industry', 'step3_biz', 'step4_finance', 'step5_mgmt'],
-    ['step6b_valuation'],
-    ['step6_insight', 'step7_risk'],
+    ['step1_industry', 'step2_biz', 'step3_finance', 'step4_mgmt'],
+    ['step6_valuation'],
+    ['step7_insight', 'step8_risk'],
     ['step8_master'],
 ]
 
