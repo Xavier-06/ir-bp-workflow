@@ -3,8 +3,10 @@
 BP DD 管线任务树预设
 
 为完整 BP 尽调链路创建任务树：
-phase01_document_intake -> phase02_company_verify -> phase03_research_plan -> phase04_presearch
+phase01_document_intake -> phase03_research_plan -> phase04_presearch
 -> Wave 1/2 dispatch/collect -> shared page/gates -> synthesis -> IC/RedTeam/reviews -> phase30_delivery
+
+注：phase02_company_verify 已于 2026-07-29 删除（tyc 工商核验由 phase04 research_plan 子代理直调）。
 """
 from __future__ import annotations
 
@@ -48,20 +50,12 @@ def create_bp_dd_tasks(task_id: str, reg: Optional["TaskRegistry"] = None) -> "T
         blocked_by=[],
     )
 
-    company_verify = create(
-        subject="主体核验",
-        description="基于公开信息核验公司主体、创始人和风险线索",
-        active_form="正在核验公司主体",
-        phase="phase02_company_verify",
-        blocked_by=[intake.id],
-    )
-
     research_plan = create(
         subject="研究计划",
         description="生成 BP 尽调研究计划、claim matrix、fact requirements 和 section requirements",
         active_form="正在生成研究计划",
         phase="phase03_research_plan",
-        blocked_by=[company_verify.id],
+        blocked_by=[intake.id],
     )
 
     presearch = create(

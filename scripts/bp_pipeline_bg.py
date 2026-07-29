@@ -54,14 +54,13 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 # Heavy phases — 走 launch_heavy_phase 路径
-HEAVY_PHASES = {"phase01_document_intake", "phase02_company_verify", "phase04_presearch", "phase30_delivery"}
+HEAVY_PHASES = {"phase01_document_intake", "phase04_presearch", "phase30_delivery"}
 
 # phase01 OCR 和 phase04 预搜索无超时，其他 phase 保留超时
 _NO_TIMEOUT_PHASES = {"phase01_document_intake", "phase04_presearch"}
 
 # 超时设置（秒）— NO_TIMEOUT_PHASES 不使用此表
 PHASE_TIMEOUTS = {
-    "phase02_company_verify": 600,    # 10 分钟
     "phase08_dispatch_prepare": 120,
     "phase09_dispatch_collect": 120,
     "phase13_wave3_prepare": 120,

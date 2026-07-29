@@ -310,8 +310,9 @@ def test_current_bp_role_prompts_are_loaded_exactly_from_instruction_store():
 
 
 def test_current_bp_role_prompts_state_vc_diligence_identity():
-    # v4.5 narrative roles (Wave 0/4) have different identities — buyer analyst, not VC researcher
-    narrative_roles = {"bp_investment_hypothesis", "bp_consensus_challenge", "bp_catalyst", "bp_industry_research"}
+    # v4.5 narrative roles (Wave 4) have different identities — buyer analyst, not VC researcher
+    # (Wave 0 investment_hypothesis 已删除 2026-07-29)
+    narrative_roles = {"bp_consensus_challenge", "bp_catalyst", "bp_industry_research"}
     diligence_roles = CURRENT_BP_ROLES - narrative_roles
     for role in diligence_roles:
         prompt = ROLE_SYSTEM_PROMPTS[role]

@@ -27,8 +27,7 @@ ROLE_TO_KEY = {
     'bp_competition_positioning': 'competition_positioning',
     'bp_valuation_return': 'valuation_return',
     'bp_dealbreaker_risk': 'dealbreaker_risk',
-    # v4.5 新增：投资叙事层 4 角色
-    'bp_investment_hypothesis': 'investment_hypothesis',
+    # v4.5 新增：投资叙事层 3 角色（Wave 4）
     'bp_consensus_challenge': 'consensus_challenge',
     'bp_catalyst': 'catalyst',
     'bp_industry_research': 'industry_research',
@@ -54,8 +53,7 @@ CURRENT_BP_ROLES = {
     'bp_competition_positioning',
     'bp_valuation_return',
     'bp_dealbreaker_risk',
-    # v4.5 新增：投资叙事层
-    'bp_investment_hypothesis',
+    # v4.5 新增：投资叙事层（Wave 4）
     'bp_consensus_challenge',
     'bp_catalyst',
     'bp_industry_research',
@@ -967,13 +965,7 @@ _BP_SEARCH_TEMPLATES = {
         '"{entity}" controversy negative news supply chain risk',
         '"{entity}" 风险 诉讼 债务 资质 负面 供应链',
     ],
-    # v4.5 新增：投资叙事层
-    'bp_investment_hypothesis': [
-        '"{entity}" investment thesis core hypothesis growth driver',
-        '"{entity}" market consensus bull bear case',
-        '"{entity}" 投资逻辑 增长驱动 市场预期 分歧',
-        # IMA: 长安投研 + 机构调研纪要（快速扫机构共识与分歧）
-    ],
+    # v4.5 新增：投资叙事层（Wave 4）
     'bp_consensus_challenge': [
         '"{entity}" analyst consensus market expectation sell side',
         '"{entity}" expectation gap contrarian view consensus vs reality',

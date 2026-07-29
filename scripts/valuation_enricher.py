@@ -3,7 +3,7 @@
 BP/IR 通用估值补充器 — 统一入口（PR1）。
 
 把 IR 专用 `tasks.valuation_enricher.enrich_with_yahoo` 包成 BP 子代理
-（包括主控脚本 `bp_company_verify` / BP role 子代理）也能直接 import 的形式。
+（BP role 子代理）也能直接 import 的形式。
 
 行为：
   - A/HK 股：内部走 NeoData 优先 + yfinance 交叉验证
@@ -12,9 +12,10 @@ BP/IR 通用估值补充器 — 统一入口（PR1）。
   - 失败/非上市公司 → 返回空 dict，不抛异常
 
 激活场景：
-  - `scripts/bp_company_verify.py` 主控验证层补估值字段
   - `scripts/bp_subagent_launcher_wb.py` 子代理 brief 调用
   - IR 端 `ir_company_verify.py` 继续走 `tasks.valuation_enricher`（不破坏现有 import）
+
+注：`bp_company_verify.py` 主控验证层已于 2026-07-29 随 phase02 一并删除。
 """
 from __future__ import annotations
 

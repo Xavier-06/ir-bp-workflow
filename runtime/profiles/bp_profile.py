@@ -15,7 +15,6 @@ from runtime.profiles.bp_constants import (
     BP_ALL_ROLE_SLUGS,
     BP_LEGACY_ROLE_SLUGS,
     BP_TYC_CONNECTOR_IDS,
-    BP_WAVE0_ROLE_SLUGS,
     BP_WAVE1_ROLE_SLUGS,
     BP_WAVE3_ROLE_SLUGS,
     BP_WAVE4_ROLE_SLUGS,
@@ -208,21 +207,7 @@ def _run_company_intake_collect(runtime_root: Path, job_ctx: JobContext) -> dict
     return bp_collect_company_intake(task_dir=task_dir, job_id=job_ctx.job_id)
 
 
-# ── Phase 02-04: 主体核验 + 预搜索 ────────────
-
-def _run_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    if os.environ.get("IRBP_BG_CHILD") == "1":
-        # 当前是后台子进程，直接执行
-        from scripts.bp_company_verify import run_company_verify
-        return run_company_verify(job_ctx)
-    from scripts.heavy_phase_bg import check_cached_result, launch_heavy_phase
-    cached = check_cached_result(runtime_root, job_ctx.job_id, "phase02_company_verify")
-    if cached is not None:
-        print(f"  📦 [bp] 使用缓存的 company_verify 结果", flush=True)
-        return cached
-    return launch_heavy_phase(runtime_root, job_ctx, "phase02_company_verify", pipeline="bp")
-
-
+# ── Phase 04: 研究计划（phase02 工商核验已删除，tyc 由 phase04 子代理直调）────
 
 def _bp_entity_market(job_ctx: JobContext) -> tuple[str, str]:
     metadata = job_ctx.metadata or {}
@@ -321,16 +306,7 @@ def _run_bp_search_plan_compile(runtime_root: Path, job_ctx: JobContext) -> dict
 
     profile = _load_bp_profile(task_dir)
 
-    company_verify: dict[str, Any] = {}
-    for candidate in (task_dir / "company_verify_report.json", task_dir / "bp_company_verify_report.json"):
-        if candidate.exists():
-            try:
-                company_verify = json.loads(candidate.read_text(encoding="utf-8"))
-                break
-            except Exception:
-                company_verify = {}
-
-    payload = compile_bp_search_plan(research_plan, profile=profile, company_verify=company_verify)
+    payload = compile_bp_search_plan(research_plan, profile=profile)
     path = write_bp_search_plan(task_dir, payload)
     return {
         "ok": bool(payload.get("search_tasks")),
@@ -361,7 +337,7 @@ def _run_bp_shared_page_init(runtime_root: Path, job_ctx: JobContext) -> dict[st
     }
 
 
-_WAVE_TO_PHASE_NUM = {0: "07d", 1: "12", 3: "16", 4: "20"}
+_WAVE_TO_PHASE_NUM = {1: "12", 3: "16", 4: "20"}
 
 def _run_bp_shared_page_refresh(runtime_root: Path, job_ctx: JobContext, after_wave: int = 0) -> dict[str, Any]:
     """Refresh BP shared diligence page after a wave completes."""
@@ -426,90 +402,6 @@ def _classify_source_tier(url: str) -> str:
     """根据 URL 判断 source_tier。"""
     media_domains = ("36kr", "sohu", "sina", "qq.com", "baidu", "zhihu")
     return "media" if any(d in url for d in media_domains) else "research"
-
-
-def _extract_company_verify_facts(task_dir: Path) -> list[dict[str, Any]]:
-    """Extract structured facts from company_verify_report.json."""
-    report_path = task_dir / "company_verify_report.json"
-    if not report_path.exists():
-        return []
-    try:
-        report = json.loads(report_path.read_text(encoding="utf-8"))
-    except Exception:
-        return []
-
-    facts: list[dict[str, Any]] = []
-    # Extract key registration facts
-    basic = report.get("basic_info") or report.get("registration") or {}
-    if isinstance(basic, dict):
-        field_map = {
-            "company_name": "公司名称",
-            "legal_representative": "法定代表人",
-            "registered_capital": "注册资本",
-            "established_date": "成立日期",
-            "company_status": "经营状态",
-            "unified_credit_code": "统一社会信用代码",
-        }
-        for key, label in field_map.items():
-            val = basic.get(key) or basic.get(label)
-            if val:
-                facts.append({
-                    "fact_id": f"BP-COMPANY-F{len(facts)+1:03d}",
-                    "claim": f"{label}: {val}",
-                    "value": str(val),
-                    "unit": "",
-                    "period": "工商登记",
-                    "source_url": "天眼查工商登记信息",
-                    "source_tier": "official",
-                    "source_quote": f"{label}: {val}",
-                    "question_id": "company_verify",
-                    "fact_type": "company_basic",
-                    "confidence": "high",
-                })
-
-    # Extract shareholder facts
-    shareholders = report.get("shareholders") or []
-    if isinstance(shareholders, list):
-        for sh in shareholders[:10]:
-            if isinstance(sh, dict):
-                name = sh.get("name") or sh.get("股东名称") or ""
-                ratio = sh.get("ratio") or sh.get("持股比例") or ""
-                if name:
-                    facts.append({
-                        "fact_id": f"BP-COMPANY-F{len(facts)+1:03d}",
-                        "claim": f"股东: {name}, 持股比例: {ratio}",
-                        "value": str(ratio),
-                        "unit": "%",
-                        "period": "工商登记",
-                        "source_url": "天眼查股东信息",
-                        "source_tier": "official",
-                        "source_quote": f"{name} {ratio}",
-                        "question_id": "company_verify",
-                        "fact_type": "company_shareholder",
-                        "confidence": "high",
-                    })
-
-    # Extract risk signals
-    risks = report.get("risks") or report.get("risk_signals") or []
-    if isinstance(risks, list):
-        for risk in risks[:5]:
-            if isinstance(risk, dict):
-                risk_desc = risk.get("description") or risk.get("风险描述") or json.dumps(risk, ensure_ascii=False)[:100]
-                facts.append({
-                    "fact_id": f"BP-COMPANY-F{len(facts)+1:03d}",
-                    "claim": f"风险信号: {risk_desc}",
-                    "value": risk_desc[:200],
-                    "unit": "",
-                    "period": risk.get("date", "待验证"),
-                    "source_url": "天眼查风险信息",
-                    "source_tier": "official",
-                    "source_quote": risk_desc[:150],
-                    "question_id": "company_verify",
-                    "fact_type": "company_risk",
-                    "confidence": "high",
-                })
-
-    return facts
 
 
 def _extract_research_plan_facts(task_dir: Path) -> list[dict[str, Any]]:
@@ -596,17 +488,16 @@ def _extract_research_plan_facts(task_dir: Path) -> list[dict[str, Any]]:
 
 
 def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 07: 初始化 BP 事实库 — 注入 research_plan + company_verify 事实，
+    """Phase 07: 初始化 BP 事实库 — 注入 research_plan 事实，
     子代理启动时 fact store 不再为空。
 
-    seed facts 来源：bp_research_plan.json（phase04 子代理产出）+ company_verify。
+    seed facts 来源：bp_research_plan.json（phase04 子代理产出）。
     """
     task_dir = _task_dir(runtime_root, job_ctx)
 
-    # Collect seed facts from research_plan and company verification
+    # Collect seed facts from research_plan
     seed_facts: list[dict[str, Any]] = []
     seed_facts.extend(_extract_research_plan_facts(task_dir))
-    seed_facts.extend(_extract_company_verify_facts(task_dir))
 
     # Deduplicate by fact_id
     seen_ids: set[str] = set()
@@ -618,12 +509,11 @@ def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dic
             unique_facts.append(fact)
 
     payload = _bp_fact_store_payload(job_ctx, facts=unique_facts)
-    payload["source_files"] = ["research_plan", "company_verify_report"]
+    payload["source_files"] = ["research_plan"]
     store_path, index_path = _write_bp_fact_store(task_dir, payload)
 
     research_count = sum(1 for f in unique_facts if "RESEARCH" in str(f.get("fact_id", "")))
-    company_count = sum(1 for f in unique_facts if "COMPANY" in str(f.get("fact_id", "")))
-    print(f"    📦 Fact Store bootstrap: {len(unique_facts)} seed facts (research_plan={research_count}, company_verify={company_count})", flush=True)
+    print(f"    📦 Fact Store bootstrap: {len(unique_facts)} seed facts (research_plan={research_count})", flush=True)
 
     return {
         "ok": True,
@@ -635,7 +525,6 @@ def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dic
             "index_path": str(index_path),
             "total_facts": len(unique_facts),
             "research_plan_facts": research_count,
-            "company_verify_facts": company_count,
         },
     }
 
@@ -1914,17 +1803,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
                 "research_plan": research_plan_file,
             },
         },
-        # ── v4.5 新增：投资叙事层 4 角色 ──
-        {
-            "role_name": "bp_investment_hypothesis",
-            "brief_key": "bp_investment_hypothesis",
-            "description": "Wave 0 先行者: 投资假说框架 + 可验证问题 + 市场共识初判",
-            "output_file": str(task_dir / "bp_phase2_investment_hypothesis.md"),
-            "key_inputs": {
-                "company_name": profile.get("company_name", ""),
-                "research_plan": research_plan_file,
-            },
-        },
+        # ── v4.5 新增：投资叙事层 3 角色（Wave 4）──
         {
             "role_name": "bp_consensus_challenge",
             "brief_key": "bp_consensus_challenge",
@@ -2229,77 +2108,9 @@ def _file_stable(path: Path, interval: float = 5) -> bool:
     return size2 == size1
 
 
-# Wave 0: 投资假说先行者，在所有维度子代理之前跑
-_WAVE0_ROLES = list(BP_WAVE0_ROLE_SLUGS.keys())
 # Wave 1 只做证据采集：估值延后到 Wave 3，避免在商业化/市场/竞争证据不足时拍脑袋。
 _CORE_ROLES = list(BP_WAVE1_ROLE_SLUGS.keys())
 
-
-# ── Wave 0: 投资假说框架（先行者）────────────────────────────────────
-# Wave 0 在 phase07（fact store bootstrap）之后、phase08（Wave 1 dispatch）之前跑。
-# 只有 1 个角色（bp_investment_hypothesis），不做 evidence gate（假说不做 claim-fact 校验）。
-
-
-def _run_bp_wave0_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Wave 0: 投资假说框架 — sequential 模式（只有 1 个角色）。"""
-    from scripts.bp_subagent_launcher_wb import _spawn_one
-
-    task_dir = _task_dir(runtime_root, job_ctx)
-    outputs_dir = _outputs_dir(runtime_root, job_ctx)
-    profile = _load_bp_profile(task_dir)
-
-    all_subs = _dispatch_role_specs(task_dir, profile)
-    wave0_subs = [s for s in all_subs if s["role_name"] in _WAVE0_ROLES]
-    if len(wave0_subs) != len(_WAVE0_ROLES):
-        found = {s["role_name"] for s in wave0_subs}
-        missing = [role for role in _WAVE0_ROLES if role not in found]
-        return {"ok": False, "error": f"wave0 role spec missing: {missing}"}
-
-    # sequential：找 pending
-    pending = []
-    for sub in wave0_subs:
-        slug = BP_WAVE0_ROLE_SLUGS[sub["role_name"]]
-        is_complete, _ = _role_outputs_complete(sub["role_name"], slug, outputs_dir, task_dir)
-        if not is_complete:
-            pending.append(sub)
-
-    if not pending:
-        return {"ok": True, "needs_dispatch": False, "has_more": False,
-                "mode": "bp_wave0_prepare", "phase": "phase07b_wave0_prepare", "job_id": job_ctx.job_id}
-
-    sub = pending[0]
-    shared = _shared_inputs(task_dir)
-    sub["output_file"] = str(outputs_dir / Path(sub["output_file"]).name)
-    sub["key_inputs"]["shared_inputs"] = shared
-    sub["wave_inputs"] = shared
-
-    spawn_result = _spawn_one(job_ctx.job_id, sub, task_dir=task_dir)
-    manifest_path = spawn_result.get("manifest_path", "") if isinstance(spawn_result, dict) else str(spawn_result)
-
-    has_more = len(pending) > 1
-    remaining = [s["role_name"] for s in pending[1:]]
-
-    return {
-        "ok": True, "needs_dispatch": True, "has_more": has_more,
-        "mode": "bp_wave0_prepare", "phase": "phase07b_wave0_prepare", "job_id": job_ctx.job_id,
-        "dispatch_info": {"manifests": [manifest_path], "current_role": sub["role_name"],
-                          "remaining_roles": remaining, "task_dir": str(task_dir), "outputs_dir": str(outputs_dir)},
-        "instruction": _dispatch_completion_instruction_sequential(
-            sub["role_name"], BP_WAVE0_ROLE_SLUGS, "phase07c_wave0_collect",
-            has_more=has_more, remaining=remaining),
-    }
-
-
-def _run_bp_wave0_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """检查 Wave 0 投资假说输出。"""
-    task_dir = _task_dir(runtime_root, job_ctx)
-    outputs_dir = _outputs_dir(runtime_root, job_ctx)
-    return _collect_with_retry(
-        "wave0_collect",
-        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE0_ROLE_SLUGS, _WAVE0_ROLES, "phase07c_wave0_collect"),
-        job_id=job_ctx.job_id,
-        outputs_dir=outputs_dir,
-    )
 _WAVE3_ROLES = list(BP_WAVE3_ROLE_SLUGS.keys())
 _WAVE4_ROLES = list(BP_WAVE4_ROLE_SLUGS.keys())
 
@@ -2578,9 +2389,8 @@ def _run_bp_wave4_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                 "mode": "bp_wave4_prepare", "phase": "phase17_wave4_prepare", "job_id": job_ctx.job_id}
 
     sub = pending[0]
-    # 汇总 Wave 0 + Wave 1 + Wave 3 输出（Wave 2 已移除）
-    prior_outputs = _prior_wave_files(BP_WAVE0_ROLE_SLUGS.items(), task_dir, outputs_dir)
-    prior_outputs.update(_prior_wave_files(BP_WAVE1_ROLE_SLUGS.items(), task_dir, outputs_dir))
+    # 汇总 Wave 1 + Wave 3 输出（Wave 0/2 已移除）
+    prior_outputs = _prior_wave_files(BP_WAVE1_ROLE_SLUGS.items(), task_dir, outputs_dir)
     prior_outputs.update(_prior_wave_files(BP_WAVE3_ROLE_SLUGS.items(), task_dir, outputs_dir))
     shared = _shared_inputs(task_dir)
     sub["output_file"] = str(outputs_dir / Path(sub["output_file"]).name)
@@ -2792,7 +2602,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
     # v4.5: 统稿只检查传统维度角色的三件套输出（md/facts/section）
     # 投资叙事层角色（hypothesis/consensus/catalyst/industry_research）产出纯叙述，无 claim-fact 结构，
     # 不要求 sidecar 文件——它们的内容通过 prior_wave_files 传给 synthesis prompt。
-    _NARRATIVE_SLUGS = {"investment_hypothesis", "consensus_challenge", "catalyst", "industry_research"}
+    _NARRATIVE_SLUGS = {"consensus_challenge", "catalyst", "industry_research"}
     expected_slugs = [s for s in BP_ALL_ROLE_SLUGS.values() if s not in _NARRATIVE_SLUGS]
     check_result = _collect_with_retry(
         "synthesis_prepare_check", _do_synthesis_check,
@@ -3532,16 +3342,11 @@ class BPProfile(PipelineProfile):
             "phase01_document_intake": lambda job_ctx: _run_document_intake(runtime_root, job_ctx),              # 01
             "phase01b_company_intake": lambda job_ctx: _run_company_intake(runtime_root, job_ctx),              # 01b → needs_dispatch (公司名搜索入库)
             "phase01b_company_intake_collect": lambda job_ctx: _run_company_intake_collect(runtime_root, job_ctx),  # 01b collect
-            "phase02_company_verify": lambda job_ctx: _run_company_verify(runtime_root, job_ctx),               # 02 [heavy_bg]
             "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),                 # 04 → needs_dispatch (子代理派发, tyc+westock)
             "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx), # 04c
             "phase05_bp_shared_page_init": lambda job_ctx: _run_bp_shared_page_init(runtime_root, job_ctx),     # 05
             "phase06_search_plan_compile": lambda job_ctx: _run_bp_search_plan_compile(runtime_root, job_ctx),  # 06
             "phase07_bp_fact_store_bootstrap": lambda job_ctx: _run_bp_fact_store_bootstrap(runtime_root, job_ctx),  # 07
-            # ── Wave 0: 投资假说先行者（在所有维度子代理之前）──
-            "phase07b_wave0_prepare": lambda job_ctx: _run_bp_wave0_prepare(runtime_root, job_ctx),             # 07b → needs_dispatch
-            "phase07c_wave0_collect": lambda job_ctx: _run_bp_wave0_collect(runtime_root, job_ctx),             # 07c
-            "phase07d_wave0_shared_page_refresh": lambda job_ctx: _run_bp_shared_page_refresh(runtime_root, job_ctx, after_wave=0),  # 07d
             # ── Wave 1: 基础四维并行 ──
             "phase08_dispatch_prepare": lambda job_ctx: _run_bp_dispatch_prepare(runtime_root, job_ctx),        # 08 → needs_dispatch
             "phase09_dispatch_collect": lambda job_ctx: _run_bp_dispatch_collect(runtime_root, job_ctx),        # 09
@@ -3583,7 +3388,6 @@ class BPProfile(PipelineProfile):
         return {
             "phase06_search_plan_compile": ["bp_research_plan.json"],
             "phase07_bp_fact_store_bootstrap": ["bp_research_plan.json", "bp_search_plan.json"],
-            "phase07b_wave0_prepare": ["bp_research_plan.json"],
             "phase08_dispatch_prepare": ["bp_research_plan.json"],
             "phase11_bp_fact_store_merge": ["bp_research_plan.json"],
             "phase23_bp_section_package_validation": ["bp_research_plan.json"],
@@ -3600,15 +3404,11 @@ class BPProfile(PipelineProfile):
             "phase01_document_intake": ["bp_step0_profile.json", "bp_claim_inventory.json"],
             "phase01b_company_intake": [],
             "phase01b_company_intake_collect": ["bp_step0_profile.json"],
-            "phase02_company_verify": ["company_verify_report.json"],
             "phase04_research_plan": [],  # v5.2: 子代理直接生成plan, skeleton仅作可选参考
             "phase04_research_plan_collect": ["bp_research_plan.json"],
             "phase05_bp_shared_page_init": ["bp_shared_diligence_page.md"],
             "phase06_search_plan_compile": ["bp_search_plan.json"],
             "phase07_bp_fact_store_bootstrap": ["bp_fact_store.json", "bp_fact_store_index.json"],
-            "phase07b_wave0_prepare": [],
-            "phase07c_wave0_collect": [],
-            "phase07d_wave0_shared_page_refresh": [],
             "phase08_dispatch_prepare": ["phase2_dispatch.json"],
             "phase09_dispatch_collect": [],
             "phase10_wave1_evidence_gate": ["bp_wave1_evidence_gate.json"],

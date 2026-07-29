@@ -76,9 +76,9 @@ def _expected_roles(task_dir: Path, wave: int, outputs_dir: Path | None = None) 
 # Roles that should produce comparison/benchmark tables
 _COMPARISON_ROLES = {"bp_tech_ip_moat", "bp_competition_positioning", "bp_market_supply_chain"}
 
-# v4.5: 非 claim-fact 模式的角色 —— 假说/共识/催化剂不产出标准 claim，跳过 claim 覆盖率检查
+# v4.5: 非 claim-fact 模式的角色 —— 共识/催化剂/行业研报不产出标准 claim，跳过 claim 覆盖率检查
 # 只做基础检查（文件存在 + 字数达标），不参与 evidence gate 的 claim 验证逻辑
-_NON_CLAIM_ROLES = {"bp_investment_hypothesis", "bp_consensus_challenge", "bp_catalyst", "bp_industry_research"}
+_NON_CLAIM_ROLES = {"bp_consensus_challenge", "bp_catalyst", "bp_industry_research"}
 
 
 def _comparison_table_check(role: str, markdown_path: Path) -> dict[str, Any]:

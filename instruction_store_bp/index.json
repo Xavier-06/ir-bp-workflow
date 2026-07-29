@@ -22,12 +22,6 @@
   },
   "roles": [
     {
-      "key": "bp_主管",
-      "name": "BP 尽调主管",
-      "file": "bp_主管.md",
-      "description": "主控编排 + 管线调度 + 交付"
-    },
-    {
       "key": "bp_company_team_compliance",
       "name": "公司主体、团队与合规分析师",
       "file": "bp_company_team_compliance.md",
@@ -106,12 +100,6 @@
       "description": "Synthesis: 读取 Wave 0-4 维度输出，按投研逻辑重组为完整报告"
     },
     {
-      "key": "bp_investment_hypothesis",
-      "name": "投资假说框架分析师",
-      "file": "bp_investment_hypothesis.md",
-      "description": "Wave 0 先行者：提出可验证投资假说 + 可验证问题 + 市场共识初判"
-    },
-    {
       "key": "bp_consensus_challenge",
       "name": "共识挑战与预期差分析师",
       "file": "bp_consensus_challenge.md",
@@ -146,7 +134,6 @@
       "competition_positioning": "bp_competition_positioning",
       "valuation_return": "bp_valuation_return",
       "dealbreaker_risk": "bp_dealbreaker_risk",
-      "investment_hypothesis": "bp_investment_hypothesis",
       "consensus_challenge": "bp_consensus_challenge",
       "catalyst": "bp_catalyst",
       "industry_research": "bp_industry_research",

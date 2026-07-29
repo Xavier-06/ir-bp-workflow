@@ -43,7 +43,6 @@ PHASE_RUNNER = Path(__file__).resolve().parent / "phase_runner.py"
 HEAVY_PHASES = {
     # BP phases
     "phase01_document_intake",
-    "phase02_company_verify",
     "phase04_presearch",
     "phase30_delivery",
     # IR phases
@@ -64,7 +63,6 @@ NO_TIMEOUT_PHASES = {
 # PHASE_TIMEOUTS: 其他 heavy phase 的超时设置（秒）
 PHASE_TIMEOUTS = {
     # BP phases
-    "phase02_company_verify": 600,
     "phase30_delivery": 600,
     # IR phases
     "phase14_delivery": 600,
@@ -166,7 +164,6 @@ def launch_heavy_phase(
     _EST_MINUTES = {
         "phase01_document_intake": 20,
         "phase04_presearch": 15,
-        "phase02_company_verify": 5,
         "phase30_delivery": 5,
     }
     est = _EST_MINUTES.get(phase, 10)

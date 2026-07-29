@@ -30,7 +30,6 @@ IMA_KB_IDS = {
 
 # 角色 → IMA 知识库路由 —— v4.8：所有角色第一优先搜自建研报库，辅以 1-2 个订阅库
 IMA_ROLE_KB_MAP = {
-    "bp_investment_hypothesis":    ["self_built_research", "institutional_notes"],
     "bp_company_team_compliance":  ["self_built_research", "institutional_notes"],
     "bp_product_commercial":       ["self_built_research", "industry_reports"],
     "bp_tech_ip_moat":             ["self_built_research", "industry_reports"],
@@ -55,16 +54,10 @@ BP_ROLE_CONNECTOR_IDS: dict[str, list[str]] = {
     'bp_competition_positioning': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     'bp_valuation_return': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     'bp_dealbreaker_risk': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
-    # v4.5 新增：投资叙事层 4 角色
-    'bp_investment_hypothesis': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
+    # v4.5 新增：投资叙事层 3 角色（Wave 4）
     'bp_consensus_challenge': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     'bp_catalyst': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
     'bp_industry_research': BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS,
-}
-
-# Wave 0: 投资假说框架 —— 先行者，在所有维度子代理之前跑
-BP_WAVE0_ROLE_SLUGS: dict[str, str] = {
-    "bp_investment_hypothesis": "investment_hypothesis",
 }
 
 # Wave 1: 公司团队合规 / 产品商业化 / 技术IP护城河 / 市场供应链（4 维度并行）
@@ -81,7 +74,7 @@ BP_WAVE3_ROLE_SLUGS: dict[str, str] = {
     "bp_valuation_return": "valuation_return",
 }
 
-# Wave 4: Deal Breaker + 共识挑战 + 催化剂 + 行业研报 —— 读 Wave0/1/3 全量输出
+# Wave 4: Deal Breaker + 共识挑战 + 催化剂 + 行业研报 —— 读 Wave1/3 全量输出
 BP_WAVE4_ROLE_SLUGS: dict[str, str] = {
     "bp_dealbreaker_risk": "dealbreaker_risk",
     "bp_consensus_challenge": "consensus_challenge",
@@ -98,9 +91,8 @@ BP_LEGACY_ROLE_SLUGS: dict[str, str] = {
     "bp_竞争与结论": "competition",
 }
 
-# 全部 role slug 合并映射（Wave0-4 + Legacy）
+# 全部 role slug 合并映射（Wave1-4 + Legacy）
 BP_ALL_ROLE_SLUGS: dict[str, str] = {
-    **BP_WAVE0_ROLE_SLUGS,
     **BP_WAVE1_ROLE_SLUGS,
     **BP_WAVE3_ROLE_SLUGS,
     **BP_WAVE4_ROLE_SLUGS,
@@ -108,7 +100,6 @@ BP_ALL_ROLE_SLUGS: dict[str, str] = {
 
 # Wave 编号到 role 列表的映射 —— wave evidence gate 等处使用
 BP_WAVE_ROLES: dict[int, list[str]] = {
-    0: list(BP_WAVE0_ROLE_SLUGS.keys()),
     1: list(BP_WAVE1_ROLE_SLUGS.keys()),
     3: list(BP_WAVE3_ROLE_SLUGS.keys()),
     4: list(BP_WAVE4_ROLE_SLUGS.keys()),

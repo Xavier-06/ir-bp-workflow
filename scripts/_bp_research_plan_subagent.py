@@ -245,8 +245,8 @@ def _normalize_research_plan_schema(plan: dict[str, Any]) -> dict[str, Any]:
         "bp_company_team_compliance", "bp_product_commercial", "bp_tech_ip_moat",
         "bp_market_supply_chain", "bp_competition_positioning", "bp_valuation_return",
         "bp_dealbreaker_risk",
-        # 投资叙事层
-        "bp_investment_hypothesis", "bp_consensus_challenge", "bp_catalyst", "bp_industry_research",
+        # 投资叙事层（Wave 4）
+        "bp_consensus_challenge", "bp_catalyst", "bp_industry_research",
     }
 
     # ── claim_matrix 归一化 ──

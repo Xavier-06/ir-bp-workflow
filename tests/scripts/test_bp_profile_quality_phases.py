@@ -55,7 +55,7 @@ def test_bp_profile_registers_research_plan_before_dispatch(tmp_path):
     assert "phase26_bp_debate_review" in phases
     assert "phase27_bp_final_assembly" in phases
     assert "phase28_bp_readability_review" in phases
-    assert phases.index("phase02_company_verify") < phases.index("phase04_research_plan")
+    # phase02_company_verify 已删除（2026-07-29）：tyc 工商核验由 phase04 research_plan 子代理直调，独立 phase02 冗余
     assert phases.index("phase04_research_plan_collect") < phases.index("phase05_bp_shared_page_init")
     assert phases.index("phase05_bp_shared_page_init") < phases.index("phase06_search_plan_compile")
     assert phases.index("phase06_search_plan_compile") < phases.index("phase07_bp_fact_store_bootstrap")
@@ -246,7 +246,7 @@ def test_bp_dispatch_prepare_uses_four_evidence_collection_roles_without_valuati
     dispatch_payload = json.loads((tmp_path / "tasks" / "BP-WAVE1" / "phase2_dispatch.json").read_text(encoding="utf-8"))
     assert dispatch_payload["wave_design"] == "wave1_evidence_collection_4_roles"
     assert dispatch_payload["current_subagent"] == "bp_company_team_compliance"
-    assert dispatch_payload["total_subagents"] == 11  # v5.0: 7 维度 + 4 叙事角色
+    assert dispatch_payload["total_subagents"] == 10  # 7 维度 + 3 叙事角色（Wave 0 investment_hypothesis 已删除）
 
 
 def test_bp_wave3_prepare_dispatches_two_roles_with_shared_inputs(tmp_path):
