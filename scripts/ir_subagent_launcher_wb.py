@@ -192,25 +192,29 @@ STEP_ROLE = {
 IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp', 'ima-mcp']
 
 # 步间依赖关系
-# v3.0 (2026-07-28): 删除 step1_data，下游 step 不再依赖它
-# 数据收集在 phase04 research plan 完成，产出 enriched_data_pack.json 供所有 step 引用
+# v2.1 (2026-07-29): 模型中心化重排 — 财务+估值是模型核心，最先跑；
+# 行业/业务按 P0 论点深挖（已知模型关键变量）；管理层/宏观是 P2 维度（弱依赖）。
+# 数据收集在 phase04 research plan 完成，产出 enriched_data_pack.json 供所有 step 引用。
 STEP_DEPS = {
-    'step1_industry': [],
-    'step2_biz': [],
-    'step3_finance': [],
-    'step4_mgmt': [],
-    'step5_macro': [],
-    'step7_insight': ['step1_industry', 'step2_biz', 'step6_valuation', 'step5_macro'],
-    'step6_valuation': ['step1_industry', 'step3_finance', 'step5_macro'],
-    'step8_risk': ['step2_biz', 'step3_finance', 'step4_mgmt', 'step6_valuation', 'step5_macro'],
+    'step3_finance': [],                                    # 财务是模型核心，最先跑
+    'step6_valuation': ['step3_finance'],                   # 估值绑定财务（消费 step3 预测）
+    'step1_industry': ['step6_valuation'],                  # 深挖时已知模型关键变量
+    'step2_biz': ['step6_valuation'],                       # 深挖时已知模型关键变量
+    'step4_mgmt': [],                                       # P2 维度，依赖弱
+    'step5_macro': [],                                      # P2 维度，依赖弱
+    'step7_insight': ['step6_valuation', 'step1_industry', 'step2_biz', 'step5_macro'],
+    'step8_risk': ['step6_valuation', 'step3_finance', 'step4_mgmt'],
 }
 
 # 并行发射波次
-# v3.0: Wave0 删除（原 step1_data），直接从 5 维度并行开始
+# v2.1 (2026-07-29): 模型中心化 4 波 — 财务+估值绑定建模（Wave1），行业/业务按论点深挖（Wave2），
+# 管理层/宏观 P2 维度（Wave3），洞察/风险预期差收口（Wave4）。
+# anchor / thesis 不是 step——它们在 research_plan（phase04）里已产出，所有 wave 共享读。
 LAUNCH_WAVES = [
-    ['step1_industry', 'step2_biz', 'step3_finance', 'step4_mgmt', 'step5_macro'],
-    ['step6_valuation'],
-    ['step7_insight', 'step8_risk'],
+    ['step3_finance', 'step6_valuation'],        # Wave 1 模型核心（绑定建模）
+    ['step1_industry', 'step2_biz'],             # Wave 2 按 P0 论点深挖
+    ['step4_mgmt', 'step5_macro'],               # Wave 3 P2 维度（可裁剪）
+    ['step7_insight', 'step8_risk'],             # Wave 4 预期差收口
     # step8_master 已剥离为独立 synthesis 子代理（phase13）
 ]
 
