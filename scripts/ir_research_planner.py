@@ -283,6 +283,18 @@ def build_research_plan(
         "research_type": research_type,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "objective": f"围绕 {entity} 形成证据可追溯、估值可复算、反证充分的投资研究报告。",
+        # ── v2.1 Thesis 字段（确定性默认值，子代理产出会覆盖）──
+        "valuation_paradigm": "profitable_growth",
+        "paradigm_reason": "MVP 骨架默认值，子代理 enrichment 会根据财务数据重新判定",
+        "valuation_method_primary": "PE / EV-EBITDA",
+        "valuation_forbidden": [],
+        "key_debates": [],
+        "dim_priority": {
+            "step1_industry": "P1", "step2_biz": "P1", "step3_finance": "P1",
+            "step4_mgmt": "P1", "step5_macro": "P1", "step6_valuation": "P1",
+            "step7_insight": "P1", "step8_risk": "P1",
+        },
+        "market_anchor": None,
         "investment_questions": investment_questions,
         "core_questions": core_questions,
         "section_requirements": section_requirements,

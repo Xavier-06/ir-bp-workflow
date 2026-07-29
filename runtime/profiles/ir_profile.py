@@ -283,6 +283,42 @@ mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="Gold
 
 **如果找不到大行研报**（未覆盖标的或 IMA 无全文），跳过此步，在 search_summary 中标注 `"benchmark_found": false`，后续回退到从零搜索模式。
 
+## Step 0.6: 提取市场共识锚（market_anchor — v2.1 新增）
+
+**目的**：所有下游 step 动手前先有"市场现在怎么定价"的锚点。
+
+**数据源**：
+1. IMA 自建研报库（Step 0.5 已 fetch 的大行研报）→ 一致预期 EPS/营收、目标价、评级
+2. `westock-mcp.data_consensus` → 一致预期（如有）
+3. `westock-mcp.data_rating` → 评级分布
+4. `westock-mcp.data_quote` → 现价
+
+**产出**：在输出的 `market_anchor` 字段写入：
+```json
+{{
+  "as_of": "2026-07-29",
+  "source_report": "BofA-优必选-260715.pdf",
+  "source_age_days": 14,
+  "stale": false,
+  "price": 98.5,
+  "market_cap": "410亿",
+  "consensus_eps": {{"FY25": -1.55, "FY26E": -0.82, "FY27E": 0.15}},
+  "consensus_revenue": {{"FY25": 24.9, "FY26E": 41.0, "FY27E": 68.0}},
+  "current_multiple": {{"PE": "N/A(亏损)", "PS": 16.5, "EV_Sales": 15.2}},
+  "implied_assumption": "股价隐含 FY25-27 营收 CAGR 65%，毛利率需升至 45%",
+  "analyst_ratings": {{"buy": 8, "hold": 3, "sell": 1}},
+  "avg_target_price": 128
+}}
+```
+
+**铁律**：
+- 每个数字带来源（研报名 + 日期）
+- 亏损标的 PE 标 "N/A(亏损)"，用 PS/EV-Sales
+- 必须算"股价隐含假设"（implied_assumption）
+- **时效硬规则**：研报来源必须 ≤30 天。标题日期（如 -260715.pdf=2026-07-15）据此判断 source_age_days
+- 超 30 天 → 标 `"stale": true`，下游打折
+- 1 个月内找不到大行研报 → `"market_anchor": null`，写进 data_gaps，**禁止用旧研报或模型记忆硬编共识**
+
 ## Step 1: 行情与财务 (westock-mcp) — 增量数据收集
 - westock-mcp.data_quote: query by entity名称或ticker -> PE/PB/市值/股价
 - `data_finance` 查 {entity} → 营收/净利润/ROE/毛利率趋势（最近3年）
@@ -391,9 +427,24 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 
 1. **Core Questions (7条)**: 围绕基本面、行业、商业模式、管理层、估值、风险
 2. **Strategic Questions (5条)**: 基于结构化数据发现的异常/矛盾设计尖锐问题
-3. **Key Debates (3-5条)**: 核心投资辩论（对标 GS Key Debates 风格），每条含 title + summary + data_points
+3. **Key Debates (2-4条)**: 核心投资辩论（对标 GS Key Debates 风格），每条含 debate + priority(P0/P1/P2) + market_view + our_view + owner_dims + data_points
 4. **Fact Requirements (30+条)**: 验证每条 claim 所需的 fact 项
 5. **Section Requirements (9个)**: 分配到 IR 9步骤
+6. **Valuation Paradigm (1个)**: 6 选 1 估值范式（见下方判定表），决定全报告的估值方法和骨架
+7. **Market Anchor (1个)**: 市场共识锚（Step 0.6 产出）
+
+### Valuation Paradigm 判定表（6 选 1）
+
+| paradigm | 判定信号 | 估值主方法 | 禁用 |
+|----------|---------|-----------|------|
+| `profitable_growth` | 已盈利+正增长 | PE / EV-EBITDA + DCF 佐证 | — |
+| `preprofit_growth` | 亏损+高增长 | PS / EV-Sales + TAM 份额 | PE/DCF |
+| `cyclical_asset` | 强周期+重资产 | PB / 周期中枢 EV-EBITDA + 重置成本 | 单期 PE |
+| `asset_nav` | 资产驱动+现金流稳 | NAV / DCF（储备/资源）| — |
+| `regulated_utility` | 受监管+分红驱动 | 股息率 / DDM | 高 PE |
+| `platform_two_sided` | 双边网络+take rate | EV/GP + LTV/CAC | 单 PE |
+
+判定依据：Step 1 财务数据（净利润正负+增速）+ Step 2 行业属性（周期/平台/资产驱动）+ 商业模式。
 
 ## Step 分配规则（v3.0: 删除 step1_data，9 步）
 step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuation, step7_insight, step8_risk, step8_master
@@ -403,23 +454,40 @@ step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuati
 
 ```json
 {{
-  "schema_version": "ir_research_plan.v4",
+  "schema_version": "ir_research_plan.v5",
   "task_id": "{job_ctx.job_id}", "entity": "{entity}", "market": "{market}",
   "query": "{query}", "ticker": "{ticker}", "english_name": "{english_name}",
   "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "ima-mcp:机构研报/纪要", "search_deep:公开信息", "tencent_news:实时动态"],
   "benchmark_found": true,
   "benchmark_skeleton_ref": "{tasks_dir / f'{job_ctx.job_id}-benchmark_skeleton.json'}",
+  "valuation_paradigm": "preprofit_growth",
+  "paradigm_reason": "优必选亏损+高增长，用 PS/EV-Sales + TAM 份额推导，禁用 PE/DCF",
+  "valuation_method_primary": "PS / EV-Sales",
+  "valuation_forbidden": ["PE", "DCF"],
+  "market_anchor": {{
+    "as_of": "2026-07-29", "source_report": "BofA-优必选-260715.pdf", "source_age_days": 14, "stale": false,
+    "price": 98.5, "market_cap": "410亿",
+    "consensus_eps": {{"FY25": -1.55, "FY26E": -0.82, "FY27E": 0.15}},
+    "consensus_revenue": {{"FY25": 24.9, "FY26E": 41.0, "FY27E": 68.0}},
+    "current_multiple": {{"PE": "N/A(亏损)", "PS": 16.5, "EV_Sales": 15.2}},
+    "implied_assumption": "股价隐含 FY25-27 营收 CAGR 65%，毛利率需升至 45%",
+    "analyst_ratings": {{"buy": 8, "hold": 3, "sell": 1}},
+    "avg_target_price": 128
+  }},
   "core_questions": [...], "strategic_questions": [...],
   "key_debates": [
-    {{"id": "KD-1", "title": "核心辩论1", "summary": "论点", "data_points": ["数据点1", "数据点2"]}},
-    {{"id": "KD-2", "title": "核心辩论2", "summary": "...", "data_points": ["..."]}},
-    {{"id": "KD-3", "title": "核心辩论3", "summary": "...", "data_points": ["..."]}}
+    {{"id": "KD-1", "debate": "人形机器人量产时间表", "priority": "P0",
+      "market_view": "市场认为 2027 年才能规模化出货",
+      "our_view": "我们认为 2026H2 即可小批量商用，BOM 降幅超预期",
+      "owner_dims": ["step1_industry", "step3_finance"],
+      "data_points": ["单台 BOM ¥18万", "年降幅 30%"]}}
   ],
+  "dim_priority": {{"step1_industry": "P0", "step3_finance": "P0", "step2_biz": "P1", "step4_mgmt": "P2", "step5_macro": "P2", "step6_valuation": "P0", "step7_insight": "P0", "step8_risk": "P1"}},
   "fact_requirements": [...], "section_requirements": {{}},
   "coverage_matrix": {{}}, "plan_status": "ready",
   "search_summary": {{"westock_quote_found": true, "benchmark_found": true, "analyst_views": 0, "web_evidence_count": 0}},
   "ima_insights": [
-    {{"kb_name": "KB名称", "doc_title": "文档标题", "key_points": ["要点1", "要点2"], "relevance": "high/medium"}},
+    {{"kb_name": "KB名称", "doc_title": "文档标题", "key_points": ["要点1", "要点2"], "relevance": "high/medium"}}
   ]
 }}
 ```
@@ -438,6 +506,48 @@ step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuati
     }
 
 
+def _backfill_thesis_fields(plan: dict[str, Any]) -> list[str]:
+    """v2.1: 为 research_plan 补 Thesis 字段默认值（缺失降级，不阻断）。
+
+    返回 warning 列表（非 error）。子代理未产出新字段时，用确定性默认值兜底，
+    保证下游 step（step3/6/7 等）读取 valuation_paradigm/market_anchor 时不 KeyError。
+    """
+    warnings: list[str] = []
+
+    # valuation_paradigm（缺失 → 按净利润正负自判兜底）
+    if not plan.get("valuation_paradigm"):
+        plan["valuation_paradigm"] = "profitable_growth"
+        plan.setdefault("paradigm_reason", "子代理未产出 valuation_paradigm，降级默认 profitable_growth")
+        warnings.append("valuation_paradigm_missing_fallback")
+
+    # valuation_method_primary / valuation_forbidden
+    plan.setdefault("valuation_method_primary", "PE / EV-EBITDA")
+    plan.setdefault("valuation_forbidden", [])
+
+    # key_debates（缺失 → 空列表，下游 step7 会自拟）
+    if not plan.get("key_debates"):
+        plan["key_debates"] = []
+        warnings.append("key_debates_missing")
+
+    # dim_priority（缺失 → 全 P1 默认）
+    if not plan.get("dim_priority"):
+        plan["dim_priority"] = {
+            "step1_industry": "P1", "step2_biz": "P1", "step3_finance": "P1",
+            "step4_mgmt": "P1", "step5_macro": "P1", "step6_valuation": "P1",
+            "step7_insight": "P1", "step8_risk": "P1",
+        }
+        warnings.append("dim_priority_missing_fallback")
+
+    # market_anchor（缺失 → null，下游打折处理；stale → warning）
+    anchor = plan.get("market_anchor")
+    if anchor is None:
+        warnings.append("market_anchor_null")
+    elif isinstance(anchor, dict) and anchor.get("stale"):
+        warnings.append(f"market_anchor_stale_age_{anchor.get('source_age_days', '?')}d")
+
+    return warnings
+
+
 def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
     """Phase04 collect v5.2: 读取子代理产出的 ir_research_plan.json。"""
     from scripts.ir_research_planner import validate_research_plan_ready, research_plan_path
@@ -450,12 +560,17 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
             plan = json.loads(plan_path.read_text(encoding="utf-8"))
             validation = validate_research_plan_ready(plan)
             if validation["ready"]:
+                # v2.1: 补 Thesis 字段默认值（缺失降级，不阻断）
+                thesis_warnings = _backfill_thesis_fields(plan)
+                if thesis_warnings:
+                    print(f"  ⚠️ [ir phase04_collect] Thesis 字段降级: {thesis_warnings}", flush=True)
                 final_path = research_plan_path(job_ctx.job_id, tasks_dir)
                 final_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 return {
                     "ok": True, "mode": "ir_research_plan",
                     "phase": "phase04_research_plan_collect", "job_id": job_ctx.job_id,
-                    "result": {"plan_path": str(final_path), "enrichment": "subagent_generated", "validation": validation},
+                    "result": {"plan_path": str(final_path), "enrichment": "subagent_generated",
+                               "validation": validation, "thesis_warnings": thesis_warnings},
                 }
             print(f"  ⚠️ [ir phase04_collect] plan 校验失败: {validation['errors']}", flush=True)
             return {"ok": False, "mode": "ir_research_plan", "phase": "phase04_research_plan_collect",
