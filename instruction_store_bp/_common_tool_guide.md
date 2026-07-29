@@ -44,7 +44,7 @@
 ### ⚠️ 铁律
 - **facts JSON 的 source_url 和 MD 正文的 [^N] 脚注必须对应**——你写入 facts JSON 的每条 fact，如果 source_url 有值，对应的 MD 正文必须有脚注
 - **禁止只在 facts JSON 里写 URL 而不在 MD 正文写脚注**——统稿子代理依赖你 MD 中的脚注标记
-- **禁止只写内部文件名**：❌ `[^N]: bp_phase2_xxx.md`
+- **禁止只写内部文件名**：❌ `[^N]: bp_dim_xxx.md`
 - **每条脚注必须有真实来源标注**，不能编造 URL
 
 ### 输出结构要求
@@ -62,9 +62,9 @@ MD 报告末尾必须包含"来源与参考"章节，列出所有 `[^N]` 定义�
 
 | 文件 | 最低要求 | 说明 |
 |------|---------|------|
-| `bp_phase2_{slug}.md` | >100 bytes | 维度分析正文（markdown） |
-| `bp_phase2_{slug}-facts.json` | >10 bytes，合法 JSON | 该维度的事实 sidecar |
-| `bp_phase2_{slug}-section.json` | >10 bytes，合法 JSON | 结构化 section package（**schema 见下**） |
+| `bp_dim_{slug}.md` | >100 bytes | 维度分析正文（markdown） |
+| `bp_dim_{slug}-facts.json` | >10 bytes，合法 JSON | 该维度的事实 sidecar |
+| `bp_dim_{slug}-section.json` | >10 bytes，合法 JSON | 结构化 section package（**schema 见下**） |
 
 **`-section.json` 必须遵循以下 schema（管线 phase26 validator 只认这个）：**
 
@@ -95,7 +95,7 @@ MD 报告末尾必须包含"来源与参考"章节，列出所有 `[^N]` 定义�
 - `fact_ids` 里的 ID 必须与同目录 `-facts.json` 中 `facts[].fact_id` 一致
 - `claims` 至少 1 条，每条必须有 `fact_ids`（不能为空数组）
 - `markdown_draft` 不能为空（≥100 字符）
-- 禁止用自造 schema（如 `"bp_section.v1"`、`"bp_section_output.v1"`、`"bp_phase2_section.v1"`）——管线不认，会触发 phase26 FAIL
+- 禁止用自造 schema（如 `"bp_section.v1"`、`"bp_section_output.v1"`、`"bp_dim_section.v1"`）——管线不认，会触发 phase26 FAIL
 
 ---
 

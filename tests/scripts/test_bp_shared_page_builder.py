@@ -40,7 +40,7 @@ def test_bp_claim_with_only_gap_facts_stays_unverified(tmp_path):
         ),
         encoding="utf-8",
     )
-    (tmp_path / "bp_phase2_product_commercial-section.json").write_text(
+    (tmp_path / "bp_dim_product_commercial-section.json").write_text(
         json.dumps(
             {
                 "schema_version": "bp_section_package.v2",
@@ -104,8 +104,8 @@ def test_bp_claim_with_gap_then_positive_fact_remains_unverified_for_critical_cl
         encoding="utf-8",
     )
     for name, fact_id, gaps in [
-        ("bp_phase2_product_commercial-section.json", "BP-CUSTOMER-F001", ["客户合同缺失"]),
-        ("bp_phase2_company_team_compliance-section.json", "BP-CUSTOMER-F002", []),
+        ("bp_dim_product_commercial-section.json", "BP-CUSTOMER-F001", ["客户合同缺失"]),
+        ("bp_dim_company_team_compliance-section.json", "BP-CUSTOMER-F002", []),
     ]:
         (tmp_path / name).write_text(
             json.dumps(
@@ -152,8 +152,8 @@ def test_bp_claim_with_contradiction_is_not_overwritten_by_later_supported_fact(
         encoding="utf-8",
     )
     for name, fact_id in [
-        ("bp_phase2_product_commercial-section.json", "BP-PRODUCT-F001"),
-        ("bp_phase2_market_supply_chain-section.json", "BP-PRODUCT-F002"),
+        ("bp_dim_product_commercial-section.json", "BP-PRODUCT-F001"),
+        ("bp_dim_market_supply_chain-section.json", "BP-PRODUCT-F002"),
     ]:
         (tmp_path / name).write_text(
             json.dumps(
@@ -193,7 +193,7 @@ def test_bp_claim_with_contradictory_evidence_is_contradicted(tmp_path):
         json.dumps({"facts": [{"fact_id": "BP-PRODUCT-F001", "claim": "公开信息未见量产或交付证据", "source_tier": "database", "fact_type": "negative_evidence"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (tmp_path / "bp_phase2_product_commercial-section.json").write_text(
+    (tmp_path / "bp_dim_product_commercial-section.json").write_text(
         json.dumps(
             {
                 "schema_version": "bp_section_package.v2",

@@ -258,7 +258,7 @@ def evaluate_bp_delivery_gate(task_dir: Path) -> dict[str, Any]:
     for slug in _BP_ALL_SLUGS:
         dim_found = False
         for prefix_dir in [task_dir, task_dir / "outputs"]:
-            dim_path = prefix_dir / f"bp_phase2_{slug}.md"
+            dim_path = prefix_dir / f"bp_dim_{slug}.md"
             if dim_path.exists() and dim_path.stat().st_size > 100:
                 dim_found = True
                 break
@@ -272,7 +272,7 @@ def evaluate_bp_delivery_gate(task_dir: Path) -> dict[str, Any]:
     for slug in _BP_ALL_SLUGS:
         for prefix_dir in [task_dir, task_dir / "outputs"]:
             for suffix in ("-facts.json", "-section.json"):
-                sidecar_path = prefix_dir / f"bp_phase2_{slug}{suffix}"
+                sidecar_path = prefix_dir / f"bp_dim_{slug}{suffix}"
                 if sidecar_path.exists():
                     try:
                         json.loads(sidecar_path.read_text(encoding="utf-8"))

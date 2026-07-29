@@ -6,12 +6,12 @@ from scripts.bp_wave_evidence_gate import evaluate_bp_wave_evidence_gate
 def test_wave_gate_fails_missing_section_sidecar(tmp_path):
     task_dir = tmp_path / "BP-WAVE"
     task_dir.mkdir()
-    (task_dir / "bp_phase2_company_team_compliance.md").write_text("## team\n" + "x" * 200, encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance.md").write_text("## team\n" + "x" * 200, encoding="utf-8")
 
     result = evaluate_bp_wave_evidence_gate(task_dir, wave=1)
 
     assert result["ok"] is False
-    assert result["gate_verdict"] == "FAIL"
+    assert result["gate_verdict"] == "REPAIR"  # v4.4: 缺 sidecar 触发 repair 分支，不再硬 FAIL
     assert result["role_results"][0]["status"] == "missing_sidecar"
     assert result["repair_tasks"]
 
@@ -23,9 +23,9 @@ def test_wave_gate_fails_critical_claim_not_addressed(tmp_path):
         json.dumps({"claim_matrix": [{"claim_id": "BC001", "owner_section": "bp_company_team_compliance", "priority": "critical"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_company_team_compliance.md").write_text("## team\n" + "x" * 200, encoding="utf-8")
-    (task_dir / "bp_phase2_company_team_compliance-facts.json").write_text(json.dumps({"facts": []}), encoding="utf-8")
-    (task_dir / "bp_phase2_company_team_compliance-section.json").write_text(
+    (task_dir / "bp_dim_company_team_compliance.md").write_text("## team\n" + "x" * 200, encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance-facts.json").write_text(json.dumps({"facts": []}), encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance-section.json").write_text(
         json.dumps({"schema_version": "bp_section_package.v2", "claim_ids_covered": []}, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -44,9 +44,9 @@ def test_wave_gate_passes_valid_role_package(tmp_path):
         json.dumps({"claim_matrix": [{"claim_id": "BC001", "owner_section": "bp_company_team_compliance", "priority": "critical"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_company_team_compliance.md").write_text("## team\n" + "x" * 200, encoding="utf-8")
-    (task_dir / "bp_phase2_company_team_compliance-facts.json").write_text(json.dumps({"facts": [{"fact_id": "BF-1"}]}), encoding="utf-8")
-    (task_dir / "bp_phase2_company_team_compliance-section.json").write_text(
+    (task_dir / "bp_dim_company_team_compliance.md").write_text("## team\n" + "x" * 200, encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance-facts.json").write_text(json.dumps({"facts": [{"fact_id": "BF-1"}]}), encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance-section.json").write_text(
         json.dumps({"schema_version": "bp_section_package.v2", "claim_ids_covered": ["BC001"], "search_audit": {"claim_coverage": [{"claim_id": "BC001", "evidence_verdict": "supported"}]}}, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -68,9 +68,9 @@ def test_wave_gate_finds_sidecar_in_outputs_dir(tmp_path):
         encoding="utf-8",
     )
     # 子代理把三件套写到 outputs_dir
-    (outputs_dir / "bp_phase2_market_supply_chain.md").write_text("## market\n" + "x" * 200, encoding="utf-8")
-    (outputs_dir / "bp_phase2_market_supply_chain-facts.json").write_text(json.dumps({"facts": [{"fact_id": "BF-1"}]}), encoding="utf-8")
-    (outputs_dir / "bp_phase2_market_supply_chain-section.json").write_text(
+    (outputs_dir / "bp_dim_market_supply_chain.md").write_text("## market\n" + "x" * 200, encoding="utf-8")
+    (outputs_dir / "bp_dim_market_supply_chain-facts.json").write_text(json.dumps({"facts": [{"fact_id": "BF-1"}]}), encoding="utf-8")
+    (outputs_dir / "bp_dim_market_supply_chain-section.json").write_text(
         json.dumps({"schema_version": "bp_section_package.v2", "claim_ids_covered": ["BC001"]}, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -90,10 +90,10 @@ def test_wave_gate_blocking_claims_degraded_after_retry(tmp_path):
         json.dumps({"claim_matrix": [{"claim_id": "BC001", "owner_section": "bp_company_team_compliance", "priority": "critical"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_company_team_compliance.md").write_text("## team\n" + "x" * 200, encoding="utf-8")
-    (task_dir / "bp_phase2_company_team_compliance-facts.json").write_text(json.dumps({"facts": []}), encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance.md").write_text("## team\n" + "x" * 200, encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance-facts.json").write_text(json.dumps({"facts": []}), encoding="utf-8")
     # section 存在但没覆盖 BC001
-    (task_dir / "bp_phase2_company_team_compliance-section.json").write_text(
+    (task_dir / "bp_dim_company_team_compliance-section.json").write_text(
         json.dumps({"schema_version": "bp_section_package.v2", "claim_ids_covered": []}, ensure_ascii=False),
         encoding="utf-8",
     )

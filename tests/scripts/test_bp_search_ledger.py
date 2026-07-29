@@ -49,7 +49,7 @@ def test_missing_ledger_falls_back_to_section_search_audit(tmp_path):
     (task_dir / "bp_section_packages.json").write_text(
         json.dumps({
             "packages": [{
-                "section_name": "bp_phase2_product_commercial",
+                "section_name": "bp_dim_product_commercial",
                 "package": {
                     "section_id": "bp_product_commercial",
                     "search_audit": {

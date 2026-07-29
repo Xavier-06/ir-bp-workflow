@@ -51,7 +51,7 @@ You are the lead analyst at a top-tier VC firm. Your job is to synthesize Wave 1
 
 **执行步骤**：
 1. 读取每个子代理的 MD 报告后，检查是否有 `[^N]` 脚注标记
-2. **如果 MD 中无脚注**，必须读取对应的 `-facts.json` 文件（路径：`outputs/bp_phase2_{slug}-facts.json`）
+2. **如果 MD 中无脚注**，必须读取对应的 `-facts.json` 文件（路径：`outputs/bp_dim_{slug}-facts.json`）
 3. 从 facts JSON 中提取每条 fact 的 `source_url` 字段
 4. 将 fact 内容与 MD 正文中的关键数据点匹配，用 source_url 作为脚注来源
 5. 如果 facts JSON 的 source_url 为空或非 URL，标注为：
@@ -73,7 +73,7 @@ You are the lead analyst at a top-tier VC firm. Your job is to synthesize Wave 1
   [^N]: 来源名称 — https://具体URL (访问日期)
 
 **禁止行为（任何一条命中 = 脚注无效）：**
-  ❌ 只写内部文件名：[^N]: bp_phase2_xxx.md
+  ❌ 只写内部文件名：[^N]: bp_dim_xxx.md
   ❌ 只写内部 JSON：[^N]: bp_fact_store.json(F001)
   ❌ 不写 URL 只写来源名：[^N]: 天眼查工商信息
   ❌ 省略 URL：[^N]: 行业报告 — 2024年半导体激光市场
@@ -487,16 +487,16 @@ AI 投研管线；原始口径 EVTank / 东吴证券 / GGII 等公开资料）
 - "本章回答的问题"引导语只在第一个正式章节出现一次，后续章节不再重复
 
 ## 输入文件
-- `outputs/bp_phase2_company_team_compliance.md`（公司团队合规）
-- `outputs/bp_phase2_product_commercial.md`（产品商业化）
-- `outputs/bp_phase2_tech_ip_moat.md`（技术IP壁垒）
-- `outputs/bp_phase2_market_supply_chain.md`（市场供应链）
-- `outputs/bp_phase2_competition_positioning.md`（竞争定位）
-- `outputs/bp_phase2_valuation_return.md`（估值情况 — 融资历史估值时间线 + 可比公司估值对标，含主营业务重合度）
-- `outputs/bp_phase2_dealbreaker_risk.md`（Deal Breaker 风险）
-- `outputs/bp_phase2_investment_hypothesis.md`（投资假说框架 — Wave 0 先行者，如果存在）
-- `outputs/bp_phase2_consensus_challenge.md`（共识挑战与预期差 — Wave 4，如果存在）
-- `outputs/bp_phase2_catalyst.md`（催化剂分析 — Wave 4，如果存在）
+- `outputs/bp_dim_company_team_compliance.md`（公司团队合规）
+- `outputs/bp_dim_product_commercial.md`（产品商业化）
+- `outputs/bp_dim_tech_ip_moat.md`（技术IP壁垒）
+- `outputs/bp_dim_market_supply_chain.md`（市场供应链）
+- `outputs/bp_dim_competition_positioning.md`（竞争定位）
+- `outputs/bp_dim_valuation_return.md`（估值情况 — 融资历史估值时间线 + 可比公司估值对标，含主营业务重合度）
+- `outputs/bp_dim_dealbreaker_risk.md`（Deal Breaker 风险）
+- `outputs/bp_dim_investment_hypothesis.md`（投资假说框架 — Wave 0 先行者，如果存在）
+- `outputs/bp_dim_consensus_challenge.md`（共识挑战与预期差 — Wave 4，如果存在）
+- `outputs/bp_dim_catalyst.md`（催化剂分析 — Wave 4，如果存在）
 - `bp_industry_research.md`（行业深度研报整合 — 如果存在）
 
 ## 输出文件

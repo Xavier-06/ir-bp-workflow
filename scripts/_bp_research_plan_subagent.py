@@ -387,7 +387,7 @@ def bp_collect_research_plan(
                 return {
                     "ok": True,
                     "mode": "bp_research_plan",
-                    "phase": "phase04_research_plan_collect",
+                    "phase": "phase05_research_plan_collect",
                     "job_id": job_ctx.job_id,
                     "result": {
                         "plan_path": str(plan_path),
@@ -404,7 +404,7 @@ def bp_collect_research_plan(
                 return {
                     "ok": False,
                     "mode": "bp_research_plan",
-                    "phase": "phase04_research_plan_collect",
+                    "phase": "phase05_research_plan_collect",
                     "job_id": job_ctx.job_id,
                     "result": {"error": "plan_validation_failed", "errors": validation["errors"]},
                 }
@@ -436,7 +436,7 @@ def bp_collect_research_plan(
     return {
         "ok": plan.get("plan_status") == "ready",
         "mode": "bp_research_plan",
-        "phase": "phase04_research_plan_collect",
+        "phase": "phase05_research_plan_collect",
         "job_id": job_ctx.job_id,
         "result": {"plan_path": str(plan_path_write), "enrichment": "fallback_script"},
     }

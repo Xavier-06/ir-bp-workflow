@@ -17,7 +17,7 @@ from scripts.bp_subagent_launcher_wb import (
 def test_read_brief_content_keeps_paths_without_inlining_referenced_files(tmp_path, monkeypatch):
     task_dir = tmp_path / "TASK-BP"
     task_dir.mkdir()
-    large_prior = task_dir / "bp_phase2_team.md"
+    large_prior = task_dir / "bp_dim_team.md"
     large_prior.write_text("前序输出" * 5000, encoding="utf-8")
     monkeypatch.setattr("scripts.bp_subagent_launcher_wb.ROOT", tmp_path)
 
@@ -37,13 +37,13 @@ def test_spawn_one_manifest_uses_general_purpose_agent_fields(tmp_path, monkeypa
     sub = {
         "role_name": "bp_company_team_compliance",
         "description": "团队分析",
-        "output_file": str(task_dir / "bp_phase2_company_team_compliance.md"),
+        "output_file": str(task_dir / "bp_dim_company_team_compliance.md"),
         "key_inputs": {},
     }
 
     result = _spawn_one("TASK-BP", sub, task_dir=task_dir)
 
-    manifest = json.loads((task_dir / "bp_phase2_manifest_company_team_compliance.json").read_text(encoding="utf-8"))
+    manifest = json.loads((task_dir / "bp_dim_manifest_company_team_compliance.json").read_text(encoding="utf-8"))
     assert result["status"] == "dispatched"
     assert manifest["subagent_type"] == "general-purpose"
     assert manifest["dispatch_mode"] == "team_async"
@@ -61,7 +61,7 @@ def test_build_brief_includes_fact_store_and_research_plan_paths(tmp_path, monke
     sub = {
         "role_name": "bp_company_team_compliance",
         "description": "团队分析",
-        "output_file": str(task_dir / "bp_phase2_company_team_compliance.md"),
+        "output_file": str(task_dir / "bp_dim_company_team_compliance.md"),
         "key_inputs": {},
     }
 
@@ -105,7 +105,7 @@ def test_build_brief_injects_role_owned_research_and_claim_slices(tmp_path, monk
     sub = {
         "role_name": "bp_company_team_compliance",
         "description": "团队分析",
-        "output_file": str(task_dir / "bp_phase2_company_team_compliance.md"),
+        "output_file": str(task_dir / "bp_dim_company_team_compliance.md"),
         "key_inputs": {},
     }
 
@@ -154,7 +154,7 @@ def test_build_brief_includes_claim_level_search_work_order(tmp_path, monkeypatc
     sub = {
         "role_name": "bp_product_commercial",
         "description": "产品商业化验证",
-        "output_file": str(task_dir / "bp_phase2_product_commercial.md"),
+        "output_file": str(task_dir / "bp_dim_product_commercial.md"),
         "key_inputs": {},
     }
 
@@ -178,15 +178,15 @@ def test_build_brief_enforces_bp_sidecar_output_contract(tmp_path, monkeypatch):
     sub = {
         "role_name": "bp_tech_ip_moat",
         "description": "技术分析",
-        "output_file": str(task_dir / "bp_phase2_tech_ip_moat.md"),
+        "output_file": str(task_dir / "bp_dim_tech_ip_moat.md"),
         "key_inputs": {},
     }
 
     brief_path = _build_brief("TASK-BP", sub, task_dir=task_dir)
     brief = brief_path.read_text(encoding="utf-8")
 
-    assert "bp_phase2_tech_ip_moat-facts.json" in brief
-    assert "bp_phase2_tech_ip_moat-section.json" in brief
+    assert "bp_dim_tech_ip_moat-facts.json" in brief
+    assert "bp_dim_tech_ip_moat-section.json" in brief
     assert "schema_version" in brief
     assert "bp_section_package.v2" in brief
     assert "answers" in brief
@@ -203,18 +203,18 @@ def test_spawn_one_manifest_exposes_sidecar_paths_for_dispatcher(tmp_path, monke
     sub = {
         "role_name": "bp_valuation_return",
         "description": "估值分析",
-        "output_file": str(task_dir / "bp_phase2_valuation_return.md"),
+        "output_file": str(task_dir / "bp_dim_valuation_return.md"),
         "key_inputs": {},
     }
 
     _spawn_one("TASK-BP", sub, task_dir=task_dir)
 
-    manifest = json.loads((task_dir / "bp_phase2_manifest_valuation_return.json").read_text(encoding="utf-8"))
+    manifest = json.loads((task_dir / "bp_dim_manifest_valuation_return.json").read_text(encoding="utf-8"))
     assert manifest["sidecar_paths"] == {
-        "facts": str(task_dir / "bp_phase2_valuation_return-facts.json"),
-        "section_package": str(task_dir / "bp_phase2_valuation_return-section.json"),
+        "facts": str(task_dir / "bp_dim_valuation_return-facts.json"),
+        "section_package": str(task_dir / "bp_dim_valuation_return-section.json"),
     }
-    assert "bp_phase2_valuation_return-facts.json" in manifest["brief_content_preview"]
+    assert "bp_dim_valuation_return-facts.json" in manifest["brief_content_preview"]
 
 
 def test_spawn_one_manifest_persists_wave_inputs_beyond_preview(tmp_path, monkeypatch):
@@ -228,22 +228,22 @@ def test_spawn_one_manifest_persists_wave_inputs_beyond_preview(tmp_path, monkey
         "fact_store": str(task_dir / "bp_fact_store.json"),
     }
     prior_outputs = {
-        "bp_company_team_compliance": str(task_dir / "bp_phase2_company_team_compliance.md"),
-        "bp_product_commercial": str(task_dir / "bp_phase2_product_commercial.md"),
+        "bp_company_team_compliance": str(task_dir / "bp_dim_company_team_compliance.md"),
+        "bp_product_commercial": str(task_dir / "bp_dim_product_commercial.md"),
     }
     for path in list(shared_inputs.values()) + list(prior_outputs.values()):
         Path(path).write_text("{}", encoding="utf-8")
     sub = {
         "role_name": "bp_product_commercial",
         "description": "产品商业化验证",
-        "output_file": str(task_dir / "bp_phase2_product_commercial.md"),
+        "output_file": str(task_dir / "bp_dim_product_commercial.md"),
         "key_inputs": {"shared_inputs": shared_inputs, "prior_dimension_outputs": prior_outputs},
         "wave_inputs": {**shared_inputs, **prior_outputs},
     }
 
     _spawn_one("TASK-BP", sub, task_dir=task_dir)
 
-    manifest = json.loads((task_dir / "bp_phase2_manifest_product_commercial.json").read_text(encoding="utf-8"))
+    manifest = json.loads((task_dir / "bp_dim_manifest_product_commercial.json").read_text(encoding="utf-8"))
     assert manifest["key_inputs"]["shared_inputs"] == shared_inputs
     assert manifest["wave_inputs"]["bp_company_team_compliance"] == prior_outputs["bp_company_team_compliance"]
 
@@ -327,7 +327,7 @@ def test_build_brief_states_vc_diligence_context(tmp_path, monkeypatch):
     sub = {
         "role_name": "bp_product_commercial",
         "description": "产品商业化分析",
-        "output_file": str(task_dir / "bp_phase2_product_commercial.md"),
+        "output_file": str(task_dir / "bp_dim_product_commercial.md"),
         "key_inputs": {},
     }
 
@@ -352,13 +352,13 @@ def test_unknown_bp_role_does_not_fallback_to_competition_prompt(tmp_path, monke
     sub = {
         "role_name": "bp_unknown_role",
         "description": "未知角色",
-        "output_file": str(task_dir / "bp_phase2_unknown.md"),
+        "output_file": str(task_dir / "bp_dim_unknown.md"),
         "key_inputs": {},
     }
 
     _spawn_one("TASK-BP", sub, task_dir=task_dir)
 
-    manifest = json.loads((task_dir / "bp_phase2_manifest_unknown_role.json").read_text(encoding="utf-8"))
+    manifest = json.loads((task_dir / "bp_dim_manifest_unknown_role.json").read_text(encoding="utf-8"))
     assert "UNKNOWN BP ROLE" in manifest["system_prompt"]
     assert "writing the final chapter" not in manifest["system_prompt"]
 
@@ -368,9 +368,9 @@ def test_unknown_bp_role_does_not_fallback_to_competition_prompt(tmp_path, monke
 
 def _write_full_sidecars(task_dir: Path, slug: str) -> Path:
     """写一组完整合规的 facts + section sidecar，验门禁能放行。"""
-    output = task_dir / f"bp_phase2_{slug}.md"
+    output = task_dir / f"bp_dim_{slug}.md"
     output.write_text("# 估值章节\n" + ("val " * 200), encoding="utf-8")
-    (task_dir / f"bp_phase2_{slug}-facts.json").write_text(
+    (task_dir / f"bp_dim_{slug}-facts.json").write_text(
         json.dumps({
             "role": "bp_valuation_return",
             "facts": [{
@@ -384,7 +384,7 @@ def _write_full_sidecars(task_dir: Path, slug: str) -> Path:
         }, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / f"bp_phase2_{slug}-section.json").write_text(
+    (task_dir / f"bp_dim_{slug}-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "section_id": "bp_valuation_return",
@@ -443,7 +443,7 @@ def test_check_role_quality_passes_for_full_sidecars(tmp_path):
 def test_check_role_quality_flags_missing_sidecars(tmp_path):
     task_dir = tmp_path / "TASK-BP"
     task_dir.mkdir()
-    output = task_dir / "bp_phase2_valuation_return.md"
+    output = task_dir / "bp_dim_valuation_return.md"
     output.write_text("hi", encoding="utf-8")  # < 200 字符
     quality = _check_role_quality("bp_valuation_return", task_dir, output)
     assert quality["passed"] is False
@@ -456,9 +456,9 @@ def test_check_role_quality_flags_missing_sidecars(tmp_path):
 def test_check_role_quality_flags_invalid_fact_binding(tmp_path):
     task_dir = tmp_path / "TASK-BP"
     task_dir.mkdir()
-    output = task_dir / "bp_phase2_valuation_return.md"
+    output = task_dir / "bp_dim_valuation_return.md"
     output.write_text("x" * 500, encoding="utf-8")
-    (task_dir / "bp_phase2_valuation_return-facts.json").write_text(
+    (task_dir / "bp_dim_valuation_return-facts.json").write_text(
         json.dumps({"facts": [{
             "fact_id": "F1", "claim": "c", "value": "v", "unit": "",
             "period": "p", "source_url": "https://x.com",
@@ -468,7 +468,7 @@ def test_check_role_quality_flags_invalid_fact_binding(tmp_path):
         }]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_valuation_return-section.json").write_text(
+    (task_dir / "bp_dim_valuation_return-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "answers": [{"question_id": "q1", "answer": "A",
@@ -500,7 +500,7 @@ def test_rewrite_role_injects_memo_hint_into_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.bp_subagent_launcher_wb.TASKS_DIR", task_dir.parent)
 
     # 写最小 manifest（不实际派发）
-    (task_dir / "bp_phase2_manifest_valuation_return.json").write_text(
+    (task_dir / "bp_dim_manifest_valuation_return.json").write_text(
         json.dumps({
             "task_id": "TASK-BP", "role": "bp_valuation_return",
             "brief_content_preview": "preview before",
@@ -511,7 +511,7 @@ def test_rewrite_role_injects_memo_hint_into_manifest(tmp_path, monkeypatch):
     ok = _rewrite_role("TASK-BP", "bp_valuation_return", task_dir, "/tmp/memo.md")
     assert ok is True
 
-    manifest = json.loads((task_dir / "bp_phase2_manifest_valuation_return.json").read_text(encoding="utf-8"))
+    manifest = json.loads((task_dir / "bp_dim_manifest_valuation_return.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "rewrite_pending"
     assert "PR4 补搜 Memo 引用" in manifest["brief_content_preview"]
     assert "/tmp/memo.md" in manifest["brief_content_preview"]

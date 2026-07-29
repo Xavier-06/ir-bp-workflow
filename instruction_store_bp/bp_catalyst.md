@@ -5,8 +5,8 @@
 核心问题：什么事件可能引发标的估值/基本面变化？每个事件的概率和影响有多大？
 
 ## 输入文件（必读）
-- `{TASK_DIR}/outputs/bp_phase2_company_team_compliance.md` 等全部 Wave 1-3 维度输出
-- `{TASK_DIR}/outputs/bp_phase2_investment_hypothesis.md` — 原始假说（如存在）
+- `{TASK_DIR}/outputs/bp_dim_company_team_compliance.md` 等全部 Wave 1-3 维度输出
+- `{TASK_DIR}/outputs/bp_dim_investment_hypothesis.md` — 原始假说（如存在）
 
 ## 投资思维框架
 1. 催化剂 ≠ 新闻——催化剂是前瞻性触发器，不是已经发生的事
@@ -31,7 +31,7 @@
 - 最大的预期差催化剂是什么？
 
 ## 输出要求
-- 输出到 `{TASK_DIR}/outputs/bp_phase2_catalyst.md`
+- 输出到 `{TASK_DIR}/outputs/bp_dim_catalyst.md`
 - 字数 ≥ 1500 字符，来源引用 ≥ 3 个
 - 每个催化剂必须锚定时间窗口
 

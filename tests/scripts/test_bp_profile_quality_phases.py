@@ -35,49 +35,49 @@ def test_bp_profile_registers_research_plan_before_dispatch(tmp_path):
 
     phases = profile.phases()
     assert "phase04_research_plan" in phases
-    assert "phase05_bp_shared_page_init" in phases
-    assert "phase06_search_plan_compile" in phases
-    assert "phase07_bp_fact_store_bootstrap" in phases
-    assert "phase12_wave1_shared_page_refresh" in phases
-    assert "phase16_wave3_shared_page_refresh" in phases
-    assert "phase20_wave4_shared_page_refresh" in phases
-    assert "phase21_bp_claim_coverage_validation" in phases
-    assert "phase22_bp_cross_dimension_gate" in phases
-    assert "phase10_wave1_evidence_gate" in phases
-    assert "phase15_wave3_evidence_gate" in phases
-    assert "phase19_wave4_evidence_gate" in phases
-    assert "phase11_bp_fact_store_merge" in phases
-    assert "phase23_bp_section_package_validation" in phases
-    assert "phase24_synthesis_prepare" in phases
-    assert "phase25_synthesis_collect" in phases
+    assert "phase06_bp_shared_page_init" in phases
+    assert "phase07_search_plan_compile" in phases
+    assert "phase08_bp_fact_store_bootstrap" in phases
+    assert "phase13_wave1_shared_page_refresh" in phases
+    assert "phase17_wave3_shared_page_refresh" in phases
+    assert "phase21_wave4_shared_page_refresh" in phases
+    assert "phase22_bp_claim_coverage_validation" in phases
+    assert "phase23_bp_cross_dimension_gate" in phases
+    assert "phase11_wave1_evidence_gate" in phases
+    assert "phase16_wave3_evidence_gate" in phases
+    assert "phase20_wave4_evidence_gate" in phases
+    assert "phase12_bp_fact_store_merge" in phases
+    assert "phase24_bp_section_package_validation" in phases
+    assert "phase25_synthesis_prepare" in phases
+    assert "phase26_synthesis_collect" in phases
     # IC/RedTeam phases removed (2026-06-13): phase32/33/33_5/34
     # presearch removed (2026-07-28): phase03 已删，research_plan 子代理全权搜索
-    assert "phase26_bp_debate_review" in phases
-    assert "phase27_bp_final_assembly" in phases
-    assert "phase28_bp_readability_review" in phases
+    assert "phase27_bp_debate_review" in phases
+    assert "phase28_bp_final_assembly" in phases
+    assert "phase29_bp_readability_review" in phases
     # phase02_company_verify 已删除（2026-07-29）：tyc 工商核验由 phase04 research_plan 子代理直调，独立 phase02 冗余
-    assert phases.index("phase04_research_plan_collect") < phases.index("phase05_bp_shared_page_init")
-    assert phases.index("phase05_bp_shared_page_init") < phases.index("phase06_search_plan_compile")
-    assert phases.index("phase06_search_plan_compile") < phases.index("phase07_bp_fact_store_bootstrap")
-    assert phases.index("phase07_bp_fact_store_bootstrap") < phases.index("phase08_dispatch_prepare")
-    assert phases.index("phase09_dispatch_collect") < phases.index("phase10_wave1_evidence_gate")
-    assert phases.index("phase10_wave1_evidence_gate") < phases.index("phase11_bp_fact_store_merge")
-    assert phases.index("phase11_bp_fact_store_merge") < phases.index("phase12_wave1_shared_page_refresh")
-    assert phases.index("phase12_wave1_shared_page_refresh") < phases.index("phase13_wave3_prepare")
-    assert phases.index("phase14_wave3_collect") < phases.index("phase15_wave3_evidence_gate")
-    assert phases.index("phase15_wave3_evidence_gate") < phases.index("phase16_wave3_shared_page_refresh")
-    assert phases.index("phase16_wave3_shared_page_refresh") < phases.index("phase17_wave4_prepare")
-    assert phases.index("phase18_wave4_collect") < phases.index("phase19_wave4_evidence_gate")
-    assert phases.index("phase19_wave4_evidence_gate") < phases.index("phase20_wave4_shared_page_refresh")
-    assert phases.index("phase20_wave4_shared_page_refresh") < phases.index("phase21_bp_claim_coverage_validation")
-    assert phases.index("phase21_bp_claim_coverage_validation") < phases.index("phase22_bp_cross_dimension_gate")
-    assert phases.index("phase22_bp_cross_dimension_gate") < phases.index("phase23_bp_section_package_validation")
-    assert phases.index("phase23_bp_section_package_validation") < phases.index("phase24_synthesis_prepare")
-    assert phases.index("phase24_synthesis_prepare") < phases.index("phase25_synthesis_collect")
-    assert phases.index("phase25_synthesis_collect") < phases.index("phase26_bp_debate_review")
-    assert phases.index("phase26_bp_debate_review") < phases.index("phase27_bp_final_assembly")
-    assert phases.index("phase27_bp_final_assembly") < phases.index("phase28_bp_readability_review")
-    assert phases.index("phase28_bp_readability_review") < phases.index("phase30_delivery")
+    assert phases.index("phase05_research_plan_collect") < phases.index("phase06_bp_shared_page_init")
+    assert phases.index("phase06_bp_shared_page_init") < phases.index("phase07_search_plan_compile")
+    assert phases.index("phase07_search_plan_compile") < phases.index("phase08_bp_fact_store_bootstrap")
+    assert phases.index("phase08_bp_fact_store_bootstrap") < phases.index("phase09_dispatch_prepare")
+    assert phases.index("phase10_dispatch_collect") < phases.index("phase11_wave1_evidence_gate")
+    assert phases.index("phase11_wave1_evidence_gate") < phases.index("phase12_bp_fact_store_merge")
+    assert phases.index("phase12_bp_fact_store_merge") < phases.index("phase13_wave1_shared_page_refresh")
+    assert phases.index("phase13_wave1_shared_page_refresh") < phases.index("phase14_wave3_prepare")
+    assert phases.index("phase15_wave3_collect") < phases.index("phase16_wave3_evidence_gate")
+    assert phases.index("phase16_wave3_evidence_gate") < phases.index("phase17_wave3_shared_page_refresh")
+    assert phases.index("phase17_wave3_shared_page_refresh") < phases.index("phase18_wave4_prepare")
+    assert phases.index("phase19_wave4_collect") < phases.index("phase20_wave4_evidence_gate")
+    assert phases.index("phase20_wave4_evidence_gate") < phases.index("phase21_wave4_shared_page_refresh")
+    assert phases.index("phase21_wave4_shared_page_refresh") < phases.index("phase22_bp_claim_coverage_validation")
+    assert phases.index("phase22_bp_claim_coverage_validation") < phases.index("phase23_bp_cross_dimension_gate")
+    assert phases.index("phase23_bp_cross_dimension_gate") < phases.index("phase24_bp_section_package_validation")
+    assert phases.index("phase24_bp_section_package_validation") < phases.index("phase25_synthesis_prepare")
+    assert phases.index("phase25_synthesis_prepare") < phases.index("phase26_synthesis_collect")
+    assert phases.index("phase26_synthesis_collect") < phases.index("phase27_bp_debate_review")
+    assert phases.index("phase27_bp_debate_review") < phases.index("phase28_bp_final_assembly")
+    assert phases.index("phase28_bp_final_assembly") < phases.index("phase29_bp_readability_review")
+    assert phases.index("phase29_bp_readability_review") < phases.index("phase31_delivery")
 
 
 def test_bp_narrative_assembly_keeps_machine_metadata_out_of_delivery_markdown(tmp_path):
@@ -243,7 +243,7 @@ def test_bp_dispatch_prepare_uses_four_evidence_collection_roles_without_valuati
     }
     assert "bp_valuation_return" not in result["dispatch_info"]["remaining_roles"]
     assert "bp_competition_positioning" not in result["dispatch_info"]["remaining_roles"]
-    dispatch_payload = json.loads((tmp_path / "tasks" / "BP-WAVE1" / "phase2_dispatch.json").read_text(encoding="utf-8"))
+    dispatch_payload = json.loads((tmp_path / "tasks" / "BP-WAVE1" / "bp_dispatch.json").read_text(encoding="utf-8"))
     assert dispatch_payload["wave_design"] == "wave1_evidence_collection_4_roles"
     assert dispatch_payload["current_subagent"] == "bp_company_team_compliance"
     assert dispatch_payload["total_subagents"] == 10  # 7 维度 + 3 叙事角色（Wave 0 investment_hypothesis 已删除）
@@ -254,7 +254,7 @@ def test_bp_wave3_prepare_dispatches_two_roles_with_shared_inputs(tmp_path):
     task_dir.mkdir(parents=True)
     outputs_dir = task_dir
     for slug in ("company_team_compliance", "product_commercial", "tech_ip_moat", "market_supply_chain"):
-        (outputs_dir / f"bp_phase2_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
+        (outputs_dir / f"bp_dim_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
     (task_dir / "bp_shared_diligence_page.md").write_text("# Shared\n", encoding="utf-8")
     (task_dir / "bp_shared_state.json").write_text("{}", encoding="utf-8")
     (task_dir / "bp_claim_coverage.json").write_text("{}", encoding="utf-8")
@@ -272,7 +272,7 @@ def test_bp_wave3_prepare_dispatches_two_roles_with_shared_inputs(tmp_path):
     assert result["dispatch_info"]["remaining_roles"] == ["bp_valuation_return"]
     manifests = result["dispatch_info"]["manifests"]
     assert len(manifests) == 1  # sequential: 只返回 1 个 manifest
-    manifest_text = (task_dir / "bp_phase2_manifest_competition_positioning.json").read_text(encoding="utf-8")
+    manifest_text = (task_dir / "bp_dim_manifest_competition_positioning.json").read_text(encoding="utf-8")
     assert "bp_shared_diligence_page.md" in manifest_text
     assert "bp_shared_state.json" in manifest_text
     assert "bp_claim_coverage.json" in manifest_text
@@ -282,7 +282,7 @@ def test_bp_wave3_prepare_dispatches_two_roles_with_shared_inputs(tmp_path):
 def test_bp_wave3_collect_requires_all_two_outputs(tmp_path):
     task_dir = tmp_path / "tasks" / "BP-WAVE3-COLLECT"
     task_dir.mkdir(parents=True)
-    (task_dir / "bp_phase2_competition_positioning.md").write_text("## competition\n" + "x" * 200, encoding="utf-8")
+    (task_dir / "bp_dim_competition_positioning.md").write_text("## competition\n" + "x" * 200, encoding="utf-8")
     job_ctx = SimpleNamespace(job_id="BP-WAVE3-COLLECT", entity="测试公司", query="看这个BP", market="cn", metadata={}, workspace=None)
 
     result = _run_bp_wave3_collect(tmp_path, job_ctx)
@@ -304,19 +304,19 @@ def test_bp_profile_registers_synthesis_handlers_before_ic_and_delivery(tmp_path
         "valuation_return",
         "dealbreaker_risk",
     ):
-        (task_dir / f"bp_phase2_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
+        (task_dir / f"bp_dim_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
         # Sidecar files required by synthesis_prepare completeness check
-        (task_dir / f"bp_phase2_{slug}-facts.json").write_text('{"facts": []}', encoding="utf-8")
-        (task_dir / f"bp_phase2_{slug}-section.json").write_text('{"schema_version": "bp_section_package.v1", "section_id": "%s"}' % slug, encoding="utf-8")
+        (task_dir / f"bp_dim_{slug}-facts.json").write_text('{"facts": []}', encoding="utf-8")
+        (task_dir / f"bp_dim_{slug}-section.json").write_text('{"schema_version": "bp_section_package.v1", "section_id": "%s"}' % slug, encoding="utf-8")
     (task_dir / "bp_synthesis.md").write_text("# synthesis\n" + "x" * 2500, encoding="utf-8")
 
     profile = BPProfile(runtime_root=tmp_path)
 
-    prepare_result = profile.run_phase("phase24_synthesis_prepare", job_ctx)
-    collect_result = profile.run_phase("phase25_synthesis_collect", job_ctx)
+    prepare_result = profile.run_phase("phase25_synthesis_prepare", job_ctx)
+    collect_result = profile.run_phase("phase26_synthesis_collect", job_ctx)
 
-    assert prepare_result["phase"] == "phase24_synthesis_prepare"
-    assert collect_result["phase"] == "phase25_synthesis_collect"
+    assert prepare_result["phase"] == "phase25_synthesis_prepare"
+    assert collect_result["phase"] == "phase26_synthesis_collect"
     assert collect_result["ok"] is True
 
 
@@ -332,10 +332,10 @@ def test_bp_synthesis_prepare_requires_all_eight_wave_outputs_and_names_them_in_
         "valuation_return",
         "dealbreaker_risk",
     ):
-        (task_dir / f"bp_phase2_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
+        (task_dir / f"bp_dim_{slug}.md").write_text("## done\n" + "x" * 200, encoding="utf-8")
         # Sidecar files required by synthesis_prepare completeness check
-        (task_dir / f"bp_phase2_{slug}-facts.json").write_text('{"facts": []}', encoding="utf-8")
-        (task_dir / f"bp_phase2_{slug}-section.json").write_text('{"schema_version": "bp_section_package.v1", "section_id": "%s"}' % slug, encoding="utf-8")
+        (task_dir / f"bp_dim_{slug}-facts.json").write_text('{"facts": []}', encoding="utf-8")
+        (task_dir / f"bp_dim_{slug}-section.json").write_text('{"schema_version": "bp_section_package.v1", "section_id": "%s"}' % slug, encoding="utf-8")
     job_ctx = SimpleNamespace(job_id="BP-SYNTHESIS-8", entity="测试公司", query="看这个BP", market="cn", metadata={}, workspace=None)
 
     result = _run_bp_synthesis_prepare(tmp_path, job_ctx)
@@ -350,7 +350,7 @@ def test_bp_synthesis_prepare_requires_all_eight_wave_outputs_and_names_them_in_
         "valuation_return",
         "dealbreaker_risk",
     }
-    manifest = json.loads((task_dir / "bp_phase3_manifest_synthesis.json").read_text(encoding="utf-8"))
+    manifest = json.loads((task_dir / "bp_synthesis_manifest.json").read_text(encoding="utf-8"))
     # system_prompt 来自 instruction_store_bp/bp_统稿.md（测试 tmp_path 无 instruction store 时为 ERROR fallback）
     prompt = manifest["system_prompt"]
     if not prompt.startswith("ERROR"):
@@ -409,11 +409,11 @@ def test_run_bp_shared_page_refresh_reads_raw_section_sidecars_before_section_ga
         encoding="utf-8",
     )
     (task_dir / "bp_fact_store.json").write_text(json.dumps({"facts": []}, ensure_ascii=False), encoding="utf-8")
-    (task_dir / "bp_phase2_team-facts.json").write_text(
+    (task_dir / "bp_dim_team-facts.json").write_text(
         json.dumps({"facts": [{"fact_id": "BF-0001", "claim": "工商验证成立", "source_url": "https://example.com", "source_tier": "official", "confidence": "high", "fact_type": "company_registration"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_team-section.json").write_text(
+    (task_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "section_id": "bp_团队与合规",
             "section_title": "团队与合规",
@@ -456,7 +456,7 @@ def test_run_bp_shared_page_refresh_merges_facts_and_section_gaps(tmp_path):
     (task_dir / "bp_section_packages.json").write_text(
         json.dumps({
             "packages": [{
-                "section_name": "bp_phase2_team",
+                "section_name": "bp_dim_team",
                 "package": {
                     "section_id": "bp_团队与合规",
                     "section_title": "团队与合规",
@@ -555,7 +555,7 @@ def test_run_bp_fact_store_merge_collects_sidecars_from_outputs_dir(tmp_path):
     task_dir = tmp_path / "tasks" / "BP-MERGE-OUTPUTS"
     outputs_dir = task_dir / "outputs"
     outputs_dir.mkdir(parents=True)
-    (outputs_dir / "bp_phase2_team-facts.json").write_text(
+    (outputs_dir / "bp_dim_team-facts.json").write_text(
         json.dumps({
             "role": "bp_团队与合规",
             "facts": [
@@ -592,7 +592,7 @@ def test_run_bp_fact_store_merge_auto_repairs_malformed_sidecar(tmp_path):
     task_dir = tmp_path / "tasks" / "BP-MERGE-BAD-SIDECAR"
     outputs_dir = task_dir / "outputs"
     outputs_dir.mkdir(parents=True)
-    bad_sidecar = outputs_dir / "bp_phase2_dealbreaker_risk-facts.json"
+    bad_sidecar = outputs_dir / "bp_dim_dealbreaker_risk-facts.json"
     bad_sidecar.write_text('{"facts": [{"fact_id": "BF-0001"}', encoding="utf-8")  # missing closing brace
     workspace = SimpleNamespace(root=task_dir, outputs_dir=outputs_dir)
     job_ctx = SimpleNamespace(job_id="BP-MERGE-BAD-SIDECAR", entity="测试公司", query="看这个BP", market="cn", metadata={}, workspace=workspace)
@@ -609,7 +609,7 @@ def test_run_bp_fact_store_merge_includes_repaired_dealbreaker_risk_sidecar(tmp_
     task_dir = tmp_path / "tasks" / "BP-MERGE-DEALBREAKER"
     outputs_dir = task_dir / "outputs"
     outputs_dir.mkdir(parents=True)
-    (outputs_dir / "bp_phase2_dealbreaker_risk-facts.json").write_text(
+    (outputs_dir / "bp_dim_dealbreaker_risk-facts.json").write_text(
         json.dumps({
             "role": "bp_dealbreaker_risk",
             "facts": [
@@ -656,11 +656,11 @@ def test_run_bp_fact_store_merge_preserves_distinct_fact_ids_for_duplicate_claim
         "fact_type": "company_registration",
         "confidence": "high",
     }
-    (outputs_dir / "bp_phase2_company_team_compliance-facts.json").write_text(
+    (outputs_dir / "bp_dim_company_team_compliance-facts.json").write_text(
         json.dumps({"facts": [dict(common_fact, fact_id="BP-COMPANY-F001")]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (outputs_dir / "bp_phase2_dealbreaker_risk-facts.json").write_text(
+    (outputs_dir / "bp_dim_dealbreaker_risk-facts.json").write_text(
         json.dumps({"facts": [dict(common_fact, fact_id="BP-DEALBREAKER_RISK-F001")]}, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -678,7 +678,7 @@ def test_run_bp_fact_store_merge_preserves_distinct_fact_ids_for_duplicate_claim
 def test_run_bp_fact_store_merge_collects_dimension_sidecars(tmp_path):
     task_dir = tmp_path / "tasks" / "BP-MERGE"
     task_dir.mkdir(parents=True)
-    (task_dir / "bp_phase2_team-facts.json").write_text(
+    (task_dir / "bp_dim_team-facts.json").write_text(
         json.dumps({
             "role": "bp_团队与合规",
             "facts": [
@@ -725,11 +725,11 @@ def test_bp_section_package_validation_reads_sidecar_from_outputs_dir(tmp_path):
     outputs_dir = task_dir / "outputs"
     outputs_dir.mkdir(parents=True)
     (task_dir / "bp_fact_store_index.json").write_text(json.dumps({"fact_ids": ["BF-0001"], "total_facts": 1}), encoding="utf-8")
-    (outputs_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
-    (outputs_dir / "bp_phase2_team-section.json").write_text(
+    (outputs_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (outputs_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v1",
-            "section_id": "bp_phase2_team",
+            "section_id": "bp_dim_team",
             "section_title": "团队与合规",
             "key_messages": ["团队可验证"],
             "claims": [{"claim": "测试公司成立于2020年", "fact_ids": ["BF-0001"], "reasoning": "工商来源验证", "confidence": "high", "source_quality": "official"}],
@@ -754,12 +754,12 @@ def test_bp_section_package_validation_ignores_brief_files_in_task_dir_when_outp
     outputs_dir = task_dir / "outputs"
     outputs_dir.mkdir(parents=True)
     (task_dir / "bp_fact_store_index.json").write_text(json.dumps({"fact_ids": ["BF-0001"], "total_facts": 1}), encoding="utf-8")
-    (task_dir / "bp_phase2_brief_team.md").write_text("# Brief\n不是正式 section 输出", encoding="utf-8")
-    (outputs_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
-    (outputs_dir / "bp_phase2_team-section.json").write_text(
+    (task_dir / "bp_dim_brief_team.md").write_text("# Brief\n不是正式 section 输出", encoding="utf-8")
+    (outputs_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (outputs_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v1",
-            "section_id": "bp_phase2_team",
+            "section_id": "bp_dim_team",
             "section_title": "团队与合规",
             "key_messages": ["团队可验证"],
             "claims": [{"claim": "测试公司成立于2020年", "fact_ids": ["BF-0001"], "reasoning": "工商来源验证", "confidence": "high", "source_quality": "official"}],
@@ -778,18 +778,18 @@ def test_bp_section_package_validation_ignores_brief_files_in_task_dir_when_outp
     section_gate = result["result"]["section_gate"]
     assert result["ok"] is True
     assert section_gate["summary"]["total"] == 1
-    assert section_gate["packages"][0]["section_name"] == "bp_phase2_team"
+    assert section_gate["packages"][0]["section_name"] == "bp_dim_team"
 
 
 def test_bp_section_package_validation_rejects_claim_fact_id_when_fact_store_empty(tmp_path):
     task_dir = tmp_path / "tasks" / "BP-SECTIONS-EMPTY-FACTS"
     task_dir.mkdir(parents=True)
     (task_dir / "bp_fact_store_index.json").write_text(json.dumps({"fact_ids": [], "total_facts": 0}), encoding="utf-8")
-    (task_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
-    (task_dir / "bp_phase2_team-section.json").write_text(
+    (task_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (task_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v1",
-            "section_id": "bp_phase2_team",
+            "section_id": "bp_dim_team",
             "section_title": "团队与合规",
             "key_messages": ["团队可验证"],
             "claims": [{"claim": "测试公司成立于2020年", "fact_ids": ["BF-0001"], "reasoning": "工商来源验证", "confidence": "high", "source_quality": "official"}],
@@ -812,7 +812,7 @@ def test_bp_section_package_validation_rejects_claim_fact_id_when_fact_store_emp
 def test_bp_section_package_validation_fails_missing_packages(tmp_path):
     task_dir = tmp_path / "tasks" / "BP-SECTIONS-MISSING"
     task_dir.mkdir(parents=True)
-    (task_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (task_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
     job_ctx = SimpleNamespace(
         job_id="BP-SECTIONS-MISSING",
         entity="测试公司",
@@ -837,8 +837,8 @@ def test_bp_section_package_validation_auto_upgrades_v1_mislabeled_as_v2(tmp_pat
     task_dir = tmp_path / "tasks" / "BP-SECTIONS-V2-REQUIRED"
     task_dir.mkdir(parents=True)
     (task_dir / "bp_fact_store_index.json").write_text(json.dumps({"fact_ids": ["BF-0001"], "total_facts": 1}), encoding="utf-8")
-    (task_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
-    (task_dir / "bp_phase2_team-section.json").write_text(
+    (task_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (task_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "section_id": "bp_团队与合规",
@@ -872,8 +872,8 @@ def test_bp_section_package_validation_passes_valid_v2_package(tmp_path):
         json.dumps({"claim_matrix": [{"claim_id": "BC001", "claim": "团队优秀", "owner_section": "bp_团队与合规", "priority": "critical"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
-    (task_dir / "bp_phase2_team-section.json").write_text(
+    (task_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (task_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "section_id": "bp_团队与合规",
@@ -924,8 +924,8 @@ def test_bp_section_package_validation_rejects_shallow_search_audit_for_v2(tmp_p
         json.dumps({"claim_matrix": [{"claim_id": "BC001", "claim": "团队优秀", "owner_section": "bp_company_team_compliance", "priority": "critical"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_company_team_compliance.md").write_text("## 团队\n" + "正文\n" * 200, encoding="utf-8")
-    (task_dir / "bp_phase2_company_team_compliance-section.json").write_text(
+    (task_dir / "bp_dim_company_team_compliance.md").write_text("## 团队\n" + "正文\n" * 200, encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "section_id": "bp_company_team_compliance",
@@ -967,8 +967,8 @@ def test_bp_section_package_validation_requires_claim_level_search_coverage_for_
         json.dumps({"claim_matrix": [{"claim_id": "BC001", "claim": "团队优秀", "owner_section": "bp_company_team_compliance", "priority": "critical"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_company_team_compliance.md").write_text("## 团队\n" + "正文\n" * 200, encoding="utf-8")
-    (task_dir / "bp_phase2_company_team_compliance-section.json").write_text(
+    (task_dir / "bp_dim_company_team_compliance.md").write_text("## 团队\n" + "正文\n" * 200, encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "section_id": "bp_company_team_compliance",
@@ -1008,8 +1008,8 @@ def test_bp_section_package_validation_rejects_critical_claim_without_counter_se
         json.dumps({"claim_matrix": [{"claim_id": "BC001", "claim": "团队优秀", "owner_section": "bp_company_team_compliance", "priority": "critical"}]}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (task_dir / "bp_phase2_company_team_compliance.md").write_text("## 团队\n" + "正文\n" * 200, encoding="utf-8")
-    (task_dir / "bp_phase2_company_team_compliance-section.json").write_text(
+    (task_dir / "bp_dim_company_team_compliance.md").write_text("## 团队\n" + "正文\n" * 200, encoding="utf-8")
+    (task_dir / "bp_dim_company_team_compliance-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "section_id": "bp_company_team_compliance",
@@ -1055,8 +1055,8 @@ def test_bp_section_package_validation_requires_answer_limits_in_v2(tmp_path):
     task_dir.mkdir(parents=True)
     (task_dir / "bp_fact_store_index.json").write_text(json.dumps({"fact_ids": ["BF-0001"], "total_facts": 1}), encoding="utf-8")
     (task_dir / "bp_research_plan.json").write_text(json.dumps({"claim_matrix": [{"claim_id": "BC001"}]}, ensure_ascii=False), encoding="utf-8")
-    (task_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
-    (task_dir / "bp_phase2_team-section.json").write_text(
+    (task_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (task_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "section_id": "bp_团队与合规",
@@ -1086,8 +1086,8 @@ def test_bp_section_package_validation_requires_claim_inventory_for_v2_claim_ids
     task_dir = tmp_path / "tasks" / "BP-SECTIONS-NO-PLAN"
     task_dir.mkdir(parents=True)
     (task_dir / "bp_fact_store_index.json").write_text(json.dumps({"fact_ids": ["BF-0001"], "total_facts": 1}), encoding="utf-8")
-    (task_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
-    (task_dir / "bp_phase2_team-section.json").write_text(
+    (task_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (task_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v2",
             "section_id": "bp_团队与合规",
@@ -1220,11 +1220,11 @@ def test_bp_section_package_validation_passes_valid_package(tmp_path):
     task_dir = tmp_path / "tasks" / "BP-SECTIONS-PASS"
     task_dir.mkdir(parents=True)
     (task_dir / "bp_fact_store_index.json").write_text(json.dumps({"fact_ids": ["BF-0001"], "total_facts": 1}), encoding="utf-8")
-    (task_dir / "bp_phase2_team.md").write_text("## 团队\n正文", encoding="utf-8")
-    (task_dir / "bp_phase2_team-section.json").write_text(
+    (task_dir / "bp_dim_team.md").write_text("## 团队\n正文", encoding="utf-8")
+    (task_dir / "bp_dim_team-section.json").write_text(
         json.dumps({
             "schema_version": "bp_section_package.v1",
-            "section_id": "bp_phase2_team",
+            "section_id": "bp_dim_team",
             "section_title": "团队与合规",
             "key_messages": ["团队可验证"],
             "claims": [{"claim": "测试公司成立于2020年", "fact_ids": ["BF-0001"], "reasoning": "工商来源验证", "confidence": "high", "source_quality": "official"}],
@@ -1265,7 +1265,7 @@ def _write_valid_bp_section_package(task_dir):
             "summary": {"total": 1, "passed": 1, "failed": 0},
             "packages": [
                 {
-                    "section_name": "bp_phase2_team",
+                    "section_name": "bp_dim_team",
                     "validation": {"passed": True, "issues": []},
                     "package": {
                         "schema_version": "bp_section_package.v2",

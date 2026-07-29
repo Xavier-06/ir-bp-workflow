@@ -164,9 +164,9 @@ _INTERNAL_SOURCE_PATTERNS = [
     r"bp_presearch_results\.json",
     r"bp_phase\d+_\w+\.(md|json)",
     r"phase\d+_dispatch\.json",
-    r"bp_phase2_brief_\w+\.md",
-    r"bp_phase2_manifest_\w+\.json",
-    r"bp_phase2_spawn_\w+\.json",
+    r"bp_dim_brief_\w+\.md",
+    r"bp_dim_manifest_\w+\.json",
+    r"bp_dim_spawn_\w+\.json",
 ]
 
 
@@ -1231,7 +1231,7 @@ if __name__ == "__main__":
         dimension_outputs["synthesis"] = synthesis_path.read_text(encoding="utf-8")
     else:
         for slug in ("team", "tech", "industry", "competition"):
-            for prefix in ("bp_phase2_", "bp_phase4_"):
+            for prefix in ("bp_dim_", "bp_phase4_"):
                 path = dim_dir / f"{prefix}{slug}.md"
                 if path.exists():
                     dimension_outputs[slug] = path.read_text(encoding="utf-8")

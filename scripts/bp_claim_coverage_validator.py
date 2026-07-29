@@ -120,7 +120,7 @@ def _reconstruct_ghost_facts(task_dir: Path) -> list[dict[str, Any]]:
             continue
         for path in sorted(directory.glob("bp_*-section.json")):
             section = load_json(path, {})
-            section_id = str(section.get("section_id") or path.stem).replace("bp_phase2_", "")
+            section_id = str(section.get("section_id") or path.stem).replace("bp_dim_", "")
             referenced_ids: set[str] = set()
             # From facts_used
             for fid in _as_list(section.get("facts_used")):
@@ -523,14 +523,14 @@ def _claim_role_paths(task_dir: Path, owner_section: str) -> dict[str, Path]:
     for directory in [task_dir / "outputs", task_dir]:
         if not directory.exists():
             continue
-        facts = directory / f"bp_phase2_{slug}-facts.json"
-        section = directory / f"bp_phase2_{slug}-section.json"
+        facts = directory / f"bp_dim_{slug}-facts.json"
+        section = directory / f"bp_dim_{slug}-section.json"
         if facts.exists() or section.exists():
             return {"facts": facts, "section": section}
     # fallback: task_dir 下的标准路径
     return {
-        "facts": task_dir / f"bp_phase2_{slug}-facts.json",
-        "section": task_dir / f"bp_phase2_{slug}-section.json",
+        "facts": task_dir / f"bp_dim_{slug}-facts.json",
+        "section": task_dir / f"bp_dim_{slug}-section.json",
     }
 
 

@@ -313,7 +313,7 @@ def bp_collect_company_intake(
         return {
             "ok": False,
             "mode": "bp_company_intake_collect",
-            "phase": "phase01b_company_intake_collect",
+            "phase": "phase03_company_intake_collect",
             "job_id": job_id,
             "result": {"error": "子代理未产出完整文件", "errors": errors},
         }
@@ -325,7 +325,7 @@ def bp_collect_company_intake(
         return {
             "ok": False,
             "mode": "bp_company_intake_collect",
-            "phase": "phase01b_company_intake_collect",
+            "phase": "phase03_company_intake_collect",
             "job_id": job_id,
             "result": {"error": f"bp_step0_profile.json 解析失败: {exc}"},
         }
@@ -365,7 +365,7 @@ def bp_collect_company_intake(
     return {
         "ok": True,
         "mode": "bp_company_intake_collect",
-        "phase": "phase01b_company_intake_collect",
+        "phase": "phase03_company_intake_collect",
         "job_id": job_id,
         "result": {
             "input_mode": "company_name_only",

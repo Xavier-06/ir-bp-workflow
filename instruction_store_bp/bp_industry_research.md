@@ -7,7 +7,7 @@
 ## 输入文件（必读）
 - `{TASK_DIR}/bp_research_plan.json` — 研究计划（含 industry/competitors）
 - `{TASK_DIR}/bp_step0_profile.json` — 公司概况
-- `{TASK_DIR}/outputs/bp_phase2_company_team_compliance.md` 等全部 Wave 1-3 维度输出
+- `{TASK_DIR}/outputs/bp_dim_company_team_compliance.md` 等全部 Wave 1-3 维度输出
 
 ## 核心任务
 1. **搜索行业深度研报**：
@@ -51,7 +51,7 @@
 - 数据标注来源机构和统计时点
 
 ## 输出文件
-- `{TASK_DIR}/outputs/bp_phase2_industry_research.md` — 叙述版（供统稿直接引用）
+- `{TASK_DIR}/outputs/bp_dim_industry_research.md` — 叙述版（供统稿直接引用）
 
 ## 输出要求
 - 字数 ≥ 5000 字符（研报级密度，2026-07-27 从 3000 上调）

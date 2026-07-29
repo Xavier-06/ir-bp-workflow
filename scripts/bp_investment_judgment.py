@@ -118,8 +118,8 @@ def build_investment_judgment(task_dir: Path) -> dict[str, Any]:
     dimensions: list[dict[str, Any]] = []
 
     # Scan all dimension output files
-    for dim_file in sorted(task_dir.glob("bp_phase2_*.md")):
-        slug = dim_file.stem.replace("bp_phase2_", "")
+    for dim_file in sorted(task_dir.glob("bp_dim_*.md")):
+        slug = dim_file.stem.replace("bp_dim_", "")
         label = _slug_to_label(slug)
         try:
             text = dim_file.read_text(encoding="utf-8")

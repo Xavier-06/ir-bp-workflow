@@ -33,9 +33,9 @@ def _role_paths(task_dir: Path, role: str, outputs_dir: Path | None = None) -> d
     slug = role.replace("bp_", "")
     search_dirs = [outputs_dir, task_dir] if outputs_dir else [task_dir]
     return {
-        "markdown": _resolve_path(f"bp_phase2_{slug}.md", *search_dirs),
-        "facts": _resolve_path(f"bp_phase2_{slug}-facts.json", *search_dirs),
-        "section": _resolve_path(f"bp_phase2_{slug}-section.json", *search_dirs),
+        "markdown": _resolve_path(f"bp_dim_{slug}.md", *search_dirs),
+        "facts": _resolve_path(f"bp_dim_{slug}-facts.json", *search_dirs),
+        "section": _resolve_path(f"bp_dim_{slug}-section.json", *search_dirs),
     }
 
 

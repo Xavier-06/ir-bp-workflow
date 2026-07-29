@@ -200,7 +200,7 @@ def load_bp_search_work_order(task_dir: Path, role_name: str) -> dict:
 def _build_brief(task_id: str, sub: dict, task_dir: Path | None = None) -> Path:
     task_dir = task_dir or TASKS_DIR / task_id
     slug = _slug(sub['role_name'])
-    brief_path = task_dir / f'bp_phase2_brief_{slug}.md'
+    brief_path = task_dir / f'bp_dim_brief_{slug}.md'
 
     output_rel = Path(sub['output_file'])
     sidecar_paths = _sidecar_paths(output_rel)
@@ -318,7 +318,7 @@ def _build_brief(task_id: str, sub: dict, task_dir: Path | None = None) -> Path:
     if not wave_inputs:
         # 从 task_dir 的 manifest 文件中推断同波次的其他角色
         sibling_briefs: list[tuple[str, str]] = []
-        for manifest_file in sorted(task_dir.glob("bp_phase2_manifest_*.json")):
+        for manifest_file in sorted(task_dir.glob("bp_dim_manifest_*.json")):
             try:
                 m = json.loads(manifest_file.read_text(encoding="utf-8"))
                 m_role = str(m.get("role", ""))
@@ -512,8 +512,8 @@ def _spawn_one(task_id: str, sub: dict, task_dir: Path | None = None) -> dict:
     task_dir = task_dir or TASKS_DIR / task_id
     slug = _slug(sub['role_name'])
     output_path = Path(sub['output_file'])
-    receipt_path = task_dir / f'bp_phase2_spawn_{slug}.json'
-    manifest_path = task_dir / f'bp_phase2_manifest_{slug}.json'
+    receipt_path = task_dir / f'bp_dim_spawn_{slug}.json'
+    manifest_path = task_dir / f'bp_dim_manifest_{slug}.json'
 
     if output_path.exists() and output_path.stat().st_size > 50:
         return {'role': sub['role_name'], 'status': 'already_exists', 'output': str(output_path)}
@@ -739,7 +739,7 @@ def _check_role_quality(role_name: str, task_dir: Path, output_path: Path) -> di
 def _rewrite_role(task_id: str, role_name: str, task_dir: Path, followup_memo_path: str) -> bool:
     """PR4: 把补搜 memo 注入到 role manifest，让子代理重读后重写。"""
     slug = _slug(role_name)
-    manifest_path = task_dir / f'bp_phase2_manifest_{slug}.json'
+    manifest_path = task_dir / f'bp_dim_manifest_{slug}.json'
     if not manifest_path.exists():
         return False
 
@@ -771,7 +771,7 @@ def launch_and_verify(
 ) -> dict:
     """PR4: 单 role 派发 + 质量门禁 + 补搜重写闭环节。"""
     task_dir = task_dir or TASKS_DIR / task_id
-    dispatch_path = task_dir / 'phase2_dispatch.json'
+    dispatch_path = task_dir / 'bp_dispatch.json'
     if not dispatch_path.exists():
         return {'status': 'no_dispatch', 'task_id': task_id, 'role': role_name}
 
@@ -833,7 +833,7 @@ def get_pending_bp_tasks(task_id: str) -> list[dict]:
     task_dir = TASKS_DIR / task_id
     pending = []
     for role_name, slug in ROLE_TO_KEY.items():
-        manifest_path = task_dir / f'bp_phase2_manifest_{slug}.json'
+        manifest_path = task_dir / f'bp_dim_manifest_{slug}.json'
         if manifest_path.exists():
             data = json.loads(manifest_path.read_text(encoding='utf-8'))
             output_path = Path(data.get('output_path', ''))
@@ -866,7 +866,7 @@ def main():
         if not args.role:
             print(json.dumps({'status': 'role_required', 'task_id': args.task_id}, ensure_ascii=False))
             raise SystemExit(2)
-        dispatch_path = task_dir / 'phase2_dispatch.json'
+        dispatch_path = task_dir / 'bp_dispatch.json'
         if not dispatch_path.exists():
             print(json.dumps({'status': 'no_dispatch', 'task_id': args.task_id}, ensure_ascii=False))
             raise SystemExit(1)
@@ -899,7 +899,7 @@ def main():
         print(json.dumps(result, ensure_ascii=False, indent=2))
         raise SystemExit(0 if result.get('passed') else 6)
 
-    dispatch_path = task_dir / 'phase2_dispatch.json'
+    dispatch_path = task_dir / 'bp_dispatch.json'
     if not dispatch_path.exists():
         print(json.dumps({'status': 'no_dispatch', 'task_id': args.task_id}, ensure_ascii=False))
         raise SystemExit(1)
@@ -1047,7 +1047,7 @@ def do_supplementary_search(task_id: str, role_name: str, entity: str) -> dict:
             memo_lines.append(f"{snippet[:300]}\n\n")
 
     slug = _slug(role_name)
-    memo_path = TASKS_DIR / task_id / f'bp_phase2_followup_{slug}.md'
+    memo_path = TASKS_DIR / task_id / f'bp_dim_followup_{slug}.md'
     if memo_lines:
         memo_path.write_text(''.join(memo_lines), encoding='utf-8')
         return {'role': role_name, 'memo_path': str(memo_path), 'has_results': True}

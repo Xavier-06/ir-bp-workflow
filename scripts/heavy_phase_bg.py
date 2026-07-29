@@ -44,7 +44,7 @@ HEAVY_PHASES = {
     # BP phases
     "phase01_document_intake",
     "phase04_presearch",
-    "phase30_delivery",
+    "phase31_delivery",
     # IR phases
     "phase14_delivery",
     "phase05_extract",
@@ -63,7 +63,7 @@ NO_TIMEOUT_PHASES = {
 # PHASE_TIMEOUTS: 其他 heavy phase 的超时设置（秒）
 PHASE_TIMEOUTS = {
     # BP phases
-    "phase30_delivery": 600,
+    "phase31_delivery": 600,
     # IR phases
     "phase14_delivery": 600,
     "phase05_extract": 900,
@@ -164,7 +164,7 @@ def launch_heavy_phase(
     _EST_MINUTES = {
         "phase01_document_intake": 20,
         "phase04_presearch": 15,
-        "phase30_delivery": 5,
+        "phase31_delivery": 5,
     }
     est = _EST_MINUTES.get(phase, 10)
     if phase in NO_TIMEOUT_PHASES:

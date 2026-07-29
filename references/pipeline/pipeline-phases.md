@@ -79,9 +79,9 @@
 
 | 维度 | 角色 | 输出 |
 |------|------|------|
-| 团队与合规 | bp_团队与合规 | `bp_phase2_team.md` |
-| 技术与产品 | bp_技术与产品 | `bp_phase2_tech.md` |
-| 行业与供应链 | bp_行业与供应链 | `bp_phase2_industry.md` |
+| 团队与合规 | bp_团队与合规 | `bp_dim_team.md` |
+| 技术与产品 | bp_技术与产品 | `bp_dim_tech.md` |
+| 行业与供应链 | bp_行业与供应链 | `bp_dim_industry.md` |
 
 流程：
 1. Phase 2a: `_run_bp_dispatch_prepare()` — 构建 brief + manifest → `needs_dispatch`
@@ -94,7 +94,7 @@
 
 | 维度 | 角色 | 输出 |
 |------|------|------|
-| 竞争与结论 | bp_竞争与结论 | `bp_phase2_competition.md` |
+| 竞争与结论 | bp_竞争与结论 | `bp_dim_competition.md` |
 
 流程：
 1. Phase 2.5a: 准备竞争与结论 manifest，注入前 3 维度输出作为上下文

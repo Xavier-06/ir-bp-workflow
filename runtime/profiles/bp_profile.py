@@ -147,7 +147,7 @@ def _run_company_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
         return {
             "ok": True,
             "mode": "skipped_has_input_file",
-            "phase": "phase01b_company_intake",
+            "phase": "phase02_company_intake",
             "job_id": job_ctx.job_id,
             "result": {"skipped": True, "reason": "input_file provided, using phase01"},
         }
@@ -161,7 +161,7 @@ def _run_company_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
     task_dir = _task_dir(runtime_root, job_ctx)
     entity, market = _bp_entity_market(job_ctx)
 
-    brief_path = task_dir / "bp_phase01b_brief.json"
+    brief_path = task_dir / "bp_phase02_brief.json"
     brief = bp_build_company_intake_brief(entity=entity, market=market, job_id=job_ctx.job_id)
     brief_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -175,7 +175,7 @@ def _run_company_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
         "needs_dispatch": True,
         "has_more": False,
         "mode": "bp_company_intake_subagent",
-        "phase": "phase01b_company_intake",
+        "phase": "phase02_company_intake",
         "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
@@ -199,7 +199,7 @@ def _run_company_intake_collect(runtime_root: Path, job_ctx: JobContext) -> dict
         return {
             "ok": True,
             "mode": "skipped_has_input_file",
-            "phase": "phase01b_company_intake_collect",
+            "phase": "phase03_company_intake_collect",
             "job_id": job_ctx.job_id,
             "result": {"skipped": True},
         }
@@ -296,13 +296,13 @@ def _run_bp_search_plan_compile(runtime_root: Path, job_ctx: JobContext) -> dict
         print(f"  ⚠️ [phase13] bp_research_plan.json 不存在，自动回填 phase03_research_plan", flush=True)
         backfill_result = _run_research_plan(runtime_root, job_ctx)
         if not backfill_result.get("ok"):
-            return {"ok": False, "mode": "bp_search_plan_compile", "phase": "phase06_search_plan_compile", "job_id": job_ctx.job_id, "error": f"Auto-backfill phase10 failed: {backfill_result.get('error', 'unknown')}"}
+            return {"ok": False, "mode": "bp_search_plan_compile", "phase": "phase07_search_plan_compile", "job_id": job_ctx.job_id, "error": f"Auto-backfill phase10 failed: {backfill_result.get('error', 'unknown')}"}
         if not research_plan_path.exists():
-            return {"ok": False, "mode": "bp_search_plan_compile", "phase": "phase06_search_plan_compile", "job_id": job_ctx.job_id, "error": "Auto-backfill ran but bp_research_plan.json still missing"}
+            return {"ok": False, "mode": "bp_search_plan_compile", "phase": "phase07_search_plan_compile", "job_id": job_ctx.job_id, "error": "Auto-backfill ran but bp_research_plan.json still missing"}
     try:
         research_plan = json.loads(research_plan_path.read_text(encoding="utf-8"))
     except Exception as exc:
-        return {"ok": False, "mode": "bp_search_plan_compile", "phase": "phase06_search_plan_compile", "job_id": job_ctx.job_id, "error": f"bp_research_plan.json invalid: {exc}"}
+        return {"ok": False, "mode": "bp_search_plan_compile", "phase": "phase07_search_plan_compile", "job_id": job_ctx.job_id, "error": f"bp_research_plan.json invalid: {exc}"}
 
     profile = _load_bp_profile(task_dir)
 
@@ -311,7 +311,7 @@ def _run_bp_search_plan_compile(runtime_root: Path, job_ctx: JobContext) -> dict
     return {
         "ok": bool(payload.get("search_tasks")),
         "mode": "bp_search_plan_compile",
-        "phase": "phase06_search_plan_compile",
+        "phase": "phase07_search_plan_compile",
         "job_id": job_ctx.job_id,
         "result": {
             "search_plan_path": str(path),
@@ -331,13 +331,13 @@ def _run_bp_shared_page_init(runtime_root: Path, job_ctx: JobContext) -> dict[st
     return {
         "ok": True,
         "mode": "bp_shared_page_init",
-        "phase": "phase05_bp_shared_page_init",
+        "phase": "phase06_bp_shared_page_init",
         "job_id": job_ctx.job_id,
         "result": result["paths"] | {"claim_count": len(result["state"].get("claim_status", {}))},
     }
 
 
-_WAVE_TO_PHASE_NUM = {1: "12", 3: "16", 4: "20"}
+_WAVE_TO_PHASE_NUM = {1: "13", 3: "18", 4: "22"}
 
 def _run_bp_shared_page_refresh(runtime_root: Path, job_ctx: JobContext, after_wave: int = 0) -> dict[str, Any]:
     """Refresh BP shared diligence page after a wave completes."""
@@ -518,7 +518,7 @@ def _run_bp_fact_store_bootstrap(runtime_root: Path, job_ctx: JobContext) -> dic
     return {
         "ok": True,
         "mode": "bp_fact_store_bootstrap",
-        "phase": "phase07_bp_fact_store_bootstrap",
+        "phase": "phase08_bp_fact_store_bootstrap",
         "job_id": job_ctx.job_id,
         "result": {
             "store_path": str(store_path),
@@ -581,7 +581,7 @@ def _run_bp_fact_store_merge(runtime_root: Path, job_ctx: JobContext) -> dict[st
     return {
         "ok": True,
         "mode": "bp_fact_store_merge",
-        "phase": "phase11_bp_fact_store_merge",
+        "phase": "phase12_bp_fact_store_merge",
         "job_id": job_ctx.job_id,
         "result": {
             "store_path": str(store_path),
@@ -595,13 +595,13 @@ def _run_bp_fact_store_merge(runtime_root: Path, job_ctx: JobContext) -> dict[st
 
 def _bp_section_files(*dirs: Path) -> list[Path]:
     allowed_names = {
-        f"bp_phase2_{slug}.md"
+        f"bp_dim_{slug}.md"
         for slug in set(BP_ALL_ROLE_SLUGS.values()) | set(BP_LEGACY_ROLE_SLUGS.values())
     }
     seen: set[str] = set()
     files: list[Path] = []
     for directory in dirs:
-        for path in sorted(Path(directory).glob("bp_phase2_*.md")):
+        for path in sorted(Path(directory).glob("bp_dim_*.md")):
             if not path.is_file() or path.name not in allowed_names:
                 continue
             key = path.name
@@ -869,7 +869,7 @@ def _validate_bp_section_package(package: dict[str, Any], fact_ids: set[str], cl
         # 2026-07-27: 子代理实测还会产出以下变体，统一映射
         "bp_section.v1": "bp_section_package.v1",
         "bp_section_output.v1": "bp_section_package.v1",
-        "bp_phase2_section.v1": "bp_section_package.v1",
+        "bp_phase2_section.v1": "bp_section_package.v1",  # 历史 schema 别名（旧子代理产出，不可随文件改名）
         "bp_section.v2": "bp_section_package.v2",
     }
     if schema_version in schema_aliases:
@@ -1144,7 +1144,7 @@ def _run_bp_claim_coverage_validation(runtime_root: Path, job_ctx: JobContext) -
             first_manifest = repair_manifests[0]
             remaining_manifests = repair_manifests[1:]
             has_more = len(remaining_manifests) > 0
-            phase_name = "phase21_bp_claim_coverage_validation"
+            phase_name = "phase22_bp_claim_coverage_validation"
             print(
                 f"  🔧 [phase24_claim_coverage] 派发 1/{len(repair_manifests)} 个 repair 子代理（sequential），"
                 f"涉及 claims: {failed_claim_ids}",
@@ -1174,7 +1174,7 @@ def _run_bp_claim_coverage_validation(runtime_root: Path, job_ctx: JobContext) -
     return {
         "ok": True,
         "mode": "bp_claim_coverage_validation",
-        "phase": "phase21_bp_claim_coverage_validation",
+        "phase": "phase22_bp_claim_coverage_validation",
         "job_id": job_ctx.job_id,
         "result": result,
     }
@@ -1224,7 +1224,7 @@ def _run_bp_section_package_validation(runtime_root: Path, job_ctx: JobContext) 
     return {
         "ok": section_gate["passed"],
         "mode": "bp_section_package_validation",
-        "phase": "phase23_bp_section_package_validation",
+        "phase": "phase24_bp_section_package_validation",
         "job_id": job_ctx.job_id,
         "result": {"section_gate": section_gate, "index_path": str(index_path), "gate_path": str(gate_path)},
     }
@@ -1442,7 +1442,7 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     return {
         "ok": verdict in ("PASS", "WARN"),
         "mode": "bp_debate_review",
-        "phase": "phase26_bp_debate_review",
+        "phase": "phase27_bp_debate_review",
         "job_id": job_ctx.job_id,
         "result": {
             "review_path": str(output_path),
@@ -1463,7 +1463,7 @@ def _run_bp_cross_dimension_gate(runtime_root: Path, job_ctx: JobContext) -> dic
     return {
         "ok": result.get("ok") is True,
         "mode": "bp_cross_dimension_gate",
-        "phase": "phase22_bp_cross_dimension_gate",
+        "phase": "phase23_bp_cross_dimension_gate",
         "job_id": job_ctx.job_id,
         "result": result,
     }
@@ -1496,7 +1496,7 @@ def _run_bp_final_assembly(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         dimension_count = 0
         for slug in BP_ALL_ROLE_SLUGS.values():
             for d in (outputs_dir, task_dir):
-                if (d / f"bp_phase2_{slug}.md").exists():
+                if (d / f"bp_dim_{slug}.md").exists():
                     dimension_count += 1
                     break
         if dimension_count >= 6:  # At least 6 of 8 dimensions present
@@ -1518,7 +1518,7 @@ def _run_bp_final_assembly(runtime_root: Path, job_ctx: JobContext) -> dict[str,
             return {
                 "ok": False,
                 "mode": "bp_final_assembly",
-                "phase": "phase27_bp_final_assembly",
+                "phase": "phase28_bp_final_assembly",
                 "job_id": job_ctx.job_id,
                 "result": result,
             }
@@ -1544,7 +1544,7 @@ def _run_bp_final_assembly(runtime_root: Path, job_ctx: JobContext) -> dict[str,
     return {
         "ok": result["ok"],
         "mode": "bp_narrative_assembly",
-        "phase": "phase27_bp_final_assembly",
+        "phase": "phase28_bp_final_assembly",
         "job_id": job_ctx.job_id,
         "result": result,
     }
@@ -1570,7 +1570,7 @@ def _run_bp_readability_review(runtime_root: Path, job_ctx: JobContext) -> dict[
         return {
             "ok": True,
             "mode": "bp_readability_review",
-            "phase": "phase28_bp_readability_review",
+            "phase": "phase29_bp_readability_review",
             "job_id": job_ctx.job_id,
             "result": result,
         }
@@ -1587,7 +1587,7 @@ def _run_bp_readability_review(runtime_root: Path, job_ctx: JobContext) -> dict[
     return {
         "ok": True,
         "mode": "bp_readability_review",
-        "phase": "phase28_bp_readability_review",
+        "phase": "phase29_bp_readability_review",
         "job_id": job_ctx.job_id,
         "result": result,
     }
@@ -1603,7 +1603,7 @@ def _run_bp_investment_judgment(runtime_root: Path, job_ctx: JobContext) -> dict
 
     # Copy dimension outputs to task_dir so the script can find them
     for d in (outputs_dir,):
-        for dim_file in d.glob("bp_phase2_*.md"):
+        for dim_file in d.glob("bp_dim_*.md"):
             dst = task_dir / dim_file.name
             if not dst.exists() and dim_file.stat().st_size > 100:
                 shutil.copy2(dim_file, dst)
@@ -1612,7 +1612,7 @@ def _run_bp_investment_judgment(runtime_root: Path, job_ctx: JobContext) -> dict
     return {
         "ok": True,
         "mode": "bp_investment_judgment",
-        "phase": "phase29_bp_investment_judgment",
+        "phase": "phase30_bp_investment_judgment",
         "job_id": job_ctx.job_id,
         "result": {
             "dimensions_extracted": len(result.get("dimensions", [])),
@@ -1635,7 +1635,7 @@ def _run_bp_investment_judgment(runtime_root: Path, job_ctx: JobContext) -> dict
 
 
 def _bp_role_output_path(outputs_dir: Path, role: str) -> Path:
-    return outputs_dir / f"bp_phase2_{BP_ALL_ROLE_SLUGS[role]}.md"
+    return outputs_dir / f"bp_dim_{BP_ALL_ROLE_SLUGS[role]}.md"
 
 
 def _extract_list_field(
@@ -1722,7 +1722,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_company_team_compliance",
             "brief_key": "bp_company_team_compliance",
             "description": "Wave 1 Evidence: 公司主体、团队、治理、股权、合规与风险信号验证",
-            "output_file": str(task_dir / "bp_phase2_company_team_compliance.md"),
+            "output_file": str(task_dir / "bp_dim_company_team_compliance.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "founders": profile.get("founders", []),
@@ -1733,7 +1733,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_product_commercial",
             "brief_key": "bp_product_commercial",
             "description": "Wave 1 Evidence: 产品矩阵、商业化阶段、客户案例、订单/合同线索验证",
-            "output_file": str(task_dir / "bp_phase2_product_commercial.md"),
+            "output_file": str(task_dir / "bp_dim_product_commercial.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "products": products,
@@ -1745,7 +1745,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_tech_ip_moat",
             "brief_key": "bp_tech_ip_moat",
             "description": "Wave 1 Evidence: 技术路线、知识产权、研发能力、技术壁垒与第三方验证",
-            "output_file": str(task_dir / "bp_phase2_tech_ip_moat.md"),
+            "output_file": str(task_dir / "bp_dim_tech_ip_moat.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "products": products,
@@ -1757,7 +1757,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_market_supply_chain",
             "brief_key": "bp_market_supply_chain",
             "description": "Wave 1 Evidence: 市场规模、行业格局、政策环境、供应链与产能约束",
-            "output_file": str(task_dir / "bp_phase2_market_supply_chain.md"),
+            "output_file": str(task_dir / "bp_dim_market_supply_chain.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "products": products,
@@ -1769,7 +1769,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_competition_positioning",
             "brief_key": "bp_competition_positioning",
             "description": "Wave 3 Cross-Dimension: 竞争格局、差异化定位、竞品能力验证与可复制性判断",
-            "output_file": str(task_dir / "bp_phase2_competition_positioning.md"),
+            "output_file": str(task_dir / "bp_dim_competition_positioning.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "products": products,
@@ -1781,7 +1781,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_valuation_return",
             "brief_key": "bp_valuation_return",
             "description": "Wave 3 Cross-Dimension: 融资历史估值变化、可比公司估值对标（主营业务重合筛选）、估值事实呈现",
-            "output_file": str(task_dir / "bp_phase2_valuation_return.md"),
+            "output_file": str(task_dir / "bp_dim_valuation_return.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "products": products,
@@ -1794,7 +1794,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_dealbreaker_risk",
             "brief_key": "bp_dealbreaker_risk",
             "description": "Wave 4 Reverse-Engineering: Deal breakers、反向论证、关键风险、尽调阻断项和缓释路径",
-            "output_file": str(task_dir / "bp_phase2_dealbreaker_risk.md"),
+            "output_file": str(task_dir / "bp_dim_dealbreaker_risk.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "products": products,
@@ -1808,7 +1808,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_consensus_challenge",
             "brief_key": "bp_consensus_challenge",
             "description": "Wave 4: 共识挑战与预期差分析",
-            "output_file": str(task_dir / "bp_phase2_consensus_challenge.md"),
+            "output_file": str(task_dir / "bp_dim_consensus_challenge.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "research_plan": research_plan_file,
@@ -1818,7 +1818,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_catalyst",
             "brief_key": "bp_catalyst",
             "description": "Wave 4: 催化剂与事件分析（时间窗口+概率+传导链）",
-            "output_file": str(task_dir / "bp_phase2_catalyst.md"),
+            "output_file": str(task_dir / "bp_dim_catalyst.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "research_plan": research_plan_file,
@@ -1828,7 +1828,7 @@ def _dispatch_role_specs(task_dir: Path, profile: dict) -> list[dict[str, Any]]:
             "role_name": "bp_industry_research",
             "brief_key": "bp_industry_research",
             "description": "Wave 4: 行业深度研报整合（技术路线横评/成本结构/头部财务/法规标准/第三方TAM）",
-            "output_file": str(task_dir / "bp_phase2_industry_research.md"),
+            "output_file": str(task_dir / "bp_dim_industry_research.md"),
             "key_inputs": {
                 "company_name": profile.get("company_name", ""),
                 "competitors": competitors,
@@ -1965,7 +1965,7 @@ def _collect_with_retry(
             # 进度信号：missing 数量 + .md 文件总大小
             total_md_size = 0
             if outputs_dir and outputs_dir.exists():
-                for md_file in outputs_dir.glob("bp_phase2_*.md"):
+                for md_file in outputs_dir.glob("bp_dim_*.md"):
                     try:
                         total_md_size += md_file.stat().st_size
                     except OSError:
@@ -2010,9 +2010,9 @@ def _dispatch_completion_instruction(roles: list[str], role_slugs: dict[str, str
         "## ⚠️ CRITICAL: 恢复前必须验证三文件（缺一不可）\n"
         "每个子代理输出 3 个文件，子代理先写 .md 再写 sidecar（JSON 序列化耗时较长）。\n"
         f"在调用 pipeline 恢复（start_phase='{next_phase}'）之前，你必须检查以下文件全部存在且非空：\n"
-        f"- bp_phase2_{{slug}}.md （>100 bytes）\n"
-        f"- bp_phase2_{{slug}}-facts.json （>10 bytes）\n"
-        f"- bp_phase2_{{slug}}-section.json （>10 bytes）\n"
+        f"- bp_dim_{{slug}}.md （>100 bytes）\n"
+        f"- bp_dim_{{slug}}-facts.json （>10 bytes）\n"
+        f"- bp_dim_{{slug}}-section.json （>10 bytes）\n"
         f"其中 slug ∈ {{{slug_list}}}。\n"
         "如果只看到 .md 而 sidecar 不存在，说明子代理还在写文件，必须继续等待。\n"
         "不要只看 .md 就恢复管线。"
@@ -2045,9 +2045,9 @@ def _dispatch_completion_instruction_sequential(
         "   - team_name = 'bp-{task_id}'",
         "   - mode = 'bypassPermissions'",
         f"3. 等待该子代理完成三文件输出：",
-        f"   - bp_phase2_{slug}.md (>100 bytes)",
-        f"   - bp_phase2_{slug}-facts.json (>10 bytes)",
-        f"   - bp_phase2_{slug}-section.json (>10 bytes)",
+        f"   - bp_dim_{slug}.md (>100 bytes)",
+        f"   - bp_dim_{slug}-facts.json (>10 bytes)",
+        f"   - bp_dim_{slug}-section.json (>10 bytes)",
         f"4. 确认三文件齐全后，用 start_phase='{next_phase}' 恢复管线",
     ]
     if has_more:
@@ -2144,7 +2144,7 @@ def _run_bp_dispatch_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[st
             "needs_dispatch": False,
             "has_more": False,
             "mode": "bp_dispatch_prepare",
-            "phase": "phase08_dispatch_prepare",
+            "phase": "phase09_dispatch_prepare",
             "job_id": job_ctx.job_id,
         }
 
@@ -2166,7 +2166,7 @@ def _run_bp_dispatch_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[st
         "briefs_ready": True,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
-    dispatch_path = task_dir / "phase2_dispatch.json"
+    dispatch_path = task_dir / "bp_dispatch.json"
     dispatch_path.write_text(json.dumps(dispatch_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return {
@@ -2174,7 +2174,7 @@ def _run_bp_dispatch_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[st
         "needs_dispatch": True,
         "has_more": has_more,
         "mode": "bp_dispatch_prepare",
-        "phase": "phase08_dispatch_prepare",
+        "phase": "phase09_dispatch_prepare",
         "job_id": job_ctx.job_id,
         "dispatch_info": {
             "manifests": [manifest_path],
@@ -2184,7 +2184,7 @@ def _run_bp_dispatch_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[st
             "outputs_dir": str(outputs_dir),
         },
         "instruction": _dispatch_completion_instruction_sequential(
-            sub["role_name"], BP_WAVE1_ROLE_SLUGS, "phase09_dispatch_collect",
+            sub["role_name"], BP_WAVE1_ROLE_SLUGS, "phase10_dispatch_collect",
             has_more=has_more, remaining=remaining_roles),
     }
 
@@ -2197,7 +2197,7 @@ def _run_bp_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[st
     outputs_dir = _outputs_dir(runtime_root, job_ctx)
     return _collect_with_retry(
         "dispatch_collect",
-        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE1_ROLE_SLUGS, _CORE_ROLES, "phase09_dispatch_collect"),
+        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE1_ROLE_SLUGS, _CORE_ROLES, "phase10_dispatch_collect"),
         job_id=job_ctx.job_id,
         outputs_dir=outputs_dir,
     )
@@ -2216,7 +2216,7 @@ def _run_bp_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext, wave: in
     outputs_dir = _outputs_dir(runtime_root, job_ctx)
     result = evaluate_bp_wave_evidence_gate(task_dir, wave=wave, outputs_dir=outputs_dir)
 
-    phase_name = f"phase{10 if wave == 1 else 15 if wave == 3 else 19}_wave{wave}_evidence_gate"
+    phase_name = f"phase{11 if wave == 1 else 16 if wave == 3 else 20}_wave{wave}_evidence_gate"
 
     # ── Repair 集成：gate FAIL 但有修复机会 → 派发 repair 子代理（sequential）──
     if result.get("needs_repair"):
@@ -2269,9 +2269,9 @@ def _prior_wave_files(prior_waves: list[str], task_dir: Path, outputs_dir: Path)
     """Collect output files from prior waves for injection into a new wave's subagent briefs."""
     result: dict[str, str] = {}
     for role, slug in prior_waves:
-        p = outputs_dir / f"bp_phase2_{slug}.md"
+        p = outputs_dir / f"bp_dim_{slug}.md"
         if not p.exists():
-            p = task_dir / f"bp_phase2_{slug}.md"
+            p = task_dir / f"bp_dim_{slug}.md"
         if p.exists():
             result[role] = str(p)
     return result
@@ -2318,7 +2318,7 @@ def _run_bp_wave3_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
     if not pending:
         return {"ok": True, "needs_dispatch": False, "has_more": False,
-                "mode": "bp_wave3_prepare", "phase": "phase13_wave3_prepare", "job_id": job_ctx.job_id}
+                "mode": "bp_wave3_prepare", "phase": "phase14_wave3_prepare", "job_id": job_ctx.job_id}
 
     sub = pending[0]
     # 汇总 Wave 1 输出（Wave 2 已移除）
@@ -2337,11 +2337,11 @@ def _run_bp_wave3_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
     return {
         "ok": True, "needs_dispatch": True, "has_more": has_more,
-        "mode": "bp_wave3_prepare", "phase": "phase13_wave3_prepare", "job_id": job_ctx.job_id,
+        "mode": "bp_wave3_prepare", "phase": "phase14_wave3_prepare", "job_id": job_ctx.job_id,
         "dispatch_info": {"manifests": [manifest_path], "current_role": sub["role_name"],
                           "remaining_roles": remaining, "task_dir": str(task_dir), "outputs_dir": str(outputs_dir)},
         "instruction": _dispatch_completion_instruction_sequential(
-            sub["role_name"], BP_WAVE3_ROLE_SLUGS, "phase14_wave3_collect",
+            sub["role_name"], BP_WAVE3_ROLE_SLUGS, "phase15_wave3_collect",
             has_more=has_more, remaining=remaining),
     }
 
@@ -2352,7 +2352,7 @@ def _run_bp_wave3_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     outputs_dir = _outputs_dir(runtime_root, job_ctx)
     return _collect_with_retry(
         "wave3_collect",
-        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE3_ROLE_SLUGS, _WAVE3_ROLES, "phase14_wave3_collect"),
+        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE3_ROLE_SLUGS, _WAVE3_ROLES, "phase15_wave3_collect"),
         job_id=job_ctx.job_id,
         outputs_dir=outputs_dir,
     )
@@ -2386,7 +2386,7 @@ def _run_bp_wave4_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
     if not pending:
         return {"ok": True, "needs_dispatch": False, "has_more": False,
-                "mode": "bp_wave4_prepare", "phase": "phase17_wave4_prepare", "job_id": job_ctx.job_id}
+                "mode": "bp_wave4_prepare", "phase": "phase18_wave4_prepare", "job_id": job_ctx.job_id}
 
     sub = pending[0]
     # 汇总 Wave 1 + Wave 3 输出（Wave 0/2 已移除）
@@ -2406,11 +2406,11 @@ def _run_bp_wave4_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
     return {
         "ok": True, "needs_dispatch": True, "has_more": has_more,
-        "mode": "bp_wave4_prepare", "phase": "phase17_wave4_prepare", "job_id": job_ctx.job_id,
+        "mode": "bp_wave4_prepare", "phase": "phase18_wave4_prepare", "job_id": job_ctx.job_id,
         "dispatch_info": {"manifests": [manifest_path], "current_role": sub["role_name"],
                           "remaining_roles": remaining, "task_dir": str(task_dir), "outputs_dir": str(outputs_dir)},
         "instruction": _dispatch_completion_instruction_sequential(
-            sub["role_name"], BP_WAVE4_ROLE_SLUGS, "phase18_wave4_collect",
+            sub["role_name"], BP_WAVE4_ROLE_SLUGS, "phase19_wave4_collect",
             has_more=has_more, remaining=remaining),
     }
 
@@ -2421,7 +2421,7 @@ def _run_bp_wave4_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     outputs_dir = _outputs_dir(runtime_root, job_ctx)
     return _collect_with_retry(
         "wave4_collect",
-        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE4_ROLE_SLUGS, _WAVE4_ROLES, "phase18_wave4_collect"),
+        lambda: _collect_wave_roles(runtime_root, job_ctx, BP_WAVE4_ROLE_SLUGS, _WAVE4_ROLES, "phase19_wave4_collect"),
         job_id=job_ctx.job_id,
         outputs_dir=outputs_dir,
     )
@@ -2431,16 +2431,16 @@ def _role_outputs_complete(role: str, slug: str, outputs_dir: Path, task_dir: Pa
     """检查一个 role 的全套输出（.md + facts sidecar + section sidecar）是否都存在。
 
     子代理交付 3 个文件：
-      1. bp_phase2_{slug}.md           — Markdown 正文
-      2. bp_phase2_{slug}-facts.json   — 事实 sidecar
-      3. bp_phase2_{slug}-section.json — 结构化 Section Package sidecar
+      1. bp_dim_{slug}.md           — Markdown 正文
+      2. bp_dim_{slug}-facts.json   — 事实 sidecar
+      3. bp_dim_{slug}-section.json — 结构化 Section Package sidecar
 
     只有 .md 存在但 sidecar 缺失时，说明子代理还在写文件过程中，不能视为完成。
     返回 (is_complete, md_output_path)。
     """
-    output_path = outputs_dir / f"bp_phase2_{slug}.md"
+    output_path = outputs_dir / f"bp_dim_{slug}.md"
     if not output_path.exists():
-        output_path = task_dir / f"bp_phase2_{slug}.md"
+        output_path = task_dir / f"bp_dim_{slug}.md"
     if not output_path.exists() or output_path.stat().st_size <= 100:
         return False, output_path
 
@@ -2487,7 +2487,7 @@ def _collect_wave_roles(runtime_root: Path, job_ctx: JobContext, role_slugs: dic
             quality_by_role[role] = quality
             print(f"    ✅ {role}: {quality['content_length']} chars, score={quality['score']}", flush=True)
             if outputs_dir != task_dir:
-                dst = task_dir / f"bp_phase2_{slug}.md"
+                dst = task_dir / f"bp_dim_{slug}.md"
                 if not dst.exists():
                     shutil.copy2(output_path, dst)
                 # 同步 sidecar 到 task_dir
@@ -2512,10 +2512,10 @@ def _collect_wave_roles(runtime_root: Path, job_ctx: JobContext, role_slugs: dic
     manifests: list[str] = []
     for role in missing:
         slug = role_slugs[role]
-        manifest_path = task_dir / f"bp_phase2_manifest_{slug}.json"
+        manifest_path = task_dir / f"bp_dim_manifest_{slug}.json"
         if manifest_path.exists():
             manifests.append(str(manifest_path))
-        spawn_receipt_path = task_dir / f"bp_phase2_spawn_{slug}.json"
+        spawn_receipt_path = task_dir / f"bp_dim_spawn_{slug}.json"
         if spawn_receipt_path.exists():
             try:
                 receipt = json.loads(spawn_receipt_path.read_text(encoding="utf-8"))
@@ -2579,7 +2579,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
         for slug in expected_slugs:
             is_complete = False
             for d in (outputs_dir, task_dir):
-                p = d / f"bp_phase2_{slug}.md"
+                p = d / f"bp_dim_{slug}.md"
                 if not p.exists() or p.stat().st_size <= 100:
                     continue
                 facts_path = p.with_name(f"{p.stem}-facts.json")
@@ -2618,7 +2618,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
         if slug in dim_files:
             continue
         for d in (outputs_dir, task_dir):
-            p = d / f"bp_phase2_{slug}.md"
+            p = d / f"bp_dim_{slug}.md"
             if p.exists() and p.stat().st_size > 100:
                 dim_files[slug] = str(p)
                 break
@@ -2640,7 +2640,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
     }
 
     # 写 manifest
-    manifest_path = task_dir / "bp_phase3_manifest_synthesis.json"
+    manifest_path = task_dir / "bp_synthesis_manifest.json"
 
     # ── 从 instruction_store_bp/bp_统稿.md 加载 system_prompt（单一真实来源）──
     _instruction_store = runtime_root / "instruction_store_bp"
@@ -2662,7 +2662,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
     synthesis_system_prompt = synthesis_system_prompt.replace("{OUTPUTS_DIR}", str(outputs_dir))
 
     # ── 生成 synthesis brief（结构化输入文档，与 wave 子代理对齐）──
-    brief_path = task_dir / "bp_phase3_brief_synthesis.md"
+    brief_path = task_dir / "bp_synthesis_brief.md"
     brief_lines = [
         f"# BP 统稿 Brief — {job_ctx.entity}",
         f"",
@@ -2740,7 +2740,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
         "needs_dispatch": True,
         "has_more": False,
         "mode": "bp_synthesis_prepare",
-        "phase": "phase24_synthesis_prepare",
+        "phase": "phase25_synthesis_prepare",
         "job_id": job_ctx.job_id,
         "dispatch_info": {
             "manifests": [str(manifest_path)],
@@ -2855,13 +2855,13 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                 facts_paths_lines: list[str] = []
                 for role_key, slug in BP_ALL_ROLE_SLUGS.items():
                     for d in (outputs_dir, task_dir):
-                        p = d / f"bp_phase2_{slug}.md"
+                        p = d / f"bp_dim_{slug}.md"
                         if p.exists() and p.stat().st_size > 100:
                             dim_paths_lines.append(f"  - {p}")
                             break
                     # Also collect facts JSON paths
                     for d in (outputs_dir, task_dir):
-                        fp = d / f"bp_phase2_{slug}-facts.json"
+                        fp = d / f"bp_dim_{slug}-facts.json"
                         if fp.exists() and fp.stat().st_size > 10:
                             facts_paths_lines.append(f"  - {fp}")
                             break
@@ -2927,7 +2927,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                 )
 
                 print(
-                    f"  🔧 [phase25_synthesis_collect] 脚注不达标 (attempt {prior_attempt + 1})，"
+                    f"  🔧 [phase26_synthesis_collect] 脚注不达标 (attempt {prior_attempt + 1})，"
                     f"派发 repair 子代理补脚注",
                     flush=True,
                 )
@@ -2936,7 +2936,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                     "needs_dispatch": True,
                     "has_more": False,
                     "mode": "bp_synthesis_repair",
-                    "phase": "phase25_synthesis_collect",
+                    "phase": "phase26_synthesis_collect",
                     "job_id": job_ctx.job_id,
                     "dispatch_info": {
                         "manifests": [str(repair_manifest_path)],
@@ -2946,7 +2946,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                         "is_repair": True,
                     },
                     "result": {"quality": quality, "repair_attempt": prior_attempt + 1},
-                    "instruction": _repair_instruction_sequential("phase25_synthesis_collect", False, 0),
+                    "instruction": _repair_instruction_sequential("phase26_synthesis_collect", False, 0),
                 }
 
             elif footnote_fail and prior_attempt >= _MAX_SYNTHESIS_REPAIR_RETRIES:
@@ -2954,7 +2954,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                 quality["repair_exhausted"] = True
                 quality["gate_verdict"] = "PASS_WITH_WARNINGS"
                 print(
-                    f"  ⚠️ [phase25_synthesis_collect] 脚注不达标但已 repair {prior_attempt} 次，"
+                    f"  ⚠️ [phase26_synthesis_collect] 脚注不达标但已 repair {prior_attempt} 次，"
                     f"降级为 WARN 放行",
                     flush=True,
                 )
@@ -2962,7 +2962,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
             return {
                 "ok": True,
                 "mode": "bp_synthesis_collect",
-                "phase": "phase25_synthesis_collect",
+                "phase": "phase26_synthesis_collect",
                 "job_id": job_ctx.job_id,
                 "result": {"quality": quality},
             }
@@ -2970,7 +2970,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
     return {
         "ok": False,
         "mode": "bp_synthesis_collect",
-        "phase": "phase25_synthesis_collect",
+        "phase": "phase26_synthesis_collect",
         "job_id": job_ctx.job_id,
         "result": {"missing": "bp_synthesis.md"},
     }
@@ -3056,7 +3056,7 @@ def _run_bp_delivery(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
         return _run_bp_delivery_inner(runtime_root, job_ctx)
     from scripts.heavy_phase_bg import launch_heavy_phase
     # Delivery 是最终硬门禁，不能复用缓存；否则可能跳过最新 readability/verification/delivery gate。
-    return launch_heavy_phase(runtime_root, job_ctx, "phase30_delivery", pipeline="bp")
+    return launch_heavy_phase(runtime_root, job_ctx, "phase31_delivery", pipeline="bp")
 
 
 def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
@@ -3114,7 +3114,7 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         return {
             "ok": False,
             "mode": "bp_delivery_blocked_by_gate",
-            "phase": "phase30_delivery",
+            "phase": "phase31_delivery",
             "job_id": job_ctx.job_id,
             "deliver_to_user": False,
             "result": {
@@ -3148,11 +3148,11 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
     else:
         # Fallback：Wave 1/2 八个维度原文，兼容旧版 role slug 文件
         file_map = {
-            slug: task_dir / f"bp_phase2_{slug}.md"
+            slug: task_dir / f"bp_dim_{slug}.md"
             for slug in BP_ALL_ROLE_SLUGS.values()
         }
         file_map |= {
-            slug: task_dir / f"bp_phase2_{legacy_slug}.md"
+            slug: task_dir / f"bp_dim_{legacy_slug}.md"
             for slug, legacy_slug in BP_LEGACY_ROLE_SLUGS.items()
         }
         for slug, output_path in file_map.items():
@@ -3209,9 +3209,9 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
         from scripts.build_bp_dd_report_docx import build_bp_dimension_docx, DIMENSION_TITLES as _DIM_TITLES
 
         for slug, dim_title in _DIM_TITLES.items():
-            dim_md = task_dir / f"bp_phase2_{slug}.md"
+            dim_md = task_dir / f"bp_dim_{slug}.md"
             if not dim_md.exists():
-                dim_md = outputs_dir / f"bp_phase2_{slug}.md"
+                dim_md = outputs_dir / f"bp_dim_{slug}.md"
             if dim_md.exists() and dim_md.stat().st_size > 100:
                 dim_docx_path = delivery_dir / f"{dim_title}.docx"
                 try:
@@ -3313,7 +3313,7 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
     return {
         "ok": bool(docx_path),
         "mode": "bp_delivery_minimal",
-        "phase": "phase30_delivery",
+        "phase": "phase31_delivery",
         "job_id": job_ctx.job_id,
         "deliver_to_user": True if docx_path else False,
         "result": {
@@ -3340,42 +3340,42 @@ class BPProfile(PipelineProfile):
             # ── Phase handlers — 执行顺序由 dict 插入顺序决定 ──
             # 序号仅用于注释和日志，不影响执行。
             "phase01_document_intake": lambda job_ctx: _run_document_intake(runtime_root, job_ctx),              # 01
-            "phase01b_company_intake": lambda job_ctx: _run_company_intake(runtime_root, job_ctx),              # 01b → needs_dispatch (公司名搜索入库)
-            "phase01b_company_intake_collect": lambda job_ctx: _run_company_intake_collect(runtime_root, job_ctx),  # 01b collect
+            "phase02_company_intake": lambda job_ctx: _run_company_intake(runtime_root, job_ctx),              # 01b → needs_dispatch (公司名搜索入库)
+            "phase03_company_intake_collect": lambda job_ctx: _run_company_intake_collect(runtime_root, job_ctx),  # 01b collect
             "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),                 # 04 → needs_dispatch (子代理派发, tyc+westock)
-            "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx), # 04c
-            "phase05_bp_shared_page_init": lambda job_ctx: _run_bp_shared_page_init(runtime_root, job_ctx),     # 05
-            "phase06_search_plan_compile": lambda job_ctx: _run_bp_search_plan_compile(runtime_root, job_ctx),  # 06
-            "phase07_bp_fact_store_bootstrap": lambda job_ctx: _run_bp_fact_store_bootstrap(runtime_root, job_ctx),  # 07
+            "phase05_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx), # 04c
+            "phase06_bp_shared_page_init": lambda job_ctx: _run_bp_shared_page_init(runtime_root, job_ctx),     # 05
+            "phase07_search_plan_compile": lambda job_ctx: _run_bp_search_plan_compile(runtime_root, job_ctx),  # 06
+            "phase08_bp_fact_store_bootstrap": lambda job_ctx: _run_bp_fact_store_bootstrap(runtime_root, job_ctx),  # 07
             # ── Wave 1: 基础四维并行 ──
-            "phase08_dispatch_prepare": lambda job_ctx: _run_bp_dispatch_prepare(runtime_root, job_ctx),        # 08 → needs_dispatch
-            "phase09_dispatch_collect": lambda job_ctx: _run_bp_dispatch_collect(runtime_root, job_ctx),        # 09
-            "phase10_wave1_evidence_gate": lambda job_ctx: _run_bp_wave_evidence_gate(runtime_root, job_ctx, wave=1),  # 10
-            "phase11_bp_fact_store_merge": lambda job_ctx: _run_bp_fact_store_merge(runtime_root, job_ctx),     # 11
-            "phase12_wave1_shared_page_refresh": lambda job_ctx: _run_bp_shared_page_refresh(runtime_root, job_ctx, after_wave=1),  # 12
+            "phase09_dispatch_prepare": lambda job_ctx: _run_bp_dispatch_prepare(runtime_root, job_ctx),        # 08 → needs_dispatch
+            "phase10_dispatch_collect": lambda job_ctx: _run_bp_dispatch_collect(runtime_root, job_ctx),        # 09
+            "phase11_wave1_evidence_gate": lambda job_ctx: _run_bp_wave_evidence_gate(runtime_root, job_ctx, wave=1),  # 10
+            "phase12_bp_fact_store_merge": lambda job_ctx: _run_bp_fact_store_merge(runtime_root, job_ctx),     # 11
+            "phase13_wave1_shared_page_refresh": lambda job_ctx: _run_bp_shared_page_refresh(runtime_root, job_ctx, after_wave=1),  # 12
             # ── Wave 3: 竞争 + 估值 ──
-            "phase13_wave3_prepare": lambda job_ctx: _run_bp_wave3_prepare(runtime_root, job_ctx),              # 13 → needs_dispatch
-            "phase14_wave3_collect": lambda job_ctx: _run_bp_wave3_collect(runtime_root, job_ctx),             # 14
-            "phase15_wave3_evidence_gate": lambda job_ctx: _run_bp_wave_evidence_gate(runtime_root, job_ctx, wave=3),  # 15
-            "phase16_wave3_shared_page_refresh": lambda job_ctx: _run_bp_shared_page_refresh(runtime_root, job_ctx, after_wave=3),  # 16
+            "phase14_wave3_prepare": lambda job_ctx: _run_bp_wave3_prepare(runtime_root, job_ctx),              # 13 → needs_dispatch
+            "phase15_wave3_collect": lambda job_ctx: _run_bp_wave3_collect(runtime_root, job_ctx),             # 14
+            "phase16_wave3_evidence_gate": lambda job_ctx: _run_bp_wave_evidence_gate(runtime_root, job_ctx, wave=3),  # 15
+            "phase17_wave3_shared_page_refresh": lambda job_ctx: _run_bp_shared_page_refresh(runtime_root, job_ctx, after_wave=3),  # 16
             # ── Wave 4: Deal Breaker ──
-            "phase17_wave4_prepare": lambda job_ctx: _run_bp_wave4_prepare(runtime_root, job_ctx),             # 17 → needs_dispatch
-            "phase18_wave4_collect": lambda job_ctx: _run_bp_wave4_collect(runtime_root, job_ctx),             # 18
-            "phase19_wave4_evidence_gate": lambda job_ctx: _run_bp_wave_evidence_gate(runtime_root, job_ctx, wave=4),  # 19
-            "phase20_wave4_shared_page_refresh": lambda job_ctx: _run_bp_shared_page_refresh(runtime_root, job_ctx, after_wave=4),  # 20
+            "phase18_wave4_prepare": lambda job_ctx: _run_bp_wave4_prepare(runtime_root, job_ctx),             # 17 → needs_dispatch
+            "phase19_wave4_collect": lambda job_ctx: _run_bp_wave4_collect(runtime_root, job_ctx),             # 18
+            "phase20_wave4_evidence_gate": lambda job_ctx: _run_bp_wave_evidence_gate(runtime_root, job_ctx, wave=4),  # 19
+            "phase21_wave4_shared_page_refresh": lambda job_ctx: _run_bp_shared_page_refresh(runtime_root, job_ctx, after_wave=4),  # 20
             # ── Quality Gates ──
-            "phase21_bp_claim_coverage_validation": lambda job_ctx: _run_bp_claim_coverage_validation(runtime_root, job_ctx),  # 21
-            "phase22_bp_cross_dimension_gate": lambda job_ctx: _run_bp_cross_dimension_gate(runtime_root, job_ctx),  # 22
-            "phase23_bp_section_package_validation": lambda job_ctx: _run_bp_section_package_validation(runtime_root, job_ctx),  # 23
+            "phase22_bp_claim_coverage_validation": lambda job_ctx: _run_bp_claim_coverage_validation(runtime_root, job_ctx),  # 21
+            "phase23_bp_cross_dimension_gate": lambda job_ctx: _run_bp_cross_dimension_gate(runtime_root, job_ctx),  # 22
+            "phase24_bp_section_package_validation": lambda job_ctx: _run_bp_section_package_validation(runtime_root, job_ctx),  # 23
             # ── Synthesis (统稿) ──
-            "phase24_synthesis_prepare": lambda job_ctx: _run_bp_synthesis_prepare(runtime_root, job_ctx),        # 24 → needs_dispatch
-            "phase25_synthesis_collect": lambda job_ctx: _run_bp_synthesis_collect(runtime_root, job_ctx),        # 25
+            "phase25_synthesis_prepare": lambda job_ctx: _run_bp_synthesis_prepare(runtime_root, job_ctx),        # 24 → needs_dispatch
+            "phase26_synthesis_collect": lambda job_ctx: _run_bp_synthesis_collect(runtime_root, job_ctx),        # 25
             # ── Final Assembly + Delivery ──
-            "phase26_bp_debate_review": lambda job_ctx: _run_bp_debate_review(runtime_root, job_ctx),            # 26
-            "phase27_bp_final_assembly": lambda job_ctx: _run_bp_final_assembly(runtime_root, job_ctx),          # 27
-            "phase28_bp_readability_review": lambda job_ctx: _run_bp_readability_review(runtime_root, job_ctx),  # 28
-            "phase29_bp_investment_judgment": lambda job_ctx: _run_bp_investment_judgment(runtime_root, job_ctx),  # 29
-            "phase30_delivery": lambda job_ctx: _run_bp_delivery(runtime_root, job_ctx),                         # 30 [heavy_bg]
+            "phase27_bp_debate_review": lambda job_ctx: _run_bp_debate_review(runtime_root, job_ctx),            # 26
+            "phase28_bp_final_assembly": lambda job_ctx: _run_bp_final_assembly(runtime_root, job_ctx),          # 27
+            "phase29_bp_readability_review": lambda job_ctx: _run_bp_readability_review(runtime_root, job_ctx),  # 28
+            "phase30_bp_investment_judgment": lambda job_ctx: _run_bp_investment_judgment(runtime_root, job_ctx),  # 29
+            "phase31_delivery": lambda job_ctx: _run_bp_delivery(runtime_root, job_ctx),                         # 30 [heavy_bg]
             },
         )
         self.runtime_root = runtime_root
@@ -3386,13 +3386,13 @@ class BPProfile(PipelineProfile):
         kernel 在 start_phase 跳过前置 phase 时，会自动回填缺失产物。
         """
         return {
-            "phase06_search_plan_compile": ["bp_research_plan.json"],
-            "phase07_bp_fact_store_bootstrap": ["bp_research_plan.json", "bp_search_plan.json"],
-            "phase08_dispatch_prepare": ["bp_research_plan.json"],
-            "phase11_bp_fact_store_merge": ["bp_research_plan.json"],
-            "phase23_bp_section_package_validation": ["bp_research_plan.json"],
-            "phase26_bp_debate_review": ["bp_research_plan.json"],
-            "phase27_bp_final_assembly": ["bp_research_plan.json"],
+            "phase07_search_plan_compile": ["bp_research_plan.json"],
+            "phase08_bp_fact_store_bootstrap": ["bp_research_plan.json", "bp_search_plan.json"],
+            "phase09_dispatch_prepare": ["bp_research_plan.json"],
+            "phase12_bp_fact_store_merge": ["bp_research_plan.json"],
+            "phase24_bp_section_package_validation": ["bp_research_plan.json"],
+            "phase27_bp_debate_review": ["bp_research_plan.json"],
+            "phase28_bp_final_assembly": ["bp_research_plan.json"],
         }
 
     def phase_outputs(self) -> dict[str, list[str]]:
@@ -3402,29 +3402,29 @@ class BPProfile(PipelineProfile):
         """
         return {
             "phase01_document_intake": ["bp_step0_profile.json", "bp_claim_inventory.json"],
-            "phase01b_company_intake": [],
-            "phase01b_company_intake_collect": ["bp_step0_profile.json"],
+            "phase02_company_intake": [],
+            "phase03_company_intake_collect": ["bp_step0_profile.json"],
             "phase04_research_plan": [],  # v5.2: 子代理直接生成plan, skeleton仅作可选参考
-            "phase04_research_plan_collect": ["bp_research_plan.json"],
-            "phase05_bp_shared_page_init": ["bp_shared_diligence_page.md"],
-            "phase06_search_plan_compile": ["bp_search_plan.json"],
-            "phase07_bp_fact_store_bootstrap": ["bp_fact_store.json", "bp_fact_store_index.json"],
-            "phase08_dispatch_prepare": ["phase2_dispatch.json"],
-            "phase09_dispatch_collect": [],
-            "phase10_wave1_evidence_gate": ["bp_wave1_evidence_gate.json"],
-            "phase13_wave3_prepare": [],
-            "phase14_wave3_collect": [],
-            "phase15_wave3_evidence_gate": ["bp_wave3_evidence_gate.json"],
-            "phase17_wave4_prepare": [],
-            "phase18_wave4_collect": [],
-            "phase19_wave4_evidence_gate": ["bp_wave4_evidence_gate.json"],
-            "phase23_bp_section_package_validation": ["bp_section_packages.json", "bp_section_gate.json"],
-            "phase21_bp_claim_coverage_validation": ["bp_claim_coverage_gate.json"],
-            "phase22_bp_cross_dimension_gate": ["bp_cross_dimension_gate.json"],
-            "phase25_synthesis_collect": ["bp_synthesis.md"],
-            "phase26_bp_debate_review": ["bp_debate_review.json"],
-            "phase27_bp_final_assembly": ["bp_final_report.md", "bp_final_assembly.json"],
-            "phase28_bp_readability_review": ["bp_readability_review.json"],
-            "phase29_bp_investment_judgment": ["bp_investment_judgment.json"],
-            "phase30_delivery": [],
+            "phase05_research_plan_collect": ["bp_research_plan.json"],
+            "phase06_bp_shared_page_init": ["bp_shared_diligence_page.md"],
+            "phase07_search_plan_compile": ["bp_search_plan.json"],
+            "phase08_bp_fact_store_bootstrap": ["bp_fact_store.json", "bp_fact_store_index.json"],
+            "phase09_dispatch_prepare": ["bp_dispatch.json"],
+            "phase10_dispatch_collect": [],
+            "phase11_wave1_evidence_gate": ["bp_wave1_evidence_gate.json"],
+            "phase14_wave3_prepare": [],
+            "phase15_wave3_collect": [],
+            "phase16_wave3_evidence_gate": ["bp_wave3_evidence_gate.json"],
+            "phase18_wave4_prepare": [],
+            "phase19_wave4_collect": [],
+            "phase20_wave4_evidence_gate": ["bp_wave4_evidence_gate.json"],
+            "phase24_bp_section_package_validation": ["bp_section_packages.json", "bp_section_gate.json"],
+            "phase22_bp_claim_coverage_validation": ["bp_claim_coverage_gate.json"],
+            "phase23_bp_cross_dimension_gate": ["bp_cross_dimension_gate.json"],
+            "phase26_synthesis_collect": ["bp_synthesis.md"],
+            "phase27_bp_debate_review": ["bp_debate_review.json"],
+            "phase28_bp_final_assembly": ["bp_final_report.md", "bp_final_assembly.json"],
+            "phase29_bp_readability_review": ["bp_readability_review.json"],
+            "phase30_bp_investment_judgment": ["bp_investment_judgment.json"],
+            "phase31_delivery": [],
         }
