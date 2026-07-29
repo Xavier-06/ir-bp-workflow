@@ -1,5 +1,19 @@
 # Industry Overlay: 互联网 / TMT / SaaS
 
+## 产业链定位（第一步必做：先判定标的属于哪种商业模式）
+
+| 类型 | 判定信号 | 核心指标（只用这段）| 估值范式倾向 |
+|------|---------|------------------|------------|
+| **平台型** | 双边网络、流量变现（腾讯/美团/Meta）| DAU/MAU、ARPU、take rate、ad load、LTV/CAC | platform_two_sided / profitable_growth |
+| **模型公司** | 大模型/AI 服务（GLM/MiniMax/OpenAI）| token 经济学（成本/收入）、ARR、算力成本、融资跑道、推理效率 | preprofit_growth |
+| **电商/零售** | GMV 驱动（拼多多/Shopify/京东）| GMV、take rate、履约成本、UE 单均利润 | profitable_growth / platform_two_sided |
+| **SaaS/企业服务** | 订阅收入（Salesforce/有赞/金山办公）| NDR、Rule of 40、ARR 增速、CAC 回收期、毛利率 | profitable_growth / preprofit_growth |
+| **内容/游戏** | IP/内容变现（网易/迪士尼/泡泡玛特）| 流水、ARPPU、内容生命周期、IP 集中度 | profitable_growth |
+
+> ⚠️ 判定类型后，下方「核心分析框架」只展开对应类型的指标。
+> ⚠️ 类型判定与 research_plan 的 valuation_paradigm 交叉验证：模型公司不该用 platform_two_sided 框架。
+> ⚠️ 模型公司 ≠ 平台型：GLM/MiniMax 核心是 token 经济学 + 算力成本 + ARR + 融资跑道，不是 DAU/take rate。
+
 ## 核心分析框架
 
 ### 用户增长与留存（必查）

@@ -66,6 +66,34 @@
 3. **防双重计价** — 新兴业务显性/隐性价值必须拆分
 4. **最新季度数据优先** — 估值必须基于最新财报数据
 5. **算术必须可复算** — 每一步计算都必须可验证
+6. **范式驱动方法选择** — 估值方法由 research_plan 的 `valuation_paradigm` 决定，不是拍脑袋选 PE/DCF
+
+---
+
+## 估值范式联动（第一优先级 — 决定方法选择）
+
+⚠️ **动手前必读 `{task_id}-research_plan.json` 的 `valuation_paradigm` 字段**。范式是估值方法选择的主驱动：
+
+| paradigm | 主估值方法 | 辅助方法 | 禁用 | 目标价锚 |
+|----------|-----------|---------|------|---------|
+| `profitable_growth` | PE / EV-EBITDA | DCF 佐证 | — | EPS power × target PE |
+| `preprofit_growth` | PS / EV-Sales + TAM 份额推导 | 远期 PE 折现 | 单期 PE / 标准 DCF | 营收×PS 或 TAM×份额×PS |
+| `cyclical_asset` | PB / 周期中枢 EV-EBITDA | 重置成本 | 单期峰值 PE | mid-cycle EPS × cycle PE |
+| `asset_nav` | NAV / DCF（储量/资源量）| 可比交易 | — | Σ(储量×价格−成本)÷股本 |
+| `regulated_utility` | 股息率 / DDM | PB | 高 PE | DPS÷目标股息率 |
+| `platform_two_sided` | EV/GP + LTV/CAC | PS | 单 PE | GP×target EV/GP |
+
+**降级规则**：research_plan 无 `valuation_paradigm` 字段 → 按下方「方法选择矩阵（无新兴业务时）」的盈利状态自判，并在输出标注"paradigm 缺失，已自判"。
+
+⚠️ **与行业 overlay 交叉验证**：如果 prompt 注入了行业 overlay 的"估值范式倾向"，与本表一致则确认，冲突时以 research_plan 的 paradigm 为准。
+
+### 消费 step3_finance 预测（模型中心化 — 硬规则）
+
+**step6 不再独立做营收/利润预测**。直接引用 step3_finance §9「前瞻预测模型」的 FY+1E/FY+2E/FY+3E 营收、毛利率、EPS、EPS power。
+
+- 如果 step3_finance 输出存在 → 直接引用其数字，标注"来源：step3_finance §9"
+- 如果 step3_finance 输出不存在或数字缺失 → 自行补做最小预测（仅营收+EPS），标注"step3 预测缺失，本节自补"
+- **禁止与 step3 使用不同的营收/EPS 假设**——如发现 step3 数字有问题，指出矛盾但不编新数字
 
 ---
 

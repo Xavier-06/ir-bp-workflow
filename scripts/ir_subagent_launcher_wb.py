@@ -89,7 +89,58 @@ _OVERLAY_CACHE: dict[str, str] = {}
 
 
 def _infer_ir_industry(entity: str) -> str:
-    """从标的名称推断行业 overlay 标签。返回 overlay 文件名（不含 .md）或空字符串。"""
+    """从标的名称推断行业 overlay 标签。三层匹配（照抄 IC ic_topic_intake._infer_category 模式）。
+
+    返回 overlay 文件名（不含 .md）或空字符串。
+    """
+    # ── 层1：精确匹配（多字符专有名词，直接子串）──
+    _EXACT: dict[str, str] = {
+        # AI 硬件 / 机器人
+        '人形机器人': 'ai_hardware', 'Optimus': 'ai_hardware', '灵巧手': 'ai_hardware',
+        '具身': 'ai_hardware', '减速器': 'ai_hardware', '丝杠': 'ai_hardware',
+        '宇树': 'ai_hardware', '优必选': 'ai_hardware', '伺服电机': 'ai_hardware',
+        # 半导体
+        '晶圆': 'semiconductor', '光刻': 'semiconductor', '封测': 'semiconductor',
+        'GPU': 'semiconductor', 'Fabless': 'semiconductor', 'Foundry': 'semiconductor',
+        # 医药
+        '创新药': 'pharma', 'ADC': 'pharma', '管线': 'pharma', 'Biotech': 'pharma',
+        'CXO': 'pharma', '临床': 'pharma',
+        # 汽车
+        '电动车': 'auto', '智能驾驶': 'auto', '自动驾驶': 'auto', '智驾': 'auto',
+        '整车': 'auto', '新势力': 'auto',
+        # 重资产 / 新能源
+        '光伏': 'heavy_asset', '锂电': 'heavy_asset', '锂矿': 'heavy_asset',
+        '化工': 'heavy_asset', '钢铁': 'heavy_asset', '航运': 'heavy_asset',
+        '电池': 'heavy_asset', '储能': 'heavy_asset',
+        # 房地产 / REITs
+        'REITs': 'realestate', '物流地产': 'realestate', '产业园': 'realestate',
+        '房地产': 'realestate', '住宅开发': 'realestate',
+        # 消费
+        '白酒': 'consumer', '免税': 'consumer', '餐饮': 'consumer', '零售': 'consumer',
+        # 金融
+        '银行': 'financial', '保险': 'financial', '券商': 'financial', '证券': 'financial',
+        '信托': 'financial', '基金': 'financial',
+    }
+    for kw, industry in _EXACT.items():
+        if kw in entity:
+            return industry
+
+    # ── 层2：单字符边界匹配（排除化合物误判）──
+    _SINGLE: dict[str, tuple[str, set, set]] = {
+        # (行业, 前缀排除字符集, 后缀排除字符集)
+        '锂': ('heavy_asset', set('氢氧'), set('')),  # 氢氧化锂 → 不是氢能
+        '芯': ('semiconductor', set(''), set('')),
+        '药': ('pharma', set(''), set('')),
+    }
+    for kw, (ind, prev_excl, next_excl) in _SINGLE.items():
+        idx = entity.find(kw)
+        if idx >= 0:
+            ok_prev = (idx == 0 or entity[idx - 1] not in prev_excl)
+            ok_next = (idx + 1 >= len(entity) or entity[idx + 1] not in next_excl)
+            if ok_prev and ok_next:
+                return ind
+
+    # ── 层3：兜底关键词计分匹配（保留 _INDUSTRY_KEYWORDS 作 fallback）──
     entity_lower = entity.lower()
     scores: dict[str, int] = {}
     for industry, keywords in _INDUSTRY_KEYWORDS.items():
@@ -1453,15 +1504,25 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'💡 风险提示：step4_mgmt 的管理层评估、step6_valuation 的估值敏感性和 step5_macro 的政策/宏观风险是风险分析的核心输入，务必完整阅读。\n\n'
             )
 
-        # ── 行业 Overlay（轻量版 archetype，v2.0 新增）──
+        # ── 行业 Overlay + 估值范式联动（v2.1，2026-07-29）──
         _industry = _infer_ir_industry(entity)
         _overlay = _load_industry_overlay(_industry)
+        # 读取 research_plan 的 valuation_paradigm（模型中心化的核心联动）
+        _plan = load_research_plan(task_id, TASKS_DIR) or {}
+        _paradigm = _plan.get('valuation_paradigm') or 'unknown'
         if _overlay and entity:
             _overlay = _overlay.replace('{entity}', entity)
             prompt_body += (
-                f'【行业专属分析框架（{_industry}）】\n\n'
-                f'以下是针对该标的所在行业的专属分析要求，必须在你的分析中覆盖：\n\n'
+                f'【分析框架（行业={_industry}，估值范式={_paradigm}）】\n\n'
+                f'⚠️ 估值范式（{_paradigm}）是主驱动，行业 overlay 是补充。两者冲突时以 paradigm 为准。\n'
+                f'⚠️ overlay 含产业链定位段，先判定标的环节，只用对应段指标。\n\n'
                 f'{_overlay}\n\n'
+            )
+        elif _paradigm != 'unknown':
+            prompt_body += (
+                f'【估值范式（{_paradigm}）】\n\n'
+                f'⚠️ 本标的估值范式为 {_paradigm}，所有分析框架和估值方法选择以此为准。\n'
+                f'（行业 overlay 未命中，但范式已从 research_plan 获取。）\n\n'
             )
 
         prompt_body += (

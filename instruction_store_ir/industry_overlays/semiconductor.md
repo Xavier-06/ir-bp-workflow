@@ -1,5 +1,18 @@
 # Industry Overlay: 半导体 / 芯片 / 消费电子
 
+## 产业链定位（第一步必做：先判定标的属于哪个环节）
+
+| 环节 | 判定信号 | 核心指标（只用这段）| 估值范式倾向 |
+|------|---------|------------------|------------|
+| **上游·设计 Fabless** | 无晶圆厂、IP/算法驱动（寒武纪/海光/韦尔/高通）| design-win 数、流片进度、客户导入、ASP×量、研发费用率 | preprofit_growth / profitable_growth |
+| **中游·制造 Foundry/IDM** | 有晶圆厂、产能驱动（中芯/华虹/台积电）| 产能利用率、ASP、capex、良率、折旧/收入比 | cyclical_asset |
+| **上游·设备/材料** | 卖铲子（北方华创/中微/沪硅/ASML）| 订单 backlog、国产化率、客户 capex 计划 | profitable_growth |
+| **下游·封测** | 封装测试（长电/通富/日月光）| 先进封装渗透率、CoWoS 产能、稼动率 | cyclical_asset |
+| **终端·消费电子** | 品牌整机（苹果/小米/传音）| 出货量、ASP、BOM 成本、渠道库存 | profitable_growth |
+
+> ⚠️ 判定环节后，下方「核心分析框架」只展开对应环节的指标，不要全段堆砌。
+> ⚠️ 环节判定与 research_plan 的 valuation_paradigm 交叉验证：设计公司不该用 cyclical_asset 框架。
+
 ## 核心分析框架
 
 ### 产能周期（必查）
