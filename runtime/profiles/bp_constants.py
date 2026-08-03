@@ -20,6 +20,11 @@ BP_WESTOCK_CONNECTOR_IDS = ['westock-mcp']
 #         机构调研纪要(7300811407257275) / 精选行业数据报告(7302509206984644)
 BP_IMA_CONNECTOR_IDS = ['ima-mcp']
 
+# 全量子代理 connector 集合 —— 统稿 / repair 等非维度角色统一使用（2026-08-03 新增）
+# 背景：统稿与 repair manifest 此前写死 BP_TYC_CONNECTOR_IDS（仅 tyc-mcp），
+# 导致兜底搜索时拿不到 westock 结构化数据与 IMA 研报库全文。
+BP_FULL_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS
+
 # IMA 知识库 ID 映射 —— v4.8：自建研报库为主力源（全文可 fetch），3 个订阅库为补充
 IMA_KB_IDS = {
     "self_built_research": "001a89fa4b807b92",    # ★主力源：用户自建研报库（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报，全文可 fetch，按周分文件夹，03_投行报告=大行研报）

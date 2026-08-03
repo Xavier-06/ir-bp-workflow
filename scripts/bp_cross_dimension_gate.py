@@ -370,19 +370,24 @@ def evaluate_bp_cross_dimension_gate(task_dir: Path) -> dict[str, Any]:
     high_count = sum(1 for issue in issues if issue.get("severity") == "HIGH")
     warn_count = sum(1 for issue in issues if issue.get("severity") == "WARN")
     # Allow PASS with warnings (downgrade HIGH to WARN for non-blocking issues)
+    # 2026-08-03 断点修复：CRITICAL_CLAIM_CONTRADICTED 也降级为 WARN 放行。
+    # 旧逻辑把它当 dealbreaker → verdict=FAIL → handler ok=False → kernel 硬终止，
+    # 与速查表"HIGH→WARN 放行"承诺不符。核心 claim 被反证确实是严重信号，但
+    # 应由统稿层在叙事中标注反证 + delivery gate 记录 deferred_fixes，而不是
+    # 在管线中段直接杀死整条管线（前面所有波次的工作全部作废）。
     if high_count > 0:
-        # Check if any issue is a true dealbreaker (CRITICAL_CLAIM_CONTRADICTED)
-        dealbreakers = [i for i in issues if i.get("code") == "CRITICAL_CLAIM_CONTRADICTED"]
-        if dealbreakers:
-            verdict = "FAIL"
-        else:
-            # Downgrade HIGH to WARN for cross-dimension consistency issues
-            for issue in issues:
-                if issue.get("severity") == "HIGH":
-                    issue["severity"] = "WARN"
-            high_count = 0
-            warn_count = sum(1 for issue in issues if issue.get("severity") == "WARN")
-            verdict = "PASS"
+        for issue in issues:
+            if issue.get("severity") == "HIGH":
+                issue["severity"] = "WARN"
+                if issue.get("code") == "CRITICAL_CLAIM_CONTRADICTED":
+                    issue["degraded"] = True
+                    issue["degradation_note"] = (
+                        "核心 claim 被反证：降级放行，统稿叙事中必须显式标注反证与不确定性，"
+                        "delivery gate 将记入 deferred_fixes"
+                    )
+        high_count = 0
+        warn_count = sum(1 for issue in issues if issue.get("severity") == "WARN")
+        verdict = "PASS"
     else:
         verdict = "PASS"
     return {

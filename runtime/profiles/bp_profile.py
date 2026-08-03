@@ -13,8 +13,8 @@ from typing import Any
 from runtime.profiles.base import JobContext, PipelineProfile
 from runtime.profiles.bp_constants import (
     BP_ALL_ROLE_SLUGS,
+    BP_FULL_CONNECTOR_IDS,
     BP_LEGACY_ROLE_SLUGS,
-    BP_TYC_CONNECTOR_IDS,
     BP_WAVE1_ROLE_SLUGS,
     BP_WAVE3_ROLE_SLUGS,
     BP_WAVE4_ROLE_SLUGS,
@@ -187,7 +187,12 @@ def _run_company_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 
 
 def _run_company_intake_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 01b collect: 检查子代理产出的 bp_ocr_text.txt + bp_step0_profile.json。"""
+    """Phase 01b collect: 检查子代理产出的 bp_ocr_text.txt + bp_step0_profile.json。
+
+    断点修复（2026-08-03）：此前裸调无重试——子代理异步写文件慢一拍
+    （ocr_text.txt < 100B 或 profile.json 未落盘）即 ok=False，kernel 直接终止。
+    现包 _collect_with_retry 等待子代理落盘（与 wave collect 一致）。
+    """
     from scripts._bp_company_intake_subagent import bp_collect_company_intake
 
     task_dir = _task_dir(runtime_root, job_ctx)
@@ -204,7 +209,14 @@ def _run_company_intake_collect(runtime_root: Path, job_ctx: JobContext) -> dict
             "result": {"skipped": True},
         }
 
-    return bp_collect_company_intake(task_dir=task_dir, job_id=job_ctx.job_id)
+    return _collect_with_retry(
+        "company_intake_collect",
+        lambda: bp_collect_company_intake(task_dir=task_dir, job_id=job_ctx.job_id),
+        job_id=job_ctx.job_id,
+        outputs_dir=None,  # intake 产物在 task_dir 且非 .md，无进度信号，不做 early exit
+        # intake 无 .md 进度信号，死代理会跑满全部重试；缩短为 20×30s=10 分钟
+        max_retries=max(1, COLLECT_RETRY_COUNT // 2),
+    )
 
 
 # ── Phase 04: 研究计划（phase02 工商核验已删除，tyc 由 phase04 子代理直调）────
@@ -308,14 +320,26 @@ def _run_bp_search_plan_compile(runtime_root: Path, job_ctx: JobContext) -> dict
 
     payload = compile_bp_search_plan(research_plan, profile=profile)
     path = write_bp_search_plan(task_dir, payload)
+    task_count = len(payload.get("search_tasks", []))
+    # 断点修复（2026-08-03）：search_tasks 为空不再终止管线。
+    # 旧逻辑 `ok: bool(search_tasks)` 在 claim_matrix 为空（如 fallback skeleton）
+    # 时直接杀死管线；而下游消费者（load_bp_search_work_order /
+    # _search_tasks_by_claim）对空 plan 均优雅返回空 dict，数据采集由
+    # 子代理 instruction_store + 共享尽调页驱动，search work order 仅是增强。
+    if task_count == 0:
+        print(
+            f"  ⚠️ [phase07_search_plan_compile] search_tasks 为空"
+            f"（research_plan 无 claim_matrix 或全为低优先级），降级放行",
+            flush=True,
+        )
     return {
-        "ok": bool(payload.get("search_tasks")),
+        "ok": True,
         "mode": "bp_search_plan_compile",
         "phase": "phase07_search_plan_compile",
         "job_id": job_ctx.job_id,
         "result": {
             "search_plan_path": str(path),
-            "search_tasks": len(payload.get("search_tasks", [])),
+            "search_tasks": task_count,
             "owner_sections": sorted((payload.get("owner_section_index") or {}).keys()),
         },
     }
@@ -1221,8 +1245,55 @@ def _run_bp_section_package_validation(runtime_root: Path, job_ctx: JobContext) 
     index_path.write_text(json.dumps(section_gate, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     gate_path = task_dir / "bp_section_gate.json"
     gate_path.write_text(json.dumps(section_gate, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    # ── 断点修复（2026-08-03）：部分包 FAIL 不再裸终止管线 ──
+    # 旧逻辑 `ok: passed` 导致任意一个包校验 FAIL 即 kernel 硬终止，
+    # 而 v2 严格校验（search_audit 配额 / claim_id / fact_id 绑定）对子代理产出
+    # 极敏感，生产上曾出现 11/11 包卡死。
+    # 新策略：
+    #   - 有至少 1 个包通过 → 降级 WARN 放行（assembler _valid_packages 本来就
+    #     只组装 passed 包，失败包被自动剔除；delivery gate 记 deferred_fixes）
+    #   - 全部失败 / 一个包都没有 → 仍硬终止（无料可组装，快速失败）
+    if section_gate["passed"]:
+        return {
+            "ok": True,
+            "mode": "bp_section_package_validation",
+            "phase": "phase24_bp_section_package_validation",
+            "job_id": job_ctx.job_id,
+            "result": {"section_gate": section_gate, "index_path": str(index_path), "gate_path": str(gate_path)},
+        }
+
+    if passed > 0:
+        section_gate["gate_verdict"] = "WARN"
+        section_gate["degraded_from"] = "FAIL"
+        section_gate["degradation_reason"] = "partial_packages_failed_degraded_to_warn"
+        index_path.write_text(json.dumps(section_gate, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        gate_path.write_text(json.dumps(section_gate, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        failed_names = [
+            item.get("section_name") for item in packages
+            if not (item.get("validation") or {}).get("passed")
+        ]
+        print(
+            f"  ⚠️ [phase24_section_package] {failed}/{len(packages)} 个包校验失败"
+            f"（{', '.join(str(n) for n in failed_names)}），降级为 WARN 放行"
+            f"（assembler 将跳过失败包），delivery gate 记 deferred_fixes",
+            flush=True,
+        )
+        return {
+            "ok": True,
+            "mode": "bp_section_package_validation",
+            "phase": "phase24_bp_section_package_validation",
+            "job_id": job_ctx.job_id,
+            "result": {
+                "section_gate": section_gate,
+                "index_path": str(index_path),
+                "gate_path": str(gate_path),
+                "degraded_failed_sections": failed_names,
+            },
+        }
+
     return {
-        "ok": section_gate["passed"],
+        "ok": False,
         "mode": "bp_section_package_validation",
         "phase": "phase24_bp_section_package_validation",
         "job_id": job_ctx.job_id,
@@ -1243,9 +1314,26 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
         section_index = {"packages": []}
 
     issues: list[dict[str, Any]] = []
-    packages = section_index.get("packages", []) or []
+    all_packages = section_index.get("packages", []) or []
+    # 断点修复（2026-08-03）：只评审 validation 通过的包。
+    # phase24 降级放行后失败包仍在 section_packages.json 里，它们的
+    # markdown_draft 可能为空/claim 无 fact_ids——若不剔除会触发
+    # EMPTY_DIMENSION_DRAFT / ALL_CLAIMS_WITHOUT_FACTS 等 BLOCKING issue，
+    # 造成"phase24 刚降级放行、debate 又记 FAIL_BLOCKING"的级联。
+    # assembler 本来也只组装 passed 包，debate 与其口径保持一致。
+    packages = [
+        item for item in all_packages
+        if isinstance(item, dict) and (item.get("validation") or {}).get("passed")
+    ]
+    skipped_invalid = len(all_packages) - len(packages)
+    if skipped_invalid:
+        print(
+            f"  ⚠️ [phase27_debate_review] 跳过 {skipped_invalid} 个 validation 未通过的包"
+            f"（assembler 同样不组装它们，避免 BLOCKING 级联）",
+            flush=True,
+        )
     if not packages:
-        # BLOCKING：完全无 section package 属于极端情况（2026-06-26 宽松化）
+        # BLOCKING：完全无 section package（或全部 validation 失败）属于极端情况
         issues.append({
             "severity": "BLOCKING",
             "code": "NO_SECTION_PACKAGES",
@@ -1415,8 +1503,8 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     high_count = sum(1 for issue in issues if issue["severity"] == "HIGH")
     medium_count = sum(1 for issue in issues if issue["severity"] == "MEDIUM")
 
-    # verdict 逻辑（2026-06-26 宽松化）：
-    #   BLOCKING → FAIL_BLOCKING（硬阻断，极端情况）
+    # verdict 逻辑（2026-06-26 宽松化 + 2026-08-03 断点修复）：
+    #   BLOCKING → FAIL_BLOCKING（记录，但不再在本 phase 硬终止管线）
     #   HIGH（已无，保留兼容）→ WARN
     #   MEDIUM / 其他 → WARN（如有）或 PASS
     if blocking_count > 0:
@@ -1439,8 +1527,27 @@ def _run_bp_debate_review(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     }
     output_path = task_dir / "bp_debate_review.json"
     output_path.write_text(json.dumps(review, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    # ── 断点修复（2026-08-03）：FAIL_BLOCKING 不再在本 phase 裸终止 ──
+    # 旧逻辑 `ok: verdict in (PASS, WARN)` 导致 BLOCKING 级 issue（NO_SECTION_PACKAGES /
+    # EMPTY_DIMENSION_DRAFT / ALL_CLAIMS_WITHOUT_FACTS）直接终止管线，final_assembly
+    # 的"≥6 维度 force-assemble"兜底根本用不上（管线在 assembly 之前已死）。
+    # 新策略：FAIL_BLOCKING 降级为 WARN 放行，把硬阻断决策统一收敛到 delivery gate
+    # （bp_delivery_gate.py 仍保留 DEBATE_REVIEW_FAIL_BLOCKING 硬阻断检查，真正极端
+    # 情况交付时仍会被拦下，但管线能走完 assembly → delivery，给出完整审计）。
+    handler_ok = True
+    if verdict == "FAIL_BLOCKING":
+        review["degraded_from"] = "FAIL_BLOCKING"
+        review["degradation_reason"] = "debate_blocking_degraded_to_warn_for_pipeline_continuation"
+        output_path.write_text(json.dumps(review, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(
+            f"  ⚠️ [phase27_debate_review] verdict=FAIL_BLOCKING (blocking={blocking_count}) "
+            f"降级为 WARN 放行，硬阻断决策移交 delivery gate",
+            flush=True,
+        )
+
     return {
-        "ok": verdict in ("PASS", "WARN"),
+        "ok": handler_ok,
         "mode": "bp_debate_review",
         "phase": "phase27_bp_debate_review",
         "job_id": job_ctx.job_id,
@@ -2729,7 +2836,7 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
         "mode": "bypassPermissions",
         "subagent_type": "general-purpose",
         "team_name_template": "bp-{task_id}",
-        "connectorIds": BP_TYC_CONNECTOR_IDS,
+        "connectorIds": BP_FULL_CONNECTOR_IDS,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "status": "pending",
     }
@@ -2891,7 +2998,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                         f"   - 优先：维度 MD 中已有的外部 URL\n"
                         f"   - 其次：facts JSON 中的 source_url\n"
                         f"   - 兜底：对 TYC 来源标注为'天眼查结构化数据（天眼查 MCP）'；BP 自述标注为'BP自述 — 无外部来源URL'\n"
-                        f"6. 只有当以上三个来源都没有 URL 时，才用 web_search 搜索补充\n"
+                        f"6. 只有当以上三个来源都没有 URL 时，才用 search_deep(Bash) 脚本搜索补充（本环境无 web_search 内置工具）\n"
                         f"7. 在数据后插入 [^N] 标记，脚注编号从现有最大编号+1 开始连续递增\n"
                         f"8. 在报告末尾'来源与参考'章节追加新脚注定义，格式：[^N]: 来源名称 — URL (日期)\n"
                         f"9. 直接修改 bp_synthesis.md 文件\n\n"
@@ -2907,7 +3014,7 @@ def _run_bp_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[s
                     "dispatch_mode": "team_async",
                     "mode": "bypassPermissions",
                     "subagent_type": "general-purpose",
-                    "connectorIds": BP_TYC_CONNECTOR_IDS,
+                    "connectorIds": BP_FULL_CONNECTOR_IDS,
                     "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                 }
                 repair_manifest_path = task_dir / "bp_synthesis_repair_manifest.json"

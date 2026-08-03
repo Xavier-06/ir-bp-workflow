@@ -400,19 +400,20 @@ def bp_collect_research_plan(
                     },
                 }
             else:
-                print(f"  WARN [bp phase04_collect] plan validation failed: {validation['errors']}", flush=True)
-                return {
-                    "ok": False,
-                    "mode": "bp_research_plan",
-                    "phase": "phase05_research_plan_collect",
-                    "job_id": job_ctx.job_id,
-                    "result": {"error": "plan_validation_failed", "errors": validation["errors"]},
-                }
+                # 断点修复（2026-08-03）：子代理产出了 plan 但校验不过时，
+                # 旧逻辑直接 ok=False 终止管线（此时子代理已跑完，重派无意义）。
+                # 改为降级走下方 skeleton 兜底，保住管线——plan 质量降级但可用，
+                # 审计信息记录在 result.subagent_validation_errors 中。
+                print(
+                    f"  ⚠️ [bp phase04_collect] 子代理 plan 校验失败: {validation['errors']}，"
+                    f"降级为 script skeleton 兜底（不终止管线）",
+                    flush=True,
+                )
         except Exception as exc:
             print(f"  WARN [bp phase04_collect] failed to read subagent plan: {exc}", flush=True)
 
-    # Fallback: subagent didn't produce output -> use script skeleton
-    print(f"  WARN [bp phase04_collect] subagent did not produce plan, falling back to script skeleton", flush=True)
+    # Fallback: subagent didn't produce output (or produced invalid output) -> use script skeleton
+    print(f"  WARN [bp phase04_collect] subagent plan unavailable or invalid, falling back to script skeleton", flush=True)
     from scripts.bp_research_planner import build_bp_research_plan
     from scripts.bp_stage_utils import read_stage_from_task
 

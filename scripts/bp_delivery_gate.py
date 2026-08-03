@@ -36,8 +36,17 @@ def _section_packages(task_dir: Path) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         package = item.get("package") if isinstance(item.get("package"), dict) else {}
-        if package:
-            packages.append(package)
+        if not package:
+            continue
+        # 断点修复（2026-08-03）：剔除明确 validation 未通过的包，
+        # 与 assembler _valid_packages 口径一致。phase24 降级放行后失败包仍在
+        # section_packages.json 里，若不剔除，它们的 fact_ids / bp_only claims
+        # 会被计入下方 source_quality / fact_store 检查，造成误杀交付。
+        # 无 validation 字段的旧 job 数据保留（向后兼容）。
+        validation = item.get("validation")
+        if isinstance(validation, dict) and validation.get("passed") is False:
+            continue
+        packages.append(package)
     return packages
 
 
