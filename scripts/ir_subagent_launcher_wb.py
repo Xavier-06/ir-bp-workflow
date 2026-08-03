@@ -218,6 +218,29 @@ LAUNCH_WAVES = [
     # step8_master 已剥离为独立 synthesis 子代理（phase13）
 ]
 
+# ── 报告类型分流（v2.1, Batch 3）──
+# report_type → active_waves（LAUNCH_WAVES 索引白名单，None=全量）。
+# ⚠️ 白名单必须是依赖闭包安全的：wave4(insight/risk) 依赖 wave2(industry/biz)+wave3(mgmt/macro)，
+#    因此想跑 wave4 就必须含 wave2+wave3。短路径只能裁到依赖链的干净前缀。
+#   - deep_dive   : 全量 4 波（默认）
+#   - data_track  : wave1+wave2（财务估值+行业业务，闭包干净，真短跑）
+#   - earnings_note: wave1（只对数字反应、更新模型与目标价；洞察/风险退到统稿收口）
+REPORT_TYPE_ACTIVE_WAVES: dict[str, list[int] | None] = {
+    'deep_dive': None,            # 全量
+    'company_deep_dive': None,    # 兼容 research_plan 旧 report_type 取值
+    'broker_ir': None,            # 兼容
+    'industry_research': None,    # 兼容
+    'data_track': [0, 1],         # 财务+估值+行业+业务
+    'earnings_note': [0],         # 仅财务+估值模型
+}
+
+
+def active_waves_for_report_type(report_type: str | None) -> list[int] | None:
+    """按 report_type 返回 active_waves 白名单。未知类型回退全量（None）。"""
+    if not report_type:
+        return None
+    return REPORT_TYPE_ACTIVE_WAVES.get(report_type, None)
+
 # 超时
 STEP_TIMEOUTS = {
     'step1_industry': 900,
@@ -1307,9 +1330,15 @@ def launch_all(task_id: str, entity: str = '', query: str = '', dry_run: bool = 
     return result
 
 
-def get_current_wave_index(task_id: str) -> int:
-    """根据已完成的 step 输出文件推算当前应该发射的 wave 索引（0-3）。"""
-    for idx, wave_steps in enumerate(LAUNCH_WAVES):
+def get_current_wave_index(task_id: str, active_waves: list[int] | None = None) -> int:
+    """根据已完成的 step 输出文件推算当前应该发射的 wave 索引。
+
+    active_waves: 报告类型分流（v2.1）。None=全部 wave；指定时只在这些 wave 中推进，
+    全部完成返回 len(LAUNCH_WAVES)。用于 earnings_note/data_track 等裁剪场景。
+    """
+    candidates = active_waves if active_waves is not None else range(len(LAUNCH_WAVES))
+    for idx in candidates:
+        wave_steps = LAUNCH_WAVES[idx]
         for step in wave_steps:
             out = step_output_path(task_id, step)
             if not out.exists() or out.stat().st_size < 100:
@@ -1369,12 +1398,17 @@ def get_pipeline_status(task_id: str) -> dict:
 
 
 def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: str = 'us',
-                     sequential: bool = False) -> dict:
+                     sequential: bool = False,
+                     active_waves: list[int] | None = None) -> dict:
     """发射当前应该执行的 wave。主 AI 每轮调用一次，直到所有 wave 完成。
 
     sequential=True: 每次只发射当前 wave 的一个 step，返回 has_more 标志。
     主 AI 应循环调用 → 派发一个 Task 子代理 → 等待完成 → 再调用。
     避免并行 Task 子代理触发 API 429。
+
+    active_waves (v2.1 Batch3): 报告类型分流白名单。None=全量；指定 LAUNCH_WAVES
+    索引列表时只在这些 wave 中推进，白名单耗尽即视为全部完成（all_done=True）。
+    由 ir_profile._run_dispatch_prepare 按 research_plan.report_type 计算传入。
 
     返回值包含：
     - wave_index: 发射的 wave 编号
@@ -1397,16 +1431,21 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             'task_tool_instructions': [],
         }
 
-    wave_idx = get_current_wave_index(task_id)
+    wave_idx = get_current_wave_index(task_id, active_waves=active_waves)
 
-    if wave_idx >= len(LAUNCH_WAVES):
+    # 完成判定：active_waves 模式下白名单耗尽（返回 len(LAUNCH_WAVES)）或越界即完成
+    _done = wave_idx >= len(LAUNCH_WAVES) or (
+        active_waves is not None and wave_idx not in active_waves
+    )
+    if _done:
         return {
             'wave_index': -1,
             'steps': [],
             'all_done': True,
             'has_more': False,
             'next_action': 'finalize',
-            'message': '所有 wave 已完成，请调用 finalize_pipeline()',
+            'active_waves': active_waves,
+            'message': '所有激活 wave 已完成，请调用 finalize_pipeline()',
         }
 
     wave_steps = LAUNCH_WAVES[wave_idx]
@@ -1616,10 +1655,19 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             'output_path': output_path,
         })
 
+    # 推进判定：active_waves 模式下看白名单内 wave_idx 之后是否还有 wave
+    if active_waves is not None:
+        _has_next_wave = any(
+            w > wave_idx and w < len(LAUNCH_WAVES) for w in active_waves
+        )
+    else:
+        _has_next_wave = wave_idx < len(LAUNCH_WAVES) - 1
+
     return {
         'wave_index': wave_idx,
         'wave_label': f'Wave {wave_idx + 1}/{len(LAUNCH_WAVES)}',
         'research_plan_gate': research_plan_gate,
+        'active_waves': active_waves,
         'steps': results,
         'dispatched_count': len(dispatched),
         'has_more': has_more,
@@ -1627,7 +1675,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
         'next_action': 'dispatch_tasks',
         'task_tool_instructions': task_instructions,
         'after_all_tasks_complete': (
-            'launch_next_wave()' if wave_idx < len(LAUNCH_WAVES) - 1 else 'finalize_pipeline()'
+            'launch_next_wave()' if _has_next_wave else 'finalize_pipeline()'
         ),
     }
 

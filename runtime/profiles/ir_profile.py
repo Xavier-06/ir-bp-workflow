@@ -807,6 +807,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
         launch_next_wave,
         get_pipeline_status,
         step_output_path,
+        active_waves_for_report_type,
         STEP_DEPS,
         LAUNCH_WAVES,
     )
@@ -815,6 +816,16 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
     entity = job_ctx.entity
     market = metadata.get("market", job_ctx.market) if metadata else job_ctx.market
 
+    # v2.1 Batch3: 按 research_plan.report_type 计算 active_waves（报告类型分流）
+    # 未知/缺失 → None（全量 4 波），保持向后兼容。
+    _active_waves: list[int] | None = None
+    try:
+        from scripts.ir_research_planner import load_research_plan
+        _plan = load_research_plan(job_ctx.job_id, runtime_root / "data" / "tasks") or {}
+        _active_waves = active_waves_for_report_type(_plan.get("report_type"))
+    except Exception:
+        _active_waves = None
+
     # 发射当前 wave（自动检测已完成的 step，支持断点恢复）
     wave_result = launch_next_wave(
         task_id=job_ctx.job_id,
@@ -822,6 +833,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
         query=job_ctx.query,
         market=market,
         sequential=sequential,
+        active_waves=_active_waves,
     )
 
     if wave_result.get('all_done'):
