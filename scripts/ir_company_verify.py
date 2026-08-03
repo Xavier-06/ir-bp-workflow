@@ -213,18 +213,18 @@ def run(task_id: str, entity: str = '', market: str = 'us') -> dict:
     try:
         sys.path.insert(0, str(WORKSPACE))
         from tasks.valuation_enricher import enrich_with_yahoo
-        valuation_data = enrich_with_yahoo(entity)
-        if valuation_data:
-            ticker = valuation_data.get('ticker', '')
-            price = valuation_data.get('price', 'N/A')
-            pe = valuation_data.get('pe_ratio', 'N/A')
-            source = valuation_data.get('data_source', 'yfinance')
-        currency = '¥' if source == 'neodata' else '$'
-        print(f"\n  📈 估值数据({source}): {ticker} | 价格={currency}{price} | PE={pe}")
+        valuation_data = enrich_with_yahoo(entity) or {}
+        ticker = valuation_data.get('ticker', '')
+        price = valuation_data.get('price', 'N/A')
+        pe = valuation_data.get('pe_ratio', 'N/A')
+        source = valuation_data.get('data_source', 'yfinance')
+        if price not in ('N/A', None, ''):
+            currency = '¥' if source == 'neodata' else '$'
+            print(f"\n  📈 估值数据({source}): {ticker} | 价格={currency}{price} | PE={pe}")
+        else:
+            print(f"\n  📈 估值数据: 未找到对应 ticker (data_source={source})")
         if valuation_data.get('price_warning'):
             print(f"  ⚠ {valuation_data['price_warning']}")
-        else:
-            print(f"\n  📈 估值数据: 未找到对应 ticker")
     except Exception as e:
         print(f"\n  📈 估值数据: 获取失败 ({e})")
         valuation_data = {'error': str(e)}

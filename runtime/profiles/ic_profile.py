@@ -1260,6 +1260,7 @@ Agent tool 参数：
 - name = 'ic-research-planner'
 - team_name = 'ic-{job_ctx.job_id}'
 - mode = 'bypassPermissions'
+- subagent_type = 'general-purpose'（⚠️ 必须！子代理需要 westock-mcp/tyc-mcp 搜索能力，code-explorer 等受限类型会静默失败导致 plan 缺失）
 - connectorIds = ['westock-mcp', 'tyc-mcp']
 - prompt = 下面的完整 prompt
 
@@ -1389,6 +1390,7 @@ brief 中的 `research_content` 列表定义了课题的具体研究方向。你
         "phase": "phase04_research_plan", "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
+            "subagent_type": "general-purpose",
             "subagent_connector_ids": ["westock-mcp", "tyc-mcp"],
             "task_dir": str(tasks_dir),
         },

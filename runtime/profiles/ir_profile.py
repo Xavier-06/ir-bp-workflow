@@ -239,6 +239,7 @@ Agent tool 参数：
 - name = 'ir-research-planner'
 - team_name = 'ir-{job_ctx.job_id}'
 - mode = 'bypassPermissions'
+- subagent_type = 'general-purpose'（⚠️ 必须！子代理需要 ima-mcp/westock-mcp/tyc-mcp 搜索能力，code-explorer 等受限类型会静默失败导致 plan 缺失）
 - connectorIds = ['westock-mcp', 'tyc-mcp', 'ima-mcp']
 - prompt = 下面的完整 prompt
 
@@ -517,6 +518,7 @@ step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuati
         "phase": "phase04_research_plan", "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
+            "subagent_type": "general-purpose",
             "subagent_connector_ids": ["westock-mcp", "tyc-mcp", "ima-mcp"],
             "task_dir": str(tasks_dir),
         },
@@ -524,11 +526,61 @@ step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuati
     }
 
 
-def _backfill_thesis_fields(plan: dict[str, Any]) -> list[str]:
+def _infer_valuation_paradigm_from_verify(tasks_dir: Path, job_id: str) -> dict[str, Any] | None:
+    """v2.2: 从 company_verify 财务数据推断估值范式。
+
+    修复 fallback plan 硬编码 valuation_paradigm=profitable_growth/PE 的缺陷——
+    亏损股（如 MiniMax）会被错误套上 PE 框架。此处读取 {job_id}-ir_company_verify.json
+    的 financial_data 文本，检测亏损信号：
+    - 检测到亏损 → preprofit_growth + PS/EV-Sales，禁用 PE/DCF
+    - 无亏损信号 → 返回 None（沿用默认 profitable_growth）
+    文件不存在 / 无财务数据时返回 None。
+    """
+    verify_path = Path(tasks_dir) / f"{job_id}-ir_company_verify.json"
+    if not verify_path.exists():
+        return None
+    try:
+        verify = json.loads(verify_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    text_parts: list[str] = []
+    for item in verify.get("financial_data", []) or []:
+        if isinstance(item, dict):
+            text_parts.append(str(item.get("text", "")))
+        elif isinstance(item, str):
+            text_parts.append(item)
+    text_blob = "\n".join(text_parts)
+    if not text_blob.strip():
+        return None
+
+    # 亏损强信号（先检测，命中即判亏损，避免"归母净利润"在亏损报告里误判为盈利）
+    loss_signals = [
+        "净亏损", "经调整净亏损", "归母净亏损", "净亏损为",
+        "归母净利润-", "净利润-", "净利润为负", "持续亏损", "仍在亏损", "亏损扩大",
+        "net_loss", "operating loss", "经营亏损",
+    ]
+    loss_hits = [s for s in loss_signals if s in text_blob]
+    if loss_hits:
+        return {
+            "valuation_paradigm": "preprofit_growth",
+            "paradigm_reason": f"基于 company_verify 财务数据判定为亏损（信号: {', '.join(loss_hits[:3])}），采用亏损增长股框架",
+            "valuation_method_primary": "PS / EV-Sales",
+            "valuation_forbidden": ["PE", "DCF"],
+            "thesis_source": "fallback_financial_inference",
+        }
+    return None
+
+
+def _backfill_thesis_fields(plan: dict[str, Any], inferred: dict[str, Any] | None = None) -> list[str]:
     """v2.1: 为 research_plan 补 Thesis 字段默认值（缺失降级，不阻断）。
 
     返回 warning 列表（非 error）。子代理未产出新字段时，用确定性默认值兜底，
     保证下游 step（step3/6/7 等）读取 valuation_paradigm/market_anchor 时不 KeyError。
+
+    v2.2 (2026-08-03): 新增 inferred 参数——company_verify 财务数据推断的估值范式。
+    当 plan 缺 valuation_paradigm 时，用 inferred 决定 paradigm/method，而非硬编码
+    profitable_growth/PE，避免亏损股（如 MiniMax）被套上 PE 框架。
     """
     warnings: list[str] = []
 
@@ -549,15 +601,28 @@ def _backfill_thesis_fields(plan: dict[str, Any]) -> list[str]:
         plan.setdefault("report_type_reason", "子代理未产出合法 report_type，按 query 关键词兜底")
         warnings.append("report_type_missing_fallback")
 
-    # valuation_paradigm（缺失 → 按净利润正负自判兜底）
+    # valuation_paradigm（缺失 → 财务感知兜底：先用 company_verify 推断，无推断再默认 profitable_growth）
     if not plan.get("valuation_paradigm"):
-        plan["valuation_paradigm"] = "profitable_growth"
-        plan.setdefault("paradigm_reason", "子代理未产出 valuation_paradigm，降级默认 profitable_growth")
-        warnings.append("valuation_paradigm_missing_fallback")
+        if inferred and inferred.get("valuation_paradigm"):
+            plan["valuation_paradigm"] = inferred["valuation_paradigm"]
+            plan.setdefault("paradigm_reason", inferred.get("paradigm_reason", ""))
+            plan.setdefault("valuation_method_primary", inferred.get("valuation_method_primary", "PS / EV-Sales"))
+            plan.setdefault("valuation_forbidden", inferred.get("valuation_forbidden", []))
+            plan.setdefault("thesis_source", inferred.get("thesis_source", "fallback_financial_inference"))
+            warnings.append("valuation_paradigm_inferred_from_financials")
+        else:
+            plan["valuation_paradigm"] = "profitable_growth"
+            plan.setdefault("paradigm_reason", "子代理未产出 valuation_paradigm 且无法从财务数据推断，降级默认 profitable_growth")
+            plan.setdefault("thesis_source", "fallback_default")
+            warnings.append("valuation_paradigm_missing_fallback")
 
-    # valuation_method_primary / valuation_forbidden
-    plan.setdefault("valuation_method_primary", "PE / EV-EBITDA")
-    plan.setdefault("valuation_forbidden", [])
+    # valuation_method_primary / valuation_forbidden（paradigm 已由 inferred 填时沿用其值，否则默认 PE）
+    if plan.get("valuation_paradigm") == "preprofit_growth":
+        plan.setdefault("valuation_method_primary", "PS / EV-Sales")
+        plan.setdefault("valuation_forbidden", ["PE", "DCF"])
+    else:
+        plan.setdefault("valuation_method_primary", "PE / EV-EBITDA")
+        plan.setdefault("valuation_forbidden", [])
 
     # key_debates（缺失 → 空列表，下游 step7 会自拟）
     if not plan.get("key_debates"):
@@ -584,19 +649,25 @@ def _backfill_thesis_fields(plan: dict[str, Any]) -> list[str]:
 
 
 def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase04 collect v5.2: 读取子代理产出的 ir_research_plan.json。"""
+    """Phase04 collect v5.2: 读取子代理产出的 ir_research_plan.json。
+
+    v2.2 (2026-08-03): 财务感知兜底——子代理 plan 缺失或降级脚本生成时，
+    从 company_verify 财务数据推断 valuation_paradigm（亏损股→preprofit_growth+PS，禁 PE），
+    避免 MiniMax 类亏损标的被套上 PE 框架。降级时给 plan 打 thesis_source 标记。
+    """
     from scripts.ir_research_planner import validate_research_plan_ready, research_plan_path
 
     tasks_dir = runtime_root / "data" / "tasks"
     plan_path = tasks_dir / f"{job_ctx.job_id}-ir_research_plan.json"
+    inferred = _infer_valuation_paradigm_from_verify(tasks_dir, job_ctx.job_id)
 
     if plan_path.exists() and plan_path.stat().st_size > 200:
         try:
             plan = json.loads(plan_path.read_text(encoding="utf-8"))
             validation = validate_research_plan_ready(plan)
             if validation["ready"]:
-                # v2.1: 补 Thesis 字段默认值（缺失降级，不阻断）
-                thesis_warnings = _backfill_thesis_fields(plan)
+                # v2.1: 补 Thesis 字段默认值（缺失降级，不阻断）；v2.2: 传入财务推断
+                thesis_warnings = _backfill_thesis_fields(plan, inferred=inferred)
                 if thesis_warnings:
                     print(f"  ⚠️ [ir phase04_collect] Thesis 字段降级: {thesis_warnings}", flush=True)
                 final_path = research_plan_path(job_ctx.job_id, tasks_dir)
@@ -605,7 +676,8 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
                     "ok": True, "mode": "ir_research_plan",
                     "phase": "phase04_research_plan_collect", "job_id": job_ctx.job_id,
                     "result": {"plan_path": str(final_path), "enrichment": "subagent_generated",
-                               "validation": validation, "thesis_warnings": thesis_warnings},
+                               "validation": validation, "thesis_warnings": thesis_warnings,
+                               "thesis_source": plan.get("thesis_source", "subagent_generated")},
                 }
             print(f"  ⚠️ [ir phase04_collect] plan 校验失败: {validation['errors']}", flush=True)
             return {"ok": False, "mode": "ir_research_plan", "phase": "phase04_research_plan_collect",
@@ -613,17 +685,35 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
         except Exception as exc:
             print(f"  ⚠️ [ir phase04_collect] 读取子代理 plan 失败: {exc}", flush=True)
 
-    # 降级
+    # 降级：脚本生成骨架 + 财务感知 thesis 兜底
     print(f"  ⚠️ [ir phase04_collect] 子代理未产出 plan，降级脚本生成", flush=True)
     from scripts.ir_research_planner import prepare_research_plan
     path = prepare_research_plan(
         task_id=job_ctx.job_id, entity=job_ctx.entity,
         query=job_ctx.query, market=job_ctx.market, tasks_dir=tasks_dir,
     )
+    # v2.2: 用财务推断覆盖骨架默认值（亏损股→preprofit_growth+PS，禁 PE）
+    thesis_source = "fallback_default"
+    thesis_warnings: list[str] = []
+    try:
+        plan = json.loads(Path(path).read_text(encoding="utf-8"))
+        thesis_warnings = _backfill_thesis_fields(plan, inferred=inferred)
+        if inferred and inferred.get("valuation_paradigm"):
+            plan["valuation_paradigm"] = inferred["valuation_paradigm"]
+            plan["paradigm_reason"] = inferred.get("paradigm_reason", "")
+            plan["valuation_method_primary"] = inferred.get("valuation_method_primary", "PS / EV-Sales")
+            plan["valuation_forbidden"] = inferred.get("valuation_forbidden", [])
+            thesis_source = inferred.get("thesis_source", "fallback_financial_inference")
+            print(f"  🔍 [ir phase04_collect] 财务感知兜底生效: paradigm={plan['valuation_paradigm']}", flush=True)
+        plan["thesis_source"] = thesis_source
+        Path(path).write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except Exception as exc:
+        print(f"  ⚠️ [ir phase04_collect] 财务感知兜底失败（保持脚本默认）: {exc}", flush=True)
     return {
         "ok": True, "mode": "ir_research_plan",
         "phase": "phase04_research_plan_collect", "job_id": job_ctx.job_id,
-        "result": {"plan_path": path, "enrichment": "fallback_script"},
+        "result": {"plan_path": path, "enrichment": "fallback_script",
+                   "thesis_source": thesis_source, "thesis_warnings": thesis_warnings},
     }
 
 

@@ -45,7 +45,7 @@ def test_build_research_plan_mvp_contract_has_section_and_fact_coverage():
 
     section_requirements = plan["section_requirements"]
     assert "step1_data" in section_requirements
-    assert "step4_finance" in section_requirements
+    assert "step3_finance" in section_requirements
     assert "step8_master" in section_requirements
     assert "Q1" in section_requirements["step1_data"]["must_answer"]
     assert "claims" in section_requirements["step1_data"]["required_outputs"]

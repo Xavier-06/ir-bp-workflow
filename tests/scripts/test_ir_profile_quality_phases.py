@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from runtime.profiles.ir_profile import (
@@ -41,84 +42,81 @@ def test_run_research_plan_writes_skeleton_and_returns_needs_dispatch(tmp_path):
     assert brief["entity"] == "任意公司"
 
 
-def test_run_research_plan_collect_merges_enrichment(tmp_path):
+def test_run_research_plan_collect_financial_inference_fallback(tmp_path):
+    """v2.2: 子代理未产出 plan 时，collect 降级脚本生成 + 财务感知兜底。
+
+    场景：company_verify 的 financial_data 含亏损信号（净亏损），且子代理 plan 缺失。
+    期望：fallback plan 的 valuation_paradigm 被推断为 preprofit_growth，
+    valuation_method_primary=PS/EV-Sales，PE/DCF 被禁，并打 thesis_source 标记。
+    （修复 MiniMax 类亏损标的被套上 PE 框架的缺陷）
+    """
     from runtime.profiles.ir_profile import _run_research_plan_collect
 
     tasks_dir = tmp_path / "data" / "tasks"
     tasks_dir.mkdir(parents=True)
 
-    # 先写骨架
-    from scripts.ir_research_planner import build_ir_research_plan_skeleton
-    skeleton = build_ir_research_plan_skeleton(
-        task_id="TASK-ENRICH", entity="测试公司", query="测试研究",
-    )
-    (tasks_dir / "TASK-ENRICH-ir_research_plan_skeleton.json").write_text(
-        json.dumps(skeleton, ensure_ascii=False, indent=2), encoding="utf-8",
-    )
-
-    # 写 enrichment delta
-    enrichment = {
-        "strategic_questions": [
-            {
-                "question_id": "ESQ1",
-                "question": "测试公司的核心壁垒是什么？",
-                "priority": "high",
-                "owner_section": "step3_biz",
-                "supporting_sections": ["step2_industry"],
-                "required_fact_keys": ["moat_evidence", "competitive_landscape"],
-                "decision_relevance": "决定长期竞争优势",
-            },
-            {
-                "question_id": "ESQ2",
-                "question": "收入增长驱动因素？",
-                "priority": "high",
-                "owner_section": "step1_data",
-                "required_fact_keys": ["revenue_trend", "growth_rate"],
-                "decision_relevance": "决定增长可持续性",
-            },
-            {
-                "question_id": "ESQ3",
-                "question": "估值隐含什么预期？",
-                "priority": "high",
-                "owner_section": "step6b_valuation",
-                "required_fact_keys": ["valuation_multiples", "dcf_inputs"],
-                "decision_relevance": "决定估值合理性",
-            },
-            {
-                "question_id": "ESQ4",
-                "question": "管理层执行力如何？",
-                "priority": "high",
-                "owner_section": "step5_mgmt",
-                "required_fact_keys": ["management_roster", "ownership"],
-                "decision_relevance": "决定治理判断",
-            },
-            {
-                "question_id": "ESQ5",
-                "question": "哪些风险会推翻结论？",
-                "priority": "high",
-                "owner_section": "step7_risk",
-                "required_fact_keys": ["bear_case", "risk_triggers"],
-                "decision_relevance": "决定反证充分性",
-            },
+    # 写含亏损信号的 company_verify（无子代理 ir_research_plan.json，触发降级）
+    company_verify = {
+        "task_id": "TASK-LOSS",
+        "entity": "亏损科技公司",
+        "market": "hk",
+        "financial_data": [
+            {"text": "公司2025年营收同比增长158%，经调整净亏损2.51亿美元，资产负债率343%。", "url": "", "metric": "毛利率25.4%"},
         ],
+        "valuation_data": {},
+        "key_events": [],
+        "source_urls": [],
     }
-    (tasks_dir / "TASK-ENRICH-ir_research_plan_enrichment.json").write_text(
-        json.dumps(enrichment, ensure_ascii=False, indent=2), encoding="utf-8",
+    (tasks_dir / "TASK-LOSS-ir_company_verify.json").write_text(
+        json.dumps(company_verify, ensure_ascii=False, indent=2), encoding="utf-8",
     )
 
-    job_ctx = SimpleNamespace(job_id="TASK-ENRICH", entity="测试公司", query="测试研究", market="cn", metadata={}, workspace=None)
+    job_ctx = SimpleNamespace(job_id="TASK-LOSS", entity="亏损科技公司", query="深度研究", market="hk", metadata={}, workspace=None)
     result = _run_research_plan_collect(tmp_path, job_ctx)
 
     assert result["ok"] is True
-    assert result["result"]["plan_status"] == "ready"
-    assert result["result"]["enrichment_status"] == "enriched"
+    assert result["result"]["enrichment"] == "fallback_script"
+    assert result["result"]["thesis_source"] == "fallback_financial_inference"
 
-    # 最终计划已写入
-    plan_path = tasks_dir / "TASK-ENRICH-research_plan.json"
-    assert plan_path.exists()
-    plan = json.loads(plan_path.read_text(encoding="utf-8"))
-    assert len(plan["strategic_questions"]) == 5
-    assert plan["strategic_questions"][0]["question_id"] == "ESQ1"
+    # 读取落盘的 fallback plan，验证财务感知推断生效
+    plan = json.loads(Path(result["result"]["plan_path"]).read_text(encoding="utf-8"))
+    assert plan["valuation_paradigm"] == "preprofit_growth"
+    assert plan["valuation_method_primary"] == "PS / EV-Sales"
+    assert "PE" in plan["valuation_forbidden"]
+    assert "DCF" in plan["valuation_forbidden"]
+    assert plan.get("thesis_source") == "fallback_financial_inference"
+
+
+def test_run_research_plan_collect_no_loss_keeps_default(tmp_path):
+    """v2.2 对照组：company_verify 无亏损信号时，fallback 保持默认 profitable_growth。"""
+    from runtime.profiles.ir_profile import _run_research_plan_collect
+
+    tasks_dir = tmp_path / "data" / "tasks"
+    tasks_dir.mkdir(parents=True)
+
+    company_verify = {
+        "task_id": "TASK-PROFIT",
+        "entity": "盈利公司",
+        "market": "cn",
+        "financial_data": [
+            {"text": "公司2025年营收同比增长20%，归母净利润12亿元，毛利率40%。", "url": "", "metric": "毛利率40%"},
+        ],
+        "valuation_data": {},
+        "key_events": [],
+        "source_urls": [],
+    }
+    (tasks_dir / "TASK-PROFIT-ir_company_verify.json").write_text(
+        json.dumps(company_verify, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+    job_ctx = SimpleNamespace(job_id="TASK-PROFIT", entity="盈利公司", query="深度研究", market="cn", metadata={}, workspace=None)
+    result = _run_research_plan_collect(tmp_path, job_ctx)
+
+    assert result["ok"] is True
+    assert result["result"]["thesis_source"] == "fallback_default"
+    plan = json.loads(Path(result["result"]["plan_path"]).read_text(encoding="utf-8"))
+    assert plan["valuation_paradigm"] == "profitable_growth"
+    assert plan["valuation_method_primary"] == "PE / EV-EBITDA"
 
 
 def test_run_fact_store_bootstrap_writes_empty_generic_store_when_no_sources(tmp_path):
