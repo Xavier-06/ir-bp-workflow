@@ -28,6 +28,15 @@ DIMENSION_TITLES = {
     "dealbreaker_risk": "Dealbreaker 风险",
 }
 
+# ── Wave 4 投资叙事层维度标题（catalyst / consensus_challenge / industry_research）──
+# 这三个角色无 claim-fact 结构，内容已经由统稿子代理吸收（催化剂时间线等），
+# 但平铺维度 DOCX 交付时同样需要独立成卷，保留原文证据链。
+NARRATIVE_DIMENSION_TITLES = {
+    "catalyst": "催化剂与事件分析",
+    "consensus_challenge": "共识挑战与预期差分析",
+    "industry_research": "行业深度研报",
+}
+
 
 # ── 字体选择（macOS/Windows 跨平台 fallback）────────────
 

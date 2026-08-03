@@ -3314,8 +3314,11 @@ def _run_bp_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str,
     dim_docx_paths: list[str] = []
     try:
         from scripts.build_bp_dd_report_docx import build_bp_dimension_docx, DIMENSION_TITLES as _DIM_TITLES
+        from scripts.build_bp_dd_report_docx import NARRATIVE_DIMENSION_TITLES as _NARR_DIM_TITLES
 
-        for slug, dim_title in _DIM_TITLES.items():
+        # Wave 4 叙事三角色（catalyst/consensus_challenge/industry_research）同样平铺成卷，
+        # 保留催化剂时间线等原文证据链（v6.2：此前仅统稿 DOCX 间接包含其摘要）
+        for slug, dim_title in {**_DIM_TITLES, **_NARR_DIM_TITLES}.items():
             dim_md = task_dir / f"bp_dim_{slug}.md"
             if not dim_md.exists():
                 dim_md = outputs_dir / f"bp_dim_{slug}.md"
