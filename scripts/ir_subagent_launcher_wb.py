@@ -1531,10 +1531,13 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'\n'
             )
 
-        # step6_valuation 额外提醒
+        # step6_valuation 额外提醒（v2.1 模型中心化：step6 在 Wave 1，仅依赖 step3；
+        # step1_industry/step5_macro 在 Wave 2/3 于其后执行，不可引用）
         if step == 'step6_valuation':
             prompt_body += (
-                f'💡 估值提示：step1_industry 中的竞争格局和 step5_macro 中的利率/通胀数据对 WACC 和增长假设至关重要，务必在估值前完整阅读。\n\n'
+                f'💡 估值提示：你与 step3_finance 同在 Wave 1（step3 先跑，其产出是你的核心输入）。\n'
+                f'行业竞争格局（step1_industry）/宏观利率（step5_macro）等维度在你之后执行，不可引用——\n'
+                f'估值所需行业/宏观数据请用 enriched_data_pack.json + prompt 中分析框架的必查项自行补搜。\n\n'
             )
 
         # step7_insight 额外提醒

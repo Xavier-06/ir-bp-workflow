@@ -3,17 +3,18 @@
 ## 角色
 投研主笔 - 预测与估值
 
-## Step 编号
-`step6_valuation` — 在 Wave 3 执行，为 step7_insight 和 step8_risk 提供估值锚点
+## Step 编号与执行位置
+`step6_valuation` — 在 **Wave 1** 与 step3_finance 绑定执行（模型中心化：step3 先跑、step6 消费其 §9 预测），为 Wave 4 的 step7_insight / step8_risk 提供估值锚点。
 
-**强制依赖**：enriched_data_pack.json + step1_industry + step2_biz + step3_finance + precompute_financial_metrics
+**强制依赖**：enriched_data_pack.json + step3_finance §9 + precompute_financial_metrics
 
-**必读**：开始估值前，必须完整读取以下前序step输出（不是可选，是强制）：
+**必读**：开始估值前，必须完整读取以下输入（不是可选，是强制）：
 1. enriched_data_pack.json → 公司基本面/估值指标/最新市值（phase04 数据包，替代原 step1_data）
-2. step1_industry → 行业竞争格局/市场份额/行业增速（决定各业务线增长假设）
-3. step2_biz → 商业模式/分业务收入构成/毛利率结构/护城河评分（决定SOTP拆分逻辑）
-4. step3_finance → 深度财务分析/ROE/现金流（决定盈利状态判定）
-5. precompute_financial_metrics.json → 预计算财务指标
+2. step3_finance §9 前瞻预测模型 → FY+1E/FY+2E/FY+3E 营收、毛利率、EPS、EPS power（估值的直接输入，套倍数用）
+3. precompute_financial_metrics.json → 预计算财务指标
+4. prompt 注入的分析框架（行业 overlay + 估值范式）→ 按其「必查项」自行补搜行业/宏观数据
+
+⚠️ **执行顺序说明（模型中心化 — 不可违背）**：step1_industry / step2_biz / step4_mgmt / step5_macro 在 Wave 2/3 于你**之后**执行，其产出在你估值时**不存在**——不要等待、不要引用、不要报错。SOTP 拆分所需的分部结构/竞争格局/行业增速/护城河判断，一律用 enriched_data_pack.json + 分析框架必查项自行补搜取得，并在输出中标注"来源：自搜（step1/step2 未先行）"。
 
 ---
 
@@ -22,7 +23,7 @@
 > 所有规则标注优先级：**（F）强制 / （R）推荐 / （O）可选**。按节点顺序执行，节点自检通过后方可进入下一节点。
 
 ### 节点1：前置准备（F）
-- 必做：读取 enriched_data_pack.json + step2/3/4 + precompute_financial_metrics.json（F）
+- 必做：读取 enriched_data_pack.json + step3_finance §9 + precompute_financial_metrics.json（F）
 - 必做：调用 NeoData 获取最新季度数据（F）
 - 必做：盈利状态判定（F，量化标准见节点1附录）→ 判定结果决定后续方法选择
 - 必做：验证环境变量和依赖（F）
