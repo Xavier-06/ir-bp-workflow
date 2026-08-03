@@ -85,21 +85,26 @@ def _sync_artifact_to_workspace(job_ctx: JobContext, artifact_type: str, src_pat
 #
 # 核心数据采集链（preflight → delivery + 合成）在任何 tier 下均完整运行，
 # 仅可选的质量/验证 phase 被裁剪，因此不会破坏下游依赖。
+# 2026-08-03 修复断点C：legacy 合并 wave gate（phase09_wave_evidence_gate）与
+# per-wave gate 同时激活会导致同一批证据审两遍 + repair 双派发，且 legacy FAIL
+# 无 repair 兜底直接终止管线。所有 tier 统一跳过 legacy，evidence gate 以 per-wave 为准。
+_LEGACY_WAVE_GATE = {"phase09_wave_evidence_gate"}
+
 IR_RESEARCH_TIERS: dict[str, dict[str, Any]] = {
     "deep": {
         "label": "深度研究（默认，全量 phase）",
-        "skip": set(),
+        "skip": set(_LEGACY_WAVE_GATE),
     },
     "standard": {
         "label": "标准研究（跳过 claim/cross gate）",
-        "skip": {
+        "skip": _LEGACY_WAVE_GATE | {
             "phase14_claim_coverage",
             "phase14_cross_dimension_gate",
         },
     },
     "quick": {
         "label": "快速扫描（最小化验证）",
-        "skip": {
+        "skip": _LEGACY_WAVE_GATE | {
             "phase09_wave1_evidence_gate", "phase09_wave2_evidence_gate",
             "phase09_wave3_evidence_gate", "phase09_wave4_evidence_gate",
             "phase10_wave1_shared_refresh", "phase10_wave2_shared_refresh",
@@ -432,6 +437,17 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 5. **Section Requirements (9个)**: 分配到 IR 9步骤
 6. **Valuation Paradigm (1个)**: 6 选 1 估值范式（见下方判定表），决定全报告的估值方法和骨架
 7. **Market Anchor (1个)**: 市场共识锚（Step 0.6 产出）
+8. **Report Type (1个)**: 报告类型分流（见下方判定表），决定管线跑全量 4 波还是短路径
+
+### Report Type 判定表（2026-08-03 新增 — 决定 wave 裁剪）
+
+| report_type | 判定信号 | 管线行为 |
+|-------------|---------|---------|
+| `deep_dive` | 默认：无明确事件驱动的完整投研需求 | 全量 4 波 |
+| `event_update` | query 聚焦单一事件（订单/新品/财报/中标/合作）且要求快速跟踪 | 短路径 wave1+2 |
+| `earnings_note` | query 明确为财报/业绩点评，只要求更新模型与目标价 | 短路径 wave1 |
+
+判定依据：query 关键词（"订单""万台""新品发布""中标""合作"→event_update；"财报""业绩""点评""EPS"→earnings_note）+ Step 0.6 发现的最新动态性质。默认 `deep_dive`，拿不准就全量。
 
 ### Valuation Paradigm 判定表（6 选 1）
 
@@ -460,6 +476,8 @@ step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuati
   "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "ima-mcp:机构研报/纪要", "search_deep:公开信息", "tencent_news:实时动态"],
   "benchmark_found": true,
   "benchmark_skeleton_ref": "{tasks_dir / f'{job_ctx.job_id}-benchmark_skeleton.json'}",
+  "report_type": "deep_dive",
+  "report_type_reason": "依据判定表选择 deep_dive / event_update / earnings_note，并写明理由",
   "valuation_paradigm": "preprofit_growth",
   "paradigm_reason": "优必选亏损+高增长，用 PS/EV-Sales + TAM 份额推导，禁用 PE/DCF",
   "valuation_method_primary": "PS / EV-Sales",
@@ -513,6 +531,23 @@ def _backfill_thesis_fields(plan: dict[str, Any]) -> list[str]:
     保证下游 step（step3/6/7 等）读取 valuation_paradigm/market_anchor 时不 KeyError。
     """
     warnings: list[str] = []
+
+    # report_type（2026-08-03 修复断点B：缺失/未知 → 按 query 关键词判定兜底，
+    # 保证 _run_dispatch_prepare 的 active_waves 分流能拿到白名单内的合法值）
+    _VALID_REPORT_TYPES = {
+        "deep_dive", "company_deep_dive", "broker_ir", "industry_research",
+        "event_update", "data_track", "earnings_note",
+    }
+    if plan.get("report_type") not in _VALID_REPORT_TYPES:
+        _q = f"{plan.get('query', '')} {plan.get('entity', '')}".lower()
+        if any(k in _q for k in ("财报", "业绩", "点评", "earnings", "results")):
+            plan["report_type"] = "earnings_note"
+        elif any(k in _q for k in ("订单", "万台", "新品", "中标", "合作", "order", "new product")):
+            plan["report_type"] = "event_update"
+        else:
+            plan["report_type"] = "deep_dive"
+        plan.setdefault("report_type_reason", "子代理未产出合法 report_type，按 query 关键词兜底")
+        warnings.append("report_type_missing_fallback")
 
     # valuation_paradigm（缺失 → 按净利润正负自判兜底）
     if not plan.get("valuation_paradigm"):
@@ -793,6 +828,42 @@ def _run_precompute(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
 # Phase 4: Dispatch — 拆成 prepare + collect，避免死锁
 # ═══════════════════════════════════════════════════════════
 
+def _resolve_active_waves(runtime_root: Path, job_ctx: JobContext) -> list[int] | None:
+    """2026-08-03 修复断点B：读取当前 job 的 active_waves（报告类型分流白名单）。
+
+    dispatch_collect / per-wave gate 用它判断哪些 step/wave 是本次真正激活的，
+    避免短路径（event_update/earnings_note）裁剪后对未跑的 step/wave 误判缺失、
+    触发 redispatch 或 evidence gate REPAIR。未知/缺失 → None（全量 4 波）。
+    """
+    try:
+        from scripts.ir_research_planner import load_research_plan
+        from scripts.ir_subagent_launcher_wb import active_waves_for_report_type
+        plan = load_research_plan(job_ctx.job_id, runtime_root / "data" / "tasks") or {}
+        return active_waves_for_report_type(plan.get("report_type"))
+    except Exception:
+        return None
+
+
+def _collect_expected_steps(runtime_root: Path, job_ctx: JobContext,
+                            step_deps: dict) -> list[str]:
+    """2026-08-03 修复断点B：返回本次 collect/step_gate 应验证的 step 列表。
+
+    短路径（event_update/earnings_note）裁剪掉非激活 wave 内的 step；
+    不属于 wave 体系的 step（legacy/测试 mock 的 step 名）一律保留，保证向后兼容。
+    active_waves=None（全量）时返回全部 step。
+    """
+    from scripts.ir_subagent_launcher_wb import LAUNCH_WAVES
+    active_waves = _resolve_active_waves(runtime_root, job_ctx)
+    if active_waves is None:
+        return list(step_deps.keys())
+    wave_all = {s for wave in LAUNCH_WAVES for s in wave}
+    active_set: set[str] = set()
+    for idx in active_waves:
+        if 0 <= idx < len(LAUNCH_WAVES):
+            active_set.update(LAUNCH_WAVES[idx])
+    return [s for s in step_deps.keys() if (s not in wave_all) or (s in active_set)]
+
+
 def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
                            sequential: bool = False) -> dict[str, Any]:
     """Phase 4a: 使用 launch_next_wave 发射第一个 wave，返回 needs_dispatch=True。
@@ -818,13 +889,7 @@ def _run_dispatch_prepare(runtime_root: Path, job_ctx: JobContext,
 
     # v2.1 Batch3: 按 research_plan.report_type 计算 active_waves（报告类型分流）
     # 未知/缺失 → None（全量 4 波），保持向后兼容。
-    _active_waves: list[int] | None = None
-    try:
-        from scripts.ir_research_planner import load_research_plan
-        _plan = load_research_plan(job_ctx.job_id, runtime_root / "data" / "tasks") or {}
-        _active_waves = active_waves_for_report_type(_plan.get("report_type"))
-    except Exception:
-        _active_waves = None
+    _active_waves = _resolve_active_waves(runtime_root, job_ctx)
 
     # 发射当前 wave（自动检测已完成的 step，支持断点恢复）
     wave_result = launch_next_wave(
@@ -1197,8 +1262,14 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     incomplete_steps: list[dict] = []  # {step, missing_files, issue}
     step_quality: dict[str, dict[str, Any]] = {}
 
+    # 2026-08-03 修复断点B：只校验本次报告类型激活的 step。
+    # 短路径（event_update/earnings_note）裁剪掉的 wave 的 step 不应被判为
+    # incomplete 而触发 redispatch（否则短路径会被强行拉回全量）。
+    # 非 wave 体系内的 step（legacy/mock）一律保留。
+    _expected_steps = _collect_expected_steps(runtime_root, job_ctx, STEP_DEPS)
+
     # ── 4层防线: 逐 step 验证三文件完整性 ──
-    for step_name in STEP_DEPS:
+    for step_name in _expected_steps:
         md_path = step_output_path(job_ctx.job_id, step_name)
         facts_path = Path(str(md_path).replace(".md", "-facts.json"))
         section_path = Path(str(md_path).replace(".md", "-section.json"))
@@ -1278,7 +1349,8 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                 "issue": f"JSON invalid: {e}",
             })
 
-    total_expected = len(STEP_DEPS)
+    # 2026-08-03 修复断点B：分母用激活 step 数（短路径时不再是全量 8）
+    total_expected = len(_expected_steps)
     completion_rate = len(completed_steps) / max(total_expected, 1)
 
     # circuit_break 仅作诊断信号，不再阻断管线 (ok 永远 True)
@@ -1353,9 +1425,11 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                 pass
 
     from scripts.ir_quality_gate import run_step_gate
+    # 2026-08-03 修复断点B：step_gate 只检查激活 step（保持与三文件校验同一集合，
+    # 短路径下被裁剪的 step 不参与 step_gate，避免 MISSING 误判 FAIL）
     step_gate = run_step_gate(
         job_ctx.job_id,
-        step_order=list(STEP_DEPS.keys()),
+        step_order=list(_expected_steps),
         tasks_dir=runtime_root / "data" / "tasks",
     )
 
@@ -1397,6 +1471,19 @@ def _run_single_wave_evidence_gate(runtime_root: Path, job_ctx: JobContext,
         build_ir_repair_manifests,
     )
     from scripts.bp_utils import read_attempt_count
+
+    # 2026-08-03 修复断点B：短路径（event_update/earnings_note）裁剪掉的 wave
+    # 其 step 从未派发，gate 不应检查 → 直接 PASS，避免 BLOCKING/REPAIR 误判。
+    _active_waves = _resolve_active_waves(runtime_root, job_ctx)
+    if _active_waves is not None and wave_idx not in _active_waves:
+        return {
+            "ok": True,
+            "mode": "wave_evidence_gate",
+            "phase": f"wave{wave_idx}_evidence_gate",
+            "job_id": job_ctx.job_id,
+            "result": {"verdict": "SKIPPED_NOT_ACTIVE", "wave": wave_idx,
+                       "active_waves": _active_waves},
+        }
 
     tasks_dir = runtime_root / "data" / "tasks"
     gate_key = f"wave{wave_idx}_evidence_gate"
@@ -1777,8 +1864,11 @@ def _run_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str,
 
         # ── Repair 机制：脚注密度不达标 → 派发修复子代理 ──
         if not footnote_ok:
+            # 2026-08-03 修复断点A：读的文件必须与下方写入的 ir_synthesis_repair_gate.json
+            # 一致（原读 {job_id}-synthesis_repair.json 无任何写入方，attempt 恒为 0，
+            # 导致 repair 永不降级、无限循环）。对齐 BP 的 bp_synthesis_repair_gate.json 模式。
             prior_attempt = read_attempt_count(
-                tasks_dir / f"{job_ctx.job_id}-synthesis_repair.json"
+                tasks_dir / "ir_synthesis_repair_gate.json"
             )
 
             if prior_attempt < 1:
@@ -2219,11 +2309,14 @@ def _run_ir_investment_judgment(runtime_root: Path, job_ctx: JobContext) -> dict
 
     ws = _workspace_for(job_ctx)
     if ws is not None:
-        for fname in ("ir_investment_judgment.json", "ir_investment_judgment.md", "ir_investment_judgment.docx"):
-            src = tasks_dir / fname
+        # 2026-08-03 修复 P1：实际产物文件名带 {job_id} 前缀
+        # （见 ir_investment_judgment.py 的 json_path/md_path/docx_out），
+        # 原代码用无前缀名查找导致永远同步不到 workspace outputs。
+        for suffix in ("ir_investment_judgment.json", "ir_investment_judgment.md", "ir_investment_judgment.docx"):
+            src = tasks_dir / f"{job_ctx.job_id}-{suffix}"
             if src.exists():
                 try:
-                    shutil.copy2(src, ws.outputs_dir / fname)
+                    shutil.copy2(src, ws.outputs_dir / suffix)
                 except Exception:
                     pass
 
@@ -2357,8 +2450,10 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 
     # 4.5 投资判断汇总同步到交付目录（phase14_investment_judgment 产物）
     _tasks_dir = runtime_root / "data" / "tasks"
+    # 2026-08-03 修复 P1：实际产物带 {job_id} 前缀，原无前缀名永远找不到文件，
+    # 投资判断从未进入 delivery 目录。
     for _ij_name in ("ir_investment_judgment.md", "ir_investment_judgment.docx"):
-        _ij_src = _tasks_dir / _ij_name
+        _ij_src = _tasks_dir / f"{job_ctx.job_id}-{_ij_name}"
         if _ij_src.exists():
             try:
                 _sync_artifact_to_workspace(job_ctx, "investment_judgment", _ij_src)
@@ -2571,10 +2666,14 @@ class IRProfile(PipelineProfile):
             "phase13_synthesis_prepare": ["{task_id}-synthesis_manifest.json"],
             "phase13_synthesis_collect": ["{task_id}-synthesis.md"],
             "phase14_final_assembly": ["{task_id}-final_report.md", "{task_id}-final_assembly.json"],
-            "phase14_readability_review": ["{task_id}-ir_readability_review.json"],
-            "phase14_claim_coverage": ["{task_id}-ir_claim_coverage.json"],
-            "phase14_cross_dimension_gate": ["{task_id}-ir_cross_dimension_gate.json"],
-            "phase14_delivery_gate": ["{task_id}-ir_delivery_gate.json", "{task_id}-ir_delivery_deferred_fixes.json"],
+            # 2026-08-03 修复 P1：以下 4 个 gate 实际写出的是无前缀文件名
+            # （ir_readability_review.json / ir_claim_coverage.json /
+            #   ir_cross_dimension_gate.json / ir_delivery_gate.json），
+            # 原声明带 {task_id} 前缀导致 kernel 反查表匹配不上、回填失效。
+            "phase14_readability_review": ["ir_readability_review.json"],
+            "phase14_claim_coverage": ["ir_claim_coverage.json"],
+            "phase14_cross_dimension_gate": ["ir_cross_dimension_gate.json"],
+            "phase14_delivery_gate": ["ir_delivery_gate.json", "ir_delivery_deferred_fixes.json"],
             "phase14_investment_judgment": ["{task_id}-ir_investment_judgment.json", "{task_id}-ir_investment_judgment.md"],
             "phase15_delivery": [],
         }

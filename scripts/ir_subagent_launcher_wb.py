@@ -218,18 +218,20 @@ LAUNCH_WAVES = [
     # step8_master 已剥离为独立 synthesis 子代理（phase13）
 ]
 
-# ── 报告类型分流（v2.1, Batch 3）──
+# ── 报告类型分流（v2.1, Batch 3；2026-08-03 修复断点B：接线 event_update）──
 # report_type → active_waves（LAUNCH_WAVES 索引白名单，None=全量）。
 # ⚠️ 白名单必须是依赖闭包安全的：wave4(insight/risk) 依赖 wave2(industry/biz)+wave3(mgmt/macro)，
 #    因此想跑 wave4 就必须含 wave2+wave3。短路径只能裁到依赖链的干净前缀。
-#   - deep_dive   : 全量 4 波（默认）
-#   - data_track  : wave1+wave2（财务估值+行业业务，闭包干净，真短跑）
+#   - deep_dive / company_deep_dive / industry_research : 全量 4 波
+#   - event_update : wave1+wave2（事件驱动快报：更新财务模型+估值，补行业/业务背景）
+#   - data_track   : wave1+wave2（数据跟踪，同 event_update 的短路径）
 #   - earnings_note: wave1（只对数字反应、更新模型与目标价；洞察/风险退到统稿收口）
 REPORT_TYPE_ACTIVE_WAVES: dict[str, list[int] | None] = {
     'deep_dive': None,            # 全量
     'company_deep_dive': None,    # 兼容 research_plan 旧 report_type 取值
     'broker_ir': None,            # 兼容
     'industry_research': None,    # 兼容
+    'event_update': [0, 1],       # 事件快报（订单/新品/财报等）：财务估值+行业业务
     'data_track': [0, 1],         # 财务+估值+行业+业务
     'earnings_note': [0],         # 仅财务+估值模型
 }
