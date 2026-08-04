@@ -86,9 +86,9 @@ mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="Gold
 - 每个数字带来源（研报名 + 日期）
 - 亏损标的 PE 标 "N/A(亏损)"，用 PS/EV-Sales
 - 必须算"股价隐含假设"（implied_assumption）
-- **时效硬规则**：研报来源必须 ≤30 天。标题日期（如 -260715.pdf=2026-07-15）据此判断 source_age_days
-- 超 30 天 → 标 `"stale": true`，下游打折
-- 1 个月内找不到大行研报 → `"market_anchor": null`，写进 data_gaps，**禁止用旧研报或模型记忆硬编共识**
+- **时效硬规则**：研报来源必须 ≤3 个月（超 3 个月参考意义不大）。标题日期（如 -260715.pdf=2026-07-15）据此判断 source_age_days
+- 超 3 个月 → 标 `"stale": true`，下游打折；超 6 个月直接弃用
+- 3 个月内找不到大行研报 → `"market_anchor": null`，写进 data_gaps，**禁止用旧研报或模型记忆硬编共识**
 
 ## Step 1: 行情与财务 (westock-mcp) — 增量数据收集
 - westock-mcp.data_quote: query by entity名称或ticker -> PE/PB/市值/股价
@@ -148,7 +148,7 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 > 行业识别方法：用 westock-mcp `data_sector` 查 entity 的申万行业分类 → 用 tyc-mcp 经营范围推断 → 取交集即得行业关键词。
 
 **⚠️ fetch 权限（v4.8）：4 个库全文均可 fetch。Xavier 研报库/行研智库/精选报告 100% 可 fetch；机构调研纪要仅 NOTE 类型可 fetch。**
-**⚠️ 时间过滤纪律：优先最近 30 天内的投行研报（超 1 个月参考价值显著下降）；标题常含日期（如 -260703.pdf=2026-07-03）；大行优先。**
+**⚠️ 时间过滤纪律：只拉最近 3 个月内的投行研报（超 3 个月参考意义不大，直接跳过）；标题常含日期（如 -260703.pdf=2026-07-03）；大行优先。**
 
 1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="__ENTITY__ {行业关键词如半导体集成电路} 研报 目标价 估值")` — ★主力源：投行研报（**全文可fetch**：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
 2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{行业名如半导体} 市场规模 竞争格局")` — 行业深度报告（**全文可fetch**）

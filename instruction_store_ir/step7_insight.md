@@ -23,7 +23,7 @@
 
 **market_anchor 使用规则**：
 - `market_anchor` 存在且 `stale: false` → 作为"市场怎么看"的权威锚点，所有 debate 的 market_view 与它对齐
-- `market_anchor.stale: true`（研报超 30 天）→ 用但打折，标注"锚点已过期 X 天，结论置信度下调"
+- `market_anchor.stale: true`（研报超 3 个月）→ 用但打折，标注"锚点已过期 X 天，结论置信度下调"；超 6 个月直接弃用，按 null 处理
 - `market_anchor: null` → 在输出 `data_gaps` 声明"无有效市场共识锚"，market_view 退化为引用至少 2 家具名券商研报，禁止凭模型记忆编造共识
 
 **降级规则**：research_plan 无 `key_debates` 字段（旧版 plan）→ 自行提炼 2-3 个最核心的市场分歧作为 debate，标注"key_debates 字段缺失，已自拟"。

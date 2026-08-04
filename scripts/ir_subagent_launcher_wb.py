@@ -575,7 +575,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'   - ★Xavier 研报库（投行研报全文，第一优先）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{entity} 行业 竞争格局 估值")`',
         f'   - 行研智库（行业深度/TAM）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业}} 市场规模 TAM 竞争格局")`',
         f'   - search 命中后取最相关 5-8 篇 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")` 逐篇读全文（Xavier 研报库/行研智库/精选报告均可 fetch，放开拉，宁多勿少）',
-        f'   - 时间过滤: 优先最近 30 天的投行研报（标题含日期如 -260703.pdf），大行优先（GS/MS/JPM/BofA/Citi/UBS/Bernstein）',
+        f'   - 时间过滤: 只拉最近 3 个月内的投行研报——超 3 个月的参考意义不大，跳过（标题含日期如 -260703.pdf，据此判断），大行优先（GS/MS/JPM/BofA/Citi/UBS/Bernstein）',
         f'   - ⚠️ 行业分析/竞争格局/投资逻辑类查询必须搜 IMA——公开 web 搜不到的增量信息，跳过即视为质量不合格',
         f'2. **第二轮：westock-mcp 结构化数据（行情/财务/研报/板块/产业链，MCP 直调）**',
         f'   - 行情/估值: `mcp__westock-mcp__data_quote` | 财务: `data_finance` | 研报: `data_report`',
@@ -1622,7 +1622,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'- 行业深度/TAM/竞争格局 → 「Xavier 研报库」+「行研智库」\n'
             f'- 公司基本面/估值/目标价方法论 → 「Xavier 研报库」\n'
             f'- 机构观点/电话会纪要/外资视角 → 「Xavier 研报库」+「机构调研纪要」\n'
-            f'- 时间过滤：优先最近 30 天内的投行研报（标题含日期如 -260703.pdf），大行优先\n'
+            f'- 时间过滤：只拉最近 3 个月内的投行研报，超 3 个月参考意义不大直接跳过（标题含日期如 -260703.pdf），大行优先\n'
             f'- 每个查询建议搜 2-3 个 KB，取交叉验证后的高价值信息；全文提取 search→fetch_media_content\n'
             f'- 脚注格式：IMA知识库 — {{KB名称}} — "{{文档标题}}" (检索日期)\n'
             f'- ⚠️ fetch权限(v4.8)：★Xavier 研报库/行研智库/精选报告=100%可fetch全文→search后取media_id调fetch_media_content | 机构调研纪要=仅NOTE可fetch(失败用intro摘要)\n\n'
