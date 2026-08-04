@@ -469,28 +469,18 @@ Step 4: 如果缺上市可比公司 → 用一级融资估值锚或行业近3年
 ## 自主补搜规则（硬规则）
 
 **核心原则：发现数据缺口时自主补搜，不要写"待核实"就完事。**
+补搜的通用纪律（工具路由优先级、闭环流程、3 轮上限、来源标注）以 brief 中「补搜工具使用指南」和派发 prompt 中「数据源路由」表为准，本 step 不重复。
 
-### 补搜触发条件
+### 本 step 补搜触发条件
 1. **关键数据缺失** — 估值参数、可比公司、增速假设缺数据支撑
 2. **来源不足** — 关键论断只有 0-1 个来源
 3. **数据矛盾** — 多个来源数据不一致
 4. **时效性不足** — 最新数据超过 6 个月
 5. **新兴业务数据缺失** — ARR/收入/设备量等第三层估值所需数据
 
-### 补搜工具优先级
-1. **NeoData 金融搜索** — A/HK 股行情/财报/估值/板块（Bash 调用: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search('查询语句'), ensure_ascii=False))"`）
-2. **yfinance**（Python，Bash 调用: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import yfinance_summary; print(yfinance_summary('TICKER'))"`）— 金融数据首选：当前股价/市值/PE/EPS/PS/β/key statistics；可比公司估值指标
-3. **search_deep(Bash)** — 可比公司数据、分析师目标价、DCF 参数补充、新兴业务收入数据
-
-### 补搜闭环流程
-```
-发现缺口 → 构造搜索查询 → 执行搜索 → 提取关键信息 → 融入分析 → 检查是否还有缺口
-```
-
-### 补搜纪律
-- 补搜结果必须标注来源 URL
-- 最多补搜 3 轮，避免无限循环
-- 补搜后仍无法获取的数据，标注"经 X 次搜索未找到独立来源"
+### 本 step 补搜要点
+- 可比公司估值指标：yfinance（当前股价/市值/PE/PS/EPS/β）或 NeoData api 交叉
+- 分析师目标价/DCF 参数/新兴业务收入 → NeoData doc + IMA 自建研报库
 - 可比公司估值必须有市值和对应倍数来源
 
 ---
