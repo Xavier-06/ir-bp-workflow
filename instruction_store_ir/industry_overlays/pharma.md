@@ -26,7 +26,7 @@
 
 ## MCP 优先调用
 - westock-mcp.data_finance → 研发费用/营收/现金储备
-- IMA 自建研报库 → 大行管线深度（rNPV 模型/峰值销售）
+- IMA Xavier 研报库 → 大行管线深度（rNPV 模型/峰值销售）
 
 ## 估值范式倾向
 - 管线驱动/未盈利 → asset_nav（rNPV 加总）

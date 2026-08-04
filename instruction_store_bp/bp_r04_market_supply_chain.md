@@ -248,11 +248,11 @@ print(json.dumps(bids, ensure_ascii=False, indent=2))
 | 行业报告/白皮书 | WebSearch → WebFetch 深读 | 搜完整报告 |
 | 政策/补贴/标准 | WebSearch → WebFetch 深读 | 搜政策原文 |
 | 供应链产能/格局 | WebSearch | 搜上游材料/设备信息 |
-| **投行行业研报/TAM/产业链** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{行业名} 市场规模 TAM 产业链 竞争格局 研报` → fetch 全文 | 投行研报，结构化基准数据 |
+| **投行行业研报/TAM/产业链** | **IMA Xavier 研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{行业名} 市场规模 TAM 产业链 竞争格局 研报` → fetch 全文 | 投行研报，结构化基准数据 |
 | **行业深度研报/TAM/SAM** | **IMA 行研智库 `7311568991699459`**: `search_knowledge` 搜 `{行业名} 市场规模 TAM SAM 产业链 竞争格局` → fetch 全文 | 券商行业深度报告 |
 | **第三方白皮书/市场规模** | **IMA 精选行业报告 `7302509206984644`**: `search_knowledge` 搜 `{行业名} 市场规模 增长 趋势 白皮书` → fetch 全文 | 艾瑞/头豹/奥纬等第三方独立口径 |
 
-**IMA 调用（4 库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关 1-3 篇结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
+**IMA 调用（4 库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关 5-8 篇结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -262,10 +262,10 @@ print(json.dumps(bids, ensure_ascii=False, indent=2))
 - 区分保守/基准/乐观三种情景
 - ⚠️ 不得直接采用 BP 的 TAM/SAM/SOM
 - **同步 IMA 搜索**（不是兜底，与 WebSearch 并行）：
-  - 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{行业名} 市场规模 TAM 产业链 竞争格局 研报` → 取最相关 1-3 篇 `fetch_media_content` 读全文
-  - 行研智库 `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{行业名} 市场规模 TAM SAM 产业链 竞争格局` → 取最相关 1-3 篇 `fetch_media_content` 读全文
-  - 精选行业报告 `7302509206984644`: `ima-mcp.search_knowledge` 搜 `{行业名} 市场规模 增长 趋势 白皮书` → 取最相关 1-3 篇 `fetch_media_content` 读全文
-  - 每库最多取 top 5 结果，全文提取最多 3 篇/库，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
+  - Xavier 研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{行业名} 市场规模 TAM 产业链 竞争格局 研报` → 取最相关 5-8 篇 `fetch_media_content` 读全文
+  - 行研智库 `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{行业名} 市场规模 TAM SAM 产业链 竞争格局` → 取最相关 5-8 篇 `fetch_media_content` 读全文
+  - 精选行业报告 `7302509206984644`: `ima-mcp.search_knowledge` 搜 `{行业名} 市场规模 增长 趋势 白皮书` → 取最相关 5-8 篇 `fetch_media_content` 读全文
+  - 每库最多取 top 5 结果，全文提取最多 3 篇/库，来源标注 `[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
 
 **Step 2: 行业格局 + 政策环境（WebSearch）**
 - 搜索行业竞争格局、替代路线、政策驱动

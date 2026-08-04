@@ -28,7 +28,7 @@
 
 ## MCP 优先调用
 - westock-mcp.data_finance → 资产负债率/现金/融资成本
-- IMA 自建研报库 → 大行地产/REITs 深度（NAV/cap rate）
+- IMA Xavier 研报库 → 大行地产/REITs 深度（NAV/cap rate）
 
 ## 估值范式倾向
 - REITs/物流/基础设施 → asset_nav（NAV / cap rate 推导）

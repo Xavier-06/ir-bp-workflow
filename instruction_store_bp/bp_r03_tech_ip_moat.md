@@ -228,10 +228,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | **竞品新品发布/研发动态** | **NeoData (`neodata_search` data_type=doc)** | **竞品技术新闻、产品发布、研发突破** |
 | 上市竞品研发投入/营收 | NeoData (`neodata_search` data_type=api) | 研发费用/营收结构化 |
 | 公司工商基础 | TYC `get_company_basic_profile` | 仅做背景 |
-| **投行技术研报/行业深度** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{公司/技术名} 技术 壁垒 护城河 专利 研报` → fetch 全文 | 投行研报中的技术评价 |
+| **投行技术研报/行业深度** | **IMA Xavier 研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{公司/技术名} 技术 壁垒 护城河 专利 研报` → fetch 全文 | 投行研报中的技术评价 |
 | **技术路线横评/行业深度** | **IMA 行研智库 `7311568991699459`**: `search_knowledge` 搜 `{技术/行业名} 技术路线 对比 横评 壁垒` → fetch 全文 | 券商行业深度报告中的技术路线分析 |
 
-**IMA 调用（自建研报库/行研智库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关 1-3 篇结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
+**IMA 调用（Xavier 研报库/行研智库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关 5-8 篇结果的 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -249,10 +249,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 - ⚠️ 必须中英文双语搜索
 
 **Step 3: IMA 技术研报搜索（与 Step 2 并行，不是兜底）**
-- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{公司/技术名} 技术 壁垒 护城河 专利 研报` → 取最相关 1-3 篇 `fetch_media_content` 读全文
-- 行研智库 `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{技术/行业名} 技术路线 对比 横评 壁垒` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- Xavier 研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{公司/技术名} 技术 壁垒 护城河 专利 研报` → 取最相关 5-8 篇 `fetch_media_content` 读全文
+- 行研智库 `7311568991699459`: `ima-mcp.search_knowledge` 搜 `{技术/行业名} 技术路线 对比 横评 壁垒` → 取最相关 5-8 篇 `fetch_media_content` 读全文
 - 每库最多取 top 5 结果，全文提取最多 3 篇
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 竞品技术能力验证（WebSearch + NeoData）**

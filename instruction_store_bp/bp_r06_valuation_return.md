@@ -172,10 +172,10 @@ print(json.dumps(v, ensure_ascii=False, indent=2))
 | 可比公司板块/产业链 | westock-mcp | 板块归属和产业链位置 |
 | 可比交易（融资/估值/轮次） | WebSearch → WebFetch 深读 | 非上市公司交易数据 |
 | 行业估值水平（PS/PE 均值） | WebSearch + NeoData (doc) | 行业基准 |
-| **投行估值研报/目标价方法论** | **IMA 自建研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{可比公司名} 估值 目标价 研报` → fetch 全文 | 投行研报中的估值方法论 |
+| **投行估值研报/目标价方法论** | **IMA Xavier 研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{可比公司名} 估值 目标价 研报` → fetch 全文 | 投行研报中的估值方法论 |
 | **机构对标的/行业的估值观点** | **IMA 机构调研纪要 `7300811407257275`**: `search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易` → fetch 全文 | 专家交流中的估值判断 |
 
-**IMA 调用（自建研报库/机构调研纪要全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
+**IMA 调用（Xavier 研报库/机构调研纪要全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -209,10 +209,10 @@ brief 中的 `competitors` 字段可能为空或遗漏（上游数据断裂的�
 - 不匹配必须标注原因并剔除
 
 **Step 3: IMA 估值投行研报搜索（与 Step 2 并行，不是兜底）**
-- 自建研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{可比公司名} 估值 目标价 研报` → 取最相关 1-3 篇 `fetch_media_content` 读全文
-- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易` → 取最相关 1-3 篇 `fetch_media_content` 读全文
+- Xavier 研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{可比公司名} 估值 目标价 研报` → 取最相关 5-8 篇 `fetch_media_content` 读全文
+- 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{公司/行业名} 估值 融资 可比 交易` → 取最相关 5-8 篇 `fetch_media_content` 读全文
 - 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA 自建研报库 —《标题》(日期, 投行名)`
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 可比公司实时估值**

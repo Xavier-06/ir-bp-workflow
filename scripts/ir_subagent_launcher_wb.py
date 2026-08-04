@@ -505,7 +505,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'### 补搜工具使用指南',
         f'',
         f'数据源路由以本次派发 prompt 中的「数据源路由（强制）」表为准（含 westock-mcp / NeoData / yfinance / 天眼查 / IMA 研报库 KB ID / search_deep 的完整路由与调用方式）。',
-        f'核心原则：结构化源优先——行情/财务/研报/板块/产业链走 westock-mcp（MCP 直调），研报深度走 NeoData doc + IMA 自建研报库，工商/司法走天眼查；search_deep(Bash) 仅作突发新闻和长尾兜底。禁止只用通用搜索做所有搜索。',
+        f'核心原则：结构化源优先——行情/财务/研报/板块/产业链走 westock-mcp（MCP 直调），研报深度走 NeoData doc + IMA Xavier 研报库，工商/司法走天眼查；search_deep(Bash) 仅作突发新闻和长尾兜底。禁止只用通用搜索做所有搜索。',
         f'',
         f'### ⏰ 数据时效性硬要求（最高优先级，违反即任务失败）',
         f'',
@@ -514,7 +514,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'2. search_deep(Bash, "{entity} {{YYYY}}年{{M}}月 最新动态") — web 长尾补充',
         f'3. search_deep(Bash, "{entity} latest news {{YYYY}}") — 英文视角补充',
         f'4. 如涉及产品/技术: search_deep(Bash, "{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
-        f'5. 年报/定期报告原文: westock-mcp `data_news(symbol="代码", type=0)`（type=0 公告原文）或 IMA 自建研报库 fetch 全文——禁止用 search_deep 在 web 上瞎捞年报',
+        f'5. 年报/定期报告原文: westock-mcp `data_news(symbol="代码", type=0)`（type=0 公告原文）或 IMA Xavier 研报库 fetch 全文——禁止用 search_deep 在 web 上瞎捞年报',
         f'',
         f'**搜索 query 必须含时间锚点：**',
         f'- ❌ "腾讯 AI 大模型" → ✅ "腾讯 混元 最新模型 2026年7月"',
@@ -572,9 +572,9 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'   - 目的: 先知道"最新"是什么，后续分析才不会引用过期信息',
         f'   - 四层组合: westock-mcp(结构化) → 腾讯新闻(分钟级) → NeoData doc(深度) → search_deep(兜底)',
         f'1. **第一轮：IMA 研报库深度扫描（最高优先级，不可跳过）**',
-        f'   - ★自建研报库（投行研报全文，第一优先）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{entity} 行业 竞争格局 估值")`',
+        f'   - ★Xavier 研报库（投行研报全文，第一优先）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{entity} 行业 竞争格局 估值")`',
         f'   - 行研智库（行业深度/TAM）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业}} 市场规模 TAM 竞争格局")`',
-        f'   - search 命中后取最相关 1-3 篇 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")` 读全文（自建研报库/行研智库/精选报告均可 fetch）',
+        f'   - search 命中后取最相关 5-8 篇 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")` 逐篇读全文（Xavier 研报库/行研智库/精选报告均可 fetch，放开拉，宁多勿少）',
         f'   - 时间过滤: 优先最近 30 天的投行研报（标题含日期如 -260703.pdf），大行优先（GS/MS/JPM/BofA/Citi/UBS/Bernstein）',
         f'   - ⚠️ 行业分析/竞争格局/投资逻辑类查询必须搜 IMA——公开 web 搜不到的增量信息，跳过即视为质量不合格',
         f'2. **第二轮：westock-mcp 结构化数据（行情/财务/研报/板块/产业链，MCP 直调）**',
@@ -585,7 +585,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'3. **第三轮：广度扫描** — NeoData doc 拿研报/分析 + Bash 调 search_gateway prefer=multi 多关键词并行',
         f'4. **第四轮：深度验证** — 对前三轮发现的关键 claim，用 search_deep(Bash, fetch_top_n) 读全文验证',
         f'5. **第五轮：交叉验证/反证** — 搜竞品对比、负面信息、分析师观点；机构调研纪要补搜 `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} 调研 纪要")`',
-        f'6. **TYC 天眼查必查项**（如标的涉及中国大陆企业）：工商信息、司法诉讼、专利、资质',
+        f'6. **上市公司信息必查项**：股东/高管/股本变动/公告走 westock-mcp（data_shareholder / data_news(type=0)）——IR 标的都是上市公司，别用 tyc 查上市公司；tyc-mcp 仅用于非上市主体（子公司/客户/供应商）验证、专利/司法诉讼专项',
         f'',
         f'⚠️ 若跳过第 1/2 轮（IMA + westock-mcp）直接用 search_deep，搜索审计将被判为不合格。',
         f'',
@@ -1605,7 +1605,8 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'| 查什么 | 首选工具 | 调用方式 | 兜底 |\n'
             f'|--------|----------|----------|------|\n'
             f'| A/HK 股行情/财务/估值/板块/产业链/研报/评级/资金流 | **westock-mcp** | MCP 直接调用 data_quote/data_finance/data_report/data_sector 等 | NeoData → search_deep(Bash) |\n'
-            f'| 企业工商/股东/高管/专利/司法/招投标 | **tyc-mcp** | search_companies → call_tool | search_deep(Bash) |\n'
+            f'| **上市公司**股东/高管/股本变动/公告 | **westock-mcp**（别用 tyc） | MCP: `data_shareholder` / `data_news(type=0)` / `data_profile` | search_deep(Bash) |\n'
+            f'| 企业工商/专利/司法/招投标（非上市主体验证、专利司法专项） | **tyc-mcp** | search_companies → call_tool | search_deep(Bash) |\n'
             f'| A/HK 股行情/财报/估值(结构化数字) | **NeoData api** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search(\\"查询词\\", data_type=\\"api\\"), ensure_ascii=False))"` | yfinance → search_deep(Bash) |\n'
             f'| **券商研报/行业深度/财经新闻/政策分析** | **NeoData doc** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search(\\"查询词\\", data_type=\\"doc\\"), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| **机构调研纪要/专家交流/外资研报/行业深度报告** | **ima-mcp** | MCP 直接调用 `mcp__ima-mcp__search_knowledge(knowledge_base_id="KB_ID", query="查询词")` | search_deep(Bash) |\n'
@@ -1615,19 +1616,20 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'| 美股估值/财务 | **yfinance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "import yfinance as yf; print(yf.Ticker(\\"AAPL\\").info)"` | westock-mcp → search_deep(Bash) |\n'
             f'| **美股英文新闻/earnings/分析师动态** | **Yahoo Finance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import _yahoo_search; import json; print(json.dumps(_yahoo_search(\\"NVDA earnings\\", max_results=5), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| 学术论文/政策文件/英文技术文档 | **search_deep(Bash, fetch_top_n)** | Bash 调用，自动抓全文 | — |\n\n'
-            f'⚠️ IMA 知识库使用提示（ima-mcp，已授权，直接调用，v4.8 自建研报库为主力源）：\n'
-            f'- KB ID 速查：★自建研报库(投行/券商研报全文)=001a89fa4b807b92 | 机构调研纪要=7300811407257275 | 行研智库=7311568991699459 | 精选报告=7302509206984644\n'
-            f'- ★所有搜索第一优先「自建研报库」001a89fa4b807b92（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报，全文可 fetch）\n'
-            f'- 行业深度/TAM/竞争格局 → 「自建研报库」+「行研智库」\n'
-            f'- 公司基本面/估值/目标价方法论 → 「自建研报库」\n'
-            f'- 机构观点/电话会纪要/外资视角 → 「自建研报库」+「机构调研纪要」\n'
+            f'⚠️ IMA 知识库使用提示（ima-mcp，已授权，直接调用，v4.8 Xavier 研报库为主力源）：\n'
+            f'- KB ID 速查：★Xavier 研报库(投行/券商研报全文)=001a89fa4b807b92 | 机构调研纪要=7300811407257275 | 行研智库=7311568991699459 | 精选报告=7302509206984644\n'
+            f'- ★所有搜索第一优先「Xavier 研报库」001a89fa4b807b92（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报，全文可 fetch）\n'
+            f'- 行业深度/TAM/竞争格局 → 「Xavier 研报库」+「行研智库」\n'
+            f'- 公司基本面/估值/目标价方法论 → 「Xavier 研报库」\n'
+            f'- 机构观点/电话会纪要/外资视角 → 「Xavier 研报库」+「机构调研纪要」\n'
             f'- 时间过滤：优先最近 30 天内的投行研报（标题含日期如 -260703.pdf），大行优先\n'
             f'- 每个查询建议搜 2-3 个 KB，取交叉验证后的高价值信息；全文提取 search→fetch_media_content\n'
             f'- 脚注格式：IMA知识库 — {{KB名称}} — "{{文档标题}}" (检索日期)\n'
-            f'- ⚠️ fetch权限(v4.8)：★自建研报库/行研智库/精选报告=100%可fetch全文→search后取media_id调fetch_media_content | 机构调研纪要=仅NOTE可fetch(失败用intro摘要)\n\n'
+            f'- ⚠️ fetch权限(v4.8)：★Xavier 研报库/行研智库/精选报告=100%可fetch全文→search后取media_id调fetch_media_content | 机构调研纪要=仅NOTE可fetch(失败用intro摘要)\n\n'
             f'⚠️ 禁止行为：\n'
             f'- 禁止用通用搜索搜公司财务数据（用 westock-mcp: data_finance）\n'
-            f'- 禁止用通用搜索搜公司股东信息（用 tyc-mcp: search_companies → call_tool）\n'
+            f'- 禁止用通用搜索搜公司股东信息（上市公司用 westock-mcp: data_shareholder；非上市主体用 tyc-mcp）\n'
+            f'- 禁止对上市公司股东/高管/股本查询用 tyc-mcp——IR 管线标的都是上市公司，股东/高管/股本变动走 westock-mcp，tyc 仅用于非上市主体（子公司/客户/供应商）验证与专利司法专项\n\n'
             f'- 禁止用通用搜索搜行业板块走势（用 westock-mcp: data_sector）\n'
             f'- 禁止用通用搜索搜最新新闻动态（用 tencent_news_search，自动降级 NeoData doc）\n'
             f'- 禁止忽略 IMA 知识库——机构调研/专家纪要是公开 web 搜不到的增量信息，行业分析/竞争格局/投资逻辑类查询必须搜 IMA\n\n'
@@ -1746,7 +1748,7 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
             # 数据源审计（v3.2）：研究类 step 未使用 IMA 研报库或 westock-mcp 任一结构化源 → 扣分
             if step in ('step1_industry', 'step2_biz', 'step3_finance', 'step5_macro', 'step6_valuation'):
                 _used_structured = any(k in txt for k in (
-                    'IMA知识库', 'ima-mcp', '自建研报库', '行研智库', '机构调研纪要',
+                    'IMA知识库', 'ima-mcp', 'Xavier 研报库', '行研智库', '机构调研纪要',
                     'westock-mcp', '腾讯自选股', 'data_finance', 'data_quote', 'data_report', 'data_news'))
                 if not _used_structured and sc > 1:
                     sc = max(1, sc - 1)

@@ -184,7 +184,8 @@ Markdown 文件，必须包含以下章节（按顺序）：
 5. **历史承诺缺失** — 找不到过去3年管理层公开目标/指引
 
 ### 本 step 补搜要点
-- 高管履历/股权变更/公司治理优先天眼查 MCP（境内注册企业），境外用 search_deep 兜底
+- 股权变更/股本结构/大股东持仓（上市公司）→ westock-mcp `data_shareholder`，禁止用 tyc 查上市公司股东
+- 高管履历/任职关系 → tyc-mcp 高管画像 + search_deep 兜底；境外用 search_deep 兜底
 
 ---
 

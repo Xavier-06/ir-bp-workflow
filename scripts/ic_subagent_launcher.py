@@ -1005,7 +1005,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             f'- 最新行业动态 → 中文实时新闻 tencent_news_search（Bash 调用，见 System Prompt 工具指南）\n'
             f'- 龙头公司实时估值锚 → westock-mcp: data_quote（查 {sector_hint} 龙头公司）\n'
             f'- 行业研报/市场规模 → westock-mcp: data_report\n'
-            f'- **投行研报/行业共识/预期差** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{sector_hint} 行业 共识 预期 投资逻辑 研报") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            f'- **投行研报/行业共识/预期差** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{sector_hint} 行业 共识 预期 投资逻辑 研报") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             f'- **行业深度研报/TAM** → ima-mcp: search_knowledge(KB="7311568991699459", query="{sector_hint} 行业深度 市场规模 TAM") → fetch_media_content 读全文\n'
             f'- 通用搜索兜底 → {_SEARCH_DEEP_HINT}\n\n'
         )
@@ -1017,7 +1017,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 券商行业研报 → westock-mcp: data_report → NeoData(Bash)\n'
             '- **行业深度研报/TAM/产业链** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 市场规模 TAM 产业链 竞争格局") → fetch_media_content 读全文\n'
             '- **第三方白皮书/市场规模** → ima-mcp: search_knowledge(KB="7302509206984644", query="{行业} 市场规模 增长 趋势 白皮书") → fetch_media_content 读全文\n'
-            '- **机构对行业的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 行业 供应链 政策 产能") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **机构对行业的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 行业 供应链 政策 产能") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- 突发行业动态 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- 可比公司估值/财务 → westock-mcp: data_finance\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
@@ -1032,7 +1032,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 专利布局/研发能力 → tyc-mcp: call_tool(search_patents)\n'
             '- 市场份额/CR3/CR5 → westock-mcp + search_deep(Bash) 交叉验证\n'
             '- **竞品投关记录/管理层表态** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{竞品名} 投关 调研 纪要 竞争 份额") → search 后取 media_id 调 fetch_media_content 读全文\n'
-            '- **机构对竞争格局的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 竞争 格局 份额 差异化") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **机构对竞争格局的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 竞争 格局 份额 差异化") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role in ('ic_tech_product', 'ic_route_deep'):
@@ -1044,7 +1044,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 技术突破新闻 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- 公司研发投入/研发费用率 → westock-mcp: data_finance\n'
             '- **技术路线横评/行业深度** → ima-mcp: search_knowledge(KB="7311568991699459", query="{技术/行业} 技术路线 对比 横评 壁垒") → fetch_media_content 读全文\n'
-            '- **机构对技术壁垒的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司/技术} 技术 壁垒 护城河") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **机构对技术壁垒的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司/技术} 技术 壁垒 护城河") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- search_deep 用于学术/技术类搜索是合理的，但商业数据仍优先结构化源\n\n'
         )
     elif role == 'ic_supply_chain':
@@ -1056,7 +1056,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 产能/订单动态 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- 行业深度数据 → NeoData(Bash)\n'
             '- **行业深度研报/产业链成本结构** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 产业链 成本结构 拆解 供应格局") → fetch_media_content 读全文\n'
-            '- **机构对供应链的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 供应链 产能 格局 国产替代") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **机构对供应链的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 供应链 产能 格局 国产替代") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
     elif role == 'ic_policy_risk':
@@ -1066,7 +1066,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 企业司法/风险/行政处罚 → tyc-mcp: call_tool（风险扫描类）\n'
             '- 出口管制/制裁清单 → search_deep(Bash, "BIS entity list {关键词}")\n'
             '- 政策最新动态/解读 → 中文实时新闻 tencent_news_search(Bash)\n'
-            '- **机构对政策影响的研判** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 政策 监管 影响 风险") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **机构对政策影响的研判** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 政策 监管 影响 风险") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- **外资/专家对风险的观点** → ima-mcp: search_knowledge(KB="7300811407257275", query="{行业} 风险 政策 地缘 外资") → 用 introduction 摘要\n'
             '- 地缘风险/贸易摩擦 → search_deep(Bash) + 中文实时新闻 tencent_news_search\n\n'
         )
@@ -1078,7 +1078,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 定价/收费模式 → search_deep(Bash, fetch_top_n)（产品官网，读全文）\n'
             '- 用户数据/留存/渗透率 → search_deep(Bash)\n'
             '- **公司最新公告/新闻/研报动态（上市公司）** → westock-mcp: data_news(symbol="代码", type=3)（比通用新闻更聚焦该公司）\n'
-            '- **机构对商业模式/客户的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司/行业} 商业模式 客户 订单 收入") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **机构对商业模式/客户的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司/行业} 商业模式 客户 订单 收入") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- **可比公司投关记录** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司名} 投关 调研 纪要") → search 后取 media_id 调 fetch_media_content 读全文\n\n'
         )
     elif role == 'ic_feasibility':
@@ -1088,7 +1088,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 实验进展/里程碑 → search_deep(Bash) + 中文实时新闻 tencent_news_search(Bash)\n'
             '- 专利 → tyc-mcp: search_patents\n'
             '- 项目/公司融资 → tyc-mcp: search_companies → search_deep(Bash)\n'
-            '- **机构对技术可行性的判断** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{技术/行业} 可行性 里程碑 量产 时间表") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **机构对技术可行性的判断** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{技术/行业} 可行性 里程碑 量产 时间表") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- **行业研报/技术路线横评** → ima-mcp: search_knowledge(KB="7311568991699459", query="{技术/行业} 技术路线 成熟度 产业化") → fetch_media_content 读全文\n\n'
         )
     elif role in ('ic_catalyst', 'ic_consensus'):
@@ -1098,7 +1098,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 资金流向/北向持仓 → westock-mcp: data_fund_flow + data_north_holding\n'
             '- 最新动态 → 中文实时新闻 tencent_news_search(Bash)\n'
-            '- **卖方共识/机构预期** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业/公司} 卖方共识 一致预期 催化") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **卖方共识/机构预期** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业/公司} 卖方共识 一致预期 催化") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- **外资/专家非共识观点** → ima-mcp: search_knowledge(KB="7300811407257275", query="{行业/公司} 外资 非共识 分歧 预期差") → 用 introduction 摘要\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
@@ -1115,7 +1115,7 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 企业工商/股东/专利 → tyc-mcp: search_companies → call_tool\n'
             '- 行业研报/板块数据 → westock-mcp: data_report / data_sector\n'
             '- **券商研报/行业深度报告/财经新闻** → NeoData Bash(`data_type="doc"`) — 质量远优于通用搜索\n'
-            '- **机构研报/专家纪要/外资观点** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{关键词}") → search 后取 media_id 调 fetch_media_content 读全文（自建研报库全文可 fetch）\n'
+            '- **机构研报/专家纪要/外资观点** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{关键词}") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- **行业深度研报/TAM/白皮书** → ima-mcp: search_knowledge(KB="7311568991699459", query="{行业} 行业深度 市场规模") → fetch_media_content 读全文\n'
             '- 中文实时新闻 → 中文实时新闻 tencent_news_search(Bash)\n'
             '- **美股新闻/earnings/分析师** → Yahoo Finance Bash(`_yahoo_search`) — 英文金融新闻首选\n'
