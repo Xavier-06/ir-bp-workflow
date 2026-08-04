@@ -2751,9 +2751,9 @@ def _run_bp_synthesis_prepare(runtime_root: Path, job_ctx: JobContext) -> dict[s
     # 写 manifest
     manifest_path = task_dir / "bp_synthesis_manifest.json"
 
-    # ── 从 instruction_store_bp/bp_统稿.md 加载 system_prompt（单一真实来源）──
+    # ── 从 instruction_store_bp/bp_s1_统稿.md 加载 system_prompt（单一真实来源）──
     _instruction_store = runtime_root / "instruction_store_bp"
-    _synthesis_prompt_path = _instruction_store / "bp_统稿.md"
+    _synthesis_prompt_path = _instruction_store / "bp_s1_统稿.md"
     if _synthesis_prompt_path.exists():
         synthesis_system_prompt = _synthesis_prompt_path.read_text(encoding="utf-8")
     else:

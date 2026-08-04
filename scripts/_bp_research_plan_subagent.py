@@ -69,11 +69,11 @@ def bp_build_research_plan_instruction(
     """Build the main-AI instruction for dispatching the research plan subagent.
 
     v13 (2026-08-04): 子代理 prompt 主体从硬编码英文字符串迁移到
-    instruction_store_bp/bp_research_plan.md 模板（与其它角色指令同库同骨架），
+    instruction_store_bp/bp_r00_research_plan.md 模板（与其它角色指令同库同骨架），
     此处只做占位符替换。模板缺失时报配置缺口，不复用其它角色 prompt。
     """
     project_root = Path(__file__).resolve().parent.parent
-    template_path = project_root / "instruction_store_bp" / "bp_research_plan.md"
+    template_path = project_root / "instruction_store_bp" / "bp_r00_research_plan.md"
     if not template_path.exists():
         raise FileNotFoundError(
             f"BP research plan instruction template missing: {template_path}. "

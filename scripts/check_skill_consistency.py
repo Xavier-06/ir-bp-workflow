@@ -122,8 +122,7 @@ GOLDEN_SNIPPETS = {
         "description": "BP anti-defect rules",
         "allowed_in": [
             "skills/ir-reporter/references/bp-anti-defect-rules.md",
-            "instruction_store_bp/bp_技术与产品.md",
-            "instruction_store_bp/bp_统稿.md",
+            "instruction_store_bp/bp_s1_统稿.md",
         ],
         "allowed_mention": [],
     },
