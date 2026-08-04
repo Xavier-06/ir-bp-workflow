@@ -1,232 +1,188 @@
 # IR 管线详细流程
 
-## 管线阶段（14 phases，连续编号 phase01-14）
+> 本文档与代码真相源对齐：`runtime/profiles/ir_profile.py`（phase 注册表）+
+> `scripts/ir_subagent_launcher_wb.py`（STEP_DEPS/LAUNCH_WAVES）。
+> **2026-08-04 v3.2 重写**：旧版描述的 presearch/extract/脚本 research plan 骨架均已删除。
+
+## 管线阶段（29 phases，实际执行顺序）
 
 ```
-01 phase01_preflight               — 环境检测 + 任务注册 + NeoData token 预检
-02 phase02_company_verify          — 公司验证 + 估值数据 (NeoData优先 + yfinance交叉验证) [heavy_bg]
-03 phase03_research_plan           — Research Plan Gate：脚本骨架 + 主控增强 strategic_questions + ready 校验
-04 phase04_presearch               — 10 step 预搜索 (NeoData Layer 0 + SearchGateway/SearXNG) [heavy_bg]
-05 phase05_extract                 — URL 内容提取 (Scrapling 三层递进)
-06 phase06_fact_store_bootstrap    — 初始化 Fact Store，沉淀可追溯事实和候选事实
-07 phase07_precompute              — 预计算引擎: financial_metrics + sector_benchmarks
-│   └── 输出写入 data/tasks/{TASK_ID}_precompute_{engine}.json 供子代理使用
-08 phase08_dispatch_prepare        — launch_next_wave() 发射第一个 wave，返回 needs_dispatch
-│   └── kernel 暂停，coordinator 循环 launch_next_wave() 推进所有 wave
-09 phase09_dispatch_collect        — 检查子代理输出 + 初步质量门禁
-10 phase10_fact_store_merge        — 合并各 step 的 fact sidecar 到 Fact Store
-11 phase11_section_package_validation — 抽取并校验各 step 的 Section Package
-12 phase12_debate_review           — 中途批判复盘：证据不足、无反证、弱来源高置信等
-13 phase13_final_assembly          — 只组装通过校验的 Section Package，不新增事实
-14 phase14_delivery                — 对抗验证 + DOCX + 交付（最终保险丝）[heavy_bg]
+01  phase01_preflight               — 环境检测 + 任务注册 + 指令库/角色校验 + research plan 状态检查
+02  phase02_company_verify          — 公司验证 + 估值数据 [heavy_bg，kernel 内部自动等待]
+    （phase03/phase05 编号永久空缺：presearch + extract 已于 v5.3 删除，
+      搜索由 phase04 research plan 子代理全权执行）
+03  phase04_research_plan           — ★ 派发研究计划子代理（指令: instruction_store_ir/ir_research_plan.md）
+    │                                 → 返回 needs_dispatch，Coordinator 手动派发子代理
+    └ 子代理产出: ir_research_plan.json + benchmark_skeleton.json（大行研报骨架）
+                  + enriched_data_pack.json（替代旧 step1_data 数据包）
+04  phase04_research_plan_collect   — 校验并落盘子代理 plan（v3.2: 缺失/校验失败=硬失败，无脚本兜底）
+05  phase06_fact_store_bootstrap    — 初始化 Fact Store
+06  phase07_precompute              — 预计算引擎: financial_metrics + sector_benchmarks
+07  phase08_dispatch_prepare        — launch_next_wave() 发射 Wave1 → needs_dispatch
+08  phase09_dispatch_collect        — 检查子代理输出 + 质量门禁（collect/prepare 成对循环推进 4 波）
+09-12 phase09_wave1~4_evidence_gate — 每个 wave 的证据完整性门禁
+13  phase10_fact_store_merge        — 合并各 step fact sidecar 到 Fact Store
+14-18 phase10_shared_state_refresh  — 跨 Wave 共享状态摘要（+ wave1~4 各一份）
+19  phase11_section_package_validation — 抽取并校验各 step 的 Section Package
+20  phase12_debate_review           — 中途批判复盘（证据不足/无反证/弱来源高置信）
+21  phase13_synthesis_prepare       — 构建统稿子代理 manifest（指令: instruction_store_ir/ir_统稿.md）→ needs_dispatch
+22  phase13_synthesis_collect       — 校验统稿输出完整性 + 脚注密度 repair
+23  phase14_final_assembly          — 只组装通过校验的 Section Package，不新增事实
+24  phase14_readability_review      — 可读性审查（机器ID泄漏/长段落/脚注完整性）
+25  phase14_claim_coverage          — claim ↔ fact 覆盖校验
+26  phase14_cross_dimension_gate    — 跨 step 指标一致性与逻辑矛盾检查
+27  phase14_delivery_gate           — 汇总上游 gate 的最终交付门禁（FAIL 记 deferred，不阻断）
+28  phase14_investment_judgment     — 投资判断汇总（明确建议 + 逻辑 + 风险）
+29  phase15_delivery                — 对抗验证 + DOCX + 交付 [heavy_bg，kernel 内部自动等待]
 ```
 
-> 新质量协议详见 `references/ir-quality-production-pipeline.md`。Coordinator 必须按完整链路推进，不能把 delivery gate 当成唯一质量来源。
+**heavy phase 只有两个**：phase02_company_verify、phase15_delivery。kernel 内部 block-wait，
+Coordinator 不需要轮询 bg_pid，但 Bash 必须设 `timeout=600000`（否则 Bash 120s 切断会话）。
+
+## Research Plan（phase04，v3.2 起子代理唯一产出）
+
+- **指令库**：`instruction_store_ir/ir_research_plan.md`（ir_profile 读模板 + token 替换渲染）
+- **Step 0.5 大行研报骨架（最高优先级）**：IMA 自建研报库 `001a89fa4b807b92`，
+  搜 GS/MS/JPM/Citi/HSBC/UBS/BofA/Bernstein 最新研报 → fetch 全文 → 解析为
+  `{task_id}-benchmark_skeleton.json`（key_debates/财务预测/估值方法/情景分析）
+- **Step 0.6 market_anchor**：市场共识锚（一致预期/目标价/隐含假设，研报时效 ≤30 天铁律）
+- **输出**：plan 含 valuation_paradigm（6 选 1）/ key_debates（P0-P2）/ dim_priority /
+  report_type（deep_dive/event_update/earnings_note，决定 wave 裁剪）
+- **脚本不再生成 plan**：`ir_research_planner.py` 只剩契约校验（normalize/validate/load/path）。
+  Coordinator 不要手动调任何 plan 生成函数。
+
+## Wave 编排（v3.1 研究链 4 波，2026-08-04 回归大行真实研究顺序）
+
+```
+Wave 1: step1_industry, step2_biz, step5_macro     — 背景层（并行）
+Wave 2: step3_finance, step4_mgmt                  — 预测与验证（消费 Wave1）
+Wave 3: step6_valuation                            — 估值收口（消费预测）
+Wave 4: step7_insight, step8_risk                  — 预期差收口
+统稿:   phase13 synthesis（ir_统稿.md），不在 LAUNCH_WAVES 内
+```
+
+> 估值是研究的**收口**不是起点——报告开头放目标价只是"结论前置"的成文技巧。
+> 依据：4 篇大行公司首发研报全文解剖（爱建/先锋精科、交银国际/鸣鸣很忙、东方/中国太保、Bernstein/Booking）。
+
+### Step 依赖
+
+| Step | 依赖 | 角色指令 |
+|------|------|---------|
+| step1_industry | — | step1_industry.md |
+| step2_biz | — | step2_biz.md |
+| step5_macro | — | step5_macro.md |
+| step3_finance | step1_industry, step2_biz | step3_finance.md |
+| step4_mgmt | step2_biz | step4_mgmt.md |
+| step6_valuation | step3_finance, step1_industry, step2_biz, step5_macro | step6_valuation.md |
+| step7_insight | step1~step6 全部 | step7_insight.md |
+| step8_risk | step3_finance, step4_mgmt, step5_macro, step6_valuation | step8_risk.md |
+
+### 报告类型分流（active_waves 白名单）
+
+| report_type | 波次 | 场景 |
+|-------------|------|------|
+| deep_dive（默认） | 全量 4 波 | 完整投研 |
+| event_update | Wave1+2+3 | 订单/新品/中标/合作快速跟踪 |
+| earnings_note | Wave2+3 | 财报点评（仅预测+估值，大行点评模式） |
+
+report_type 由 phase04 子代理判定（`_backfill_thesis_fields` 按 query 关键词兜底），
+白名单外依赖由 `deps_ready(active_steps)` 自动降级放行。Coordinator 无需干预。
 
 ## 核心 API
 
 ```python
 from ir_subagent_launcher_wb import (
-    launch_next_wave,      # 发射当前 wave，返回 team 派发指令
+    launch_next_wave,      # 发射当前 wave，返回 team 派发指令（sequential=True 每次 1 个 step）
     get_pipeline_status,   # 管线状态快照
-    get_current_wave_index,# 当前该发哪个 wave
-    finalize_pipeline,     # Phase 5 全自动（质检→DOCX→桌面→微信）
-    check_step_quality,    # 单 step 质检
+    finalize_pipeline,     # 交付收尾（质检 → DOCX → 桌面复制）
 )
 ```
 
-## 提交任务
+## 提交与执行
 
 ```bash
 # ⚠️ 所有 python3 管线命令必须带 cd 前缀（Bash 每次调用是独立 shell）
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator submit \
   --entity "标的名称" --market cn --query "研究重点"
 
-# 执行管线（同样必须带 cd）
 cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
-
-# ⚠️ 如果返回 needs_poll: true + bg_pid，必须轮询到进程结束才能推进
-# while kill -0 {bg_pid} 2>/dev/null; do sleep 30; done
+# ⚠️ Bash 必须设 timeout=600000：kernel block-wait heavy phase（phase02/15）
 ```
-
-返回 `job_id`（如 `TASK-XXXXXXXX-XXX`）。
-
-## Wave 编排
-
-> **架构对齐**：10-Agent 实战管线：step_macro（宏观面）+ step6b_valuation（估值面）等。
-
-```
-Wave 1: step1_data                                         (串行)
-Wave 2: step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro  (串行派发：逐个)
-Wave 3: step6b_valuation                                   (串行)
-Wave 4: step6_insight, step7_risk                          (串行派发：逐个)
-Wave 5: step8_master                                       (串行)
-Phase 5: finalize_pipeline() → 质检 → DOCX → 桌面 → 微信通知
-```
-
-> ⚠️ sequential mode: `launch_next_wave(sequential=True)` 每次只返回一个 step，
-> Coordinator 逐个派发并等待完成，避免并行 Task 子代理触发 API 429。
-
-### IR Step 依赖和波次
-
-| 波次 | Steps | 依赖 | 预估时间 |
-|------|-------|------|---------|
-| Wave 1 | step1_data | 无 | 10-25 分钟 |
-| Wave 2 | step2_industry, step3_biz, step4_finance, step5_mgmt, step_macro | step1_data | 每个 15-25 分钟 |
-| Wave 3 | step6b_valuation | step1+4 | 15-25 分钟 |
-| Wave 4 | step6_insight, step7_risk | step1+2+3 / step1+3+4 | 每个 15-25 分钟 |
-| Wave 5 | step8_master | step1~step7_risk | 20-30 分钟 |
-
-## 质量生产型新增资产
-
-在 wave 派发前后，管线会生成以下质量资产：
-
-| 资产 | 路径 | 说明 |
-|------|------|------|
-| Research Plan | `{IR_RUNTIME}/data/tasks/{TASK_ID}-research_plan.json` | 任务级总 plan；必须 `plan_status=ready`，包含 core_questions、strategic_questions、section_requirements、coverage_matrix |
-| Fact Store | `{IR_RUNTIME}/data/tasks/{TASK_ID}-fact_store.json` | 通用事实库，保存 fact_id、claim、value、source、confidence |
-| Section Packages | `{IR_RUNTIME}/data/tasks/{TASK_ID}-section_packages.json` | 从各 step 输出抽取的结构化章节资产 |
-| Debate Review | `{IR_RUNTIME}/data/tasks/{TASK_ID}-debate_review.json` | 对章节资产做批判复盘，发现无事实绑定/缺反证等问题 |
-| Final Assembly | `{IR_RUNTIME}/data/tasks/{TASK_ID}-final_assembly.json` | 最终组装状态，只使用通过校验的 Section Package |
-| Final Report Markdown | `{IR_RUNTIME}/data/tasks/{TASK_ID}-final_report.md` | 质量生产型最终 Markdown 草稿 |
-
-子代理 brief 会自动注入 Research Plan、Fact Store 和共享输出协议。子代理不是直接写最终研报，而是生产 Section Package。所有 step 共享同一份总 Research Plan，但只回答自己 step 的 slice：`section_requirements[step]`、`core_questions.owner_section == step`、`strategic_questions.owner_section == step`。
-
-## 预计算数据（Phase 1.2 输出）
-
-预计算引擎在 `phase15_extract` 之后自动运行，输出写入 `{IR_RUNTIME}/data/tasks/`：
-
-| 引擎 | 输出文件 | 使用者 |
-|------|---------|--------|
-| financial_metrics | `{TASK_ID}_precompute_financial_metrics.json/.md` | step4_finance, step6b_valuation |
-| sector_benchmarks | `{TASK_ID}_precompute_sector_benchmarks.json/.md` | step2_industry, step6_insight |
-
-**子代理使用方式**：
-```bash
-# 读取预计算数据（JSON 格式）
-cat {IR_RUNTIME}/data/tasks/{TASK_ID}_precompute_financial_metrics.json | python3 -m json.tool
-
-# 或读取 markdown 格式（方便人类阅读）
-cat {IR_RUNTIME}/data/tasks/{TASK_ID}_precompute_financial_metrics.md
-```
-
-子代理 step brief 中会包含预计算数据路径，子代理应优先读取预计算数据，再根据需要补充搜索。
 
 ## 执行伪代码（Coordinator 循环）
 
 ```python
-# Phase 01-05: 管线自动跑 preflight → company_verify → presearch → extract → fact_store → precompute
-python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
-# → 管线在 phase08_dispatch_prepare 暂停，返回 needs_dispatch=True + task_tool_instructions
+# 阶段一：execute 自动跑 preflight → company_verify[heavy 自动等] → phase04 派发暂停
+result = execute(job_id)  # → needs_dispatch=True，返回 research plan 子代理派发指令
+# dispatch_info: subagent_type=general-purpose, connectorIds=[westock-mcp, tyc-mcp, ima-mcp]
 
-# Phase 4: Coordinator 用 team 异步模式发射 wave
-MAX_RETRIES = 2
-TOOL_LIMITS = """⚠️ 工具限制：你没有 Glob/Grep 工具。搜索文件用 Bash（find/ls），读文件用 Read，搜索内容用 Bash（grep）。不要调用 Glob 或 Grep。
-NeoData 金融数据查询（A/HK 股首选，token 已在 preflight 存好）：
-  cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import neodata_search; import json; print(json.dumps(neodata_search('查询语句'), ensure_ascii=False))"
-"""
+# 阶段二：派发研究计划子代理（ir-research-planner），等其写完 ir_research_plan.json
+Agent(name='ir-research-planner', team_name=f'ir-{task_id}', mode='bypassPermissions',
+      subagent_type='general-purpose', prompt=result['instruction'])
 
-# 1. 创建 team
+# 阶段三：继续 execute，collect 校验 plan → fact_store → precompute → Wave1 prepare 暂停
+result = execute(job_id, start_phase='phase04_research_plan_collect')
+
+# 阶段四：team 模式 sequential 派发 4 波 8 step
 team_create(team_name=f"ir-{task_id}")
-
 while True:
-    result = launch_next_wave(task_id, entity, query, market, sequential=True)
-    
-    if result['all_done']:
-        break
-
-    # sequential 模式：task_tool_instructions 最多 1 个 step
-    # ⚠️ 规则4：prompt 开头必须加 TOOL_LIMITS
-    if not result['task_tool_instructions']:
-        # 当前 wave 所有 step 被阻塞，等待 60s 后重试
-        print(f"  ⏳ Wave {result.get('wave_index',0)+1} 全阻塞，等待前序 step 完成...")
-        sleep(60)
-        continue
-
-    for instruction in result['task_tool_instructions']:
-        step = instruction['step']
-        output_path = instruction['output_path']
-        
-        # ⚠️ prompt 前面不写 run_in_background=True（不显式指定，用默认行为）
-        Agent(
-            name=f'{step}',
-            team_name=f'ir-{task_id}',
-            mode='bypassPermissions',
-            description=step,
-            prompt=TOOL_LIMITS + "\n" + instruction['prompt'],
-        )
-    
-    # 规则5：主动轮询输出文件，不等消息
-    # 单个 step 的轮询更简单：
-    # while ! test -s {output_path}; do sleep 30; done
-    # 超过 20 分钟未完成 → 重派（最多 2 次）
-
-    # has_more=True → 下一轮循环继续发射同 wave 的下一个 step
-    # has_more=False → 所有 wave 完成后 all_done=True
-
-# 清理 team
+    r = launch_next_wave(task_id, entity, query, market, sequential=True)
+    if r['all_done']: break
+    for inst in r['task_tool_instructions']:  # sequential 模式最多 1 个
+        Agent(name=inst['name'], team_name=f"ir-{task_id}", mode='bypassPermissions',
+              subagent_type='general-purpose', prompt=inst['prompt'])
+        # 轮询 inst['output_path'] 就绪后再派发下一个（超时重派，最多 2 次）
 team_delete()
 
-# Phase 10-13: 质量生产链继续推进
-# fact_store_merge → section_package_validation → debate_review → final_assembly
-cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase11_section_package_validation
-cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase12_debate_review
-cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase13_final_assembly
+# 阶段五：质量链推进（fact_store_merge → gates → debate_review）
+execute(job_id, start_phase='phase10_fact_store_merge')   # → phase13 synthesis_prepare 暂停
 
-# Phase 14: 全自动交付
-cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX --start-phase phase14_delivery
+# 阶段六：派发统稿子代理（ir_统稿.md），完成后继续
+execute(job_id, start_phase='phase13_synthesis_collect')  # → phase14 各 gate → phase15 delivery[heavy 自动等]
+
+# 阶段七：交付
+finalize_pipeline(task_id, entity, market)
 ```
+
+## 质量资产清单
+
+| 资产 | 路径（data/tasks/） | 产出者 |
+|------|------|--------|
+| Research Plan | `{TASK_ID}-research_plan.json` | phase04 子代理（collect 落盘） |
+| 大行研报骨架 | `{TASK_ID}-benchmark_skeleton.json` | phase04 子代理 Step 0.5 |
+| 数据包 | `{TASK_ID}-enriched_data_pack.json` | phase04 子代理（替代旧 step1_data） |
+| Fact Store | `{TASK_ID}-fact_store.json` | phase06 初始化，phase10 合并 |
+| Section Packages | `{TASK_ID}-section_packages.json` | phase11 抽取校验 |
+| Debate Review | `{TASK_ID}-debate_review.json` | phase12 |
+| Final Assembly | `{TASK_ID}-final_assembly.json` | phase14 |
+| 最终报告 | `{TASK_ID}-final_report.md` | phase13 统稿 |
+
+子代理 brief 自动注入 Research Plan（含 market_anchor/valuation_paradigm/key_debates）、
+enriched_data_pack、Fact Store 和共享输出协议（_shared_output_protocol.md）。
+子代理生产 Section Package，不直接写最终研报。
+
+## 预计算数据（phase07 输出）
+
+| 引擎 | 输出文件 | 使用者 |
+|------|---------|--------|
+| financial_metrics | `{TASK_ID}_precompute_financial_metrics.json/.md` | step3_finance, step6_valuation |
+| sector_benchmarks | `{TASK_ID}_precompute_sector_benchmarks.json/.md` | step1_industry, step7_insight |
+
+子代理 brief 含预计算数据路径，应优先读取再按需补搜。
 
 ## IR 子代理派发规则
 
-- **必须用 team 模式**：`team_create()` → `Agent(name=..., team_name=..., mode='bypassPermissions')` → 轮询输出文件
-- **sequential 模式（避免 API 429）**：`launch_next_wave(sequential=True)` 每次只返回一个 step
-  - 派发该 step → 等待完成 → 再次调用 → `has_more=True` 则继续同 wave
-- **禁止用同步 `task()`**（无 name 参数）——会返回 code=10003 挂掉
-- `subagent_name` 固定为 `code-explorer`
+- **subagent_type 固定 `general-purpose`**（需要 MCP 搜索能力；受限类型会静默失败）
+- **必须用 team 模式 + sequential**：`launch_next_wave(sequential=True)` 每次 1 个 step，
+  逐个派发等完成，避免并行触发 API 429
+- **禁止同步 `task()`**（无 name 参数）——code=10003 挂掉
 - `mode="bypassPermissions"` 确保子代理可写文件
-- **⚠️ 子代理 prompt 必须加工具限制声明**（规则4）：Glob/Grep 不存在，用 Bash+Read 替代
-- `launch_next_wave()` 返回的 `task_tool_instructions` 包含完整的 prompt（含 brief_path + output_path）
-- 子代理输出必须包含 Section Package JSON block；只写散文视为质量生产失败
-- **派发后主动轮询**（规则5）：每 30 秒用 Bash `test -s` 检查输出文件，不依赖子代理消息
-- **shutdown 后清理 team config**（规则6）：从 config.json members 移除已退出成员
-- 输出文件超时未出现 → 重派（最多重试 2 次）
-- 重试仍然失败 → 记录失败原因，跳过该 step，继续下一 wave
-- step8_master 失败 → 用已有 step 输出拼接兜底
+- **派发后主动轮询输出文件**（30s 一次 `test -s`），不依赖子代理消息
+- 输出超时未出现 → 重派（最多 2 次）；仍失败 → 记录原因，跳过该 step 继续
+- 子代理输出必须含 Section Package JSON block，只写散文视为质量失败
 
 ## IR 交付规则
 
-- `finalize_pipeline()` **必须执行**（全自动：质检 → DOCX → 桌面复制）
-- DOCX 失败 → 用 markdown 兜底
-- **研报必须复制到桌面**（macOS `~/Desktop/`）
-- 交付完成后，在聊天窗口告知用户文件完整路径
-- **禁止**使用 `deliver_attachments`（客户端不显示附件）
-
-## Wave 5 step8_master 统稿硬约束
-
-- 读取 step1~step7_risk 全部输出，汇总为券商风格完整研报（投资摘要→行业→商业模式→财务估值→管理层→宏观→差异化洞察→风险催化剂→来源附录）
-- **脚注硬规则**：正文每个关键数据点都要有脚注标注，末尾"来源附录"展开完整引用
-- **跨章节数据一致性**：同一指标在不同章节出现时数字必须一致，以有明确来源的为准
-- **算术验算**：PE×EPS≈股价、市值=股价×总股本等关键算术必须自验
-- **⚠️ 统稿保留硬约束**（解决统稿过度压缩问题）：
-  - **核心对比表必须原文保留**：行业竞争格局对比表、产品参数对比表、估值对比表——不得删除或压缩为文字叙述
-  - **市占率/份额/渗透率数据必须完整保留**：TAM/SAM/SOM分层推算及每层具体数字、各细分市场渗透率、竞品市占率（具体数字和百分比，不能只写"垄断竞争"等模糊表述）、标的公司渗透率——这些是判断市场空间的核心依据
-  - **去重只做跨step，不做step内压缩**：跨step重复内容可合并，但单个step内部的表格、数据、分析段落不得删除或压缩
-  - **来源合并不得丢来源**：所有step的来源索引表/脚注列表都必须合并到统稿末尾"来源附录"章节，不能因格式不同（[^N]脚注/编号表格/URL直接引用/评级格式）就丢弃；非[^N]格式的来源必须转换为[^N]脚注格式纳入统一编号；目标：统稿来源总数 ≥ 各step来源去重后总数
-- 总字数不低于原始各 step 内容总量的 70%（禁止过度压缩）
-
-## 子代理自主闭环规则
-
-子代理在执行过程中必须自主闭环，不要回主控等待指示：
-1. **检测到数据缺口** → 自己补搜（NeoData/yfinance/web_search/天眼查MCP），继续推进
-2. **来源不足** → 自己搜更多来源，补充到输出中
-3. **数据矛盾** → 自己判断哪个更可靠，标注矛盾来源
-4. **前序 step 输出有 gap** → 自己补充搜索填补
-5. **唯一需要回主控的情况**：step 输出文件写完，表示完成
-
-## 错误恢复（断点续跑）
-
-如果管线中途因 context window 等原因断裂：
-1. `get_pipeline_status(task_id)` 看哪些 step 已完成
-2. `launch_next_wave()` 自动从断点继续（已完成的 step 自动跳过）
-3. 不需要从头开始
+- `finalize_pipeline()` 收尾：质检 → DOCX → 桌面复制（`~/Desktop/`）
+- DOCX 失败 → markdown 兜底
+- 交付后在聊天窗口告知完整路径；**禁止** `deliver_attachments`（客户端不显示附件）

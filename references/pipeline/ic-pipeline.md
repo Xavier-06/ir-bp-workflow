@@ -22,14 +22,13 @@ result = run_ic_job(job_id=..., entity="半导体", query="行业研究", market
 |-------|------|------|---------|
 | phase01 | topic_intake | 课题元数据解析（DOCX/MD/JSON） | Python 自动 |
 | phase02 | multi_company_verify | 批量公司工商验证（天眼查MCP） | Python 自动 |
-| phase03 | presearch | 行业数据预搜索 [heavy_bg] | 后台子进程 |
-| phase04a | research_plan | LLM 驱动 research plan (needs_dispatch) | Coordinator 接管 |
-| phase04b | research_plan_collect | 合并 enrichment delta | Python 自动 |
-| phase05 | extract | URL 内容抽取 | Python 自动 |
+| phase04a | research_plan | 研究计划子代理派发 (needs_dispatch) | Coordinator 接管 |
+| phase04b | research_plan_collect | 读取子代理产出 plan，校验落盘 | Python 自动 |
 | phase06 | precompute | 行业规模 + 财务基准预计算 | Python 自动 |
 | phase07 | dispatch_prepare | Wave 派发 (needs_dispatch, sequential) | Coordinator 接管 |
 | phase08 | dispatch_collect | Wave 收集 + 质量检查 | Coordinator 接管 |
 | phase08b | fact_store_init | Fact Store 初始化 [v1.1 NEW] | Python 自动 |
+| phase08b5 | shared_state_init | 共享状态页初始化 | Python 自动 |
 | phase09 | evidence_gate | Step 输出质量门禁 | Python 自动 |
 | phase09b | fact_store_merge | Fact Store 合并 [v1.1 NEW] | Python 自动 |
 | phase10 | claim_coverage | Claim 覆盖校验 (FAIL→非阻断) | Python 自动 |
@@ -39,6 +38,8 @@ result = run_ic_job(job_id=..., entity="半导体", query="行业研究", market
 | phase11c | readability_review | 可读性审查 [v1.1 NEW] | Python 自动 |
 | phase11d | investment_judgment | 投资判断汇总 [v1.1 NEW] | Python 自动 |
 | phase12 | delivery | 对抗验证 + DOCX + 交付 [heavy_bg] | 后台子进程 |
+
+> v1.5: phase03 presearch / phase05 extract 已删除，搜索由 phase04 research_plan 子代理全权执行。
 
 ## Wave 编排（6 波，Wave 2-4 动态生成）
 
@@ -154,9 +155,11 @@ cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestra
 ### 默认模式（sequential，避免 API 429）
 
 ```python
-# Phase 0-1.5: 管线自动跑 scope_definition → multi_company_verify → presearch → extract → precompute
+# Phase 0-1.5: 管线自动跑 topic_intake → multi_company_verify → research_plan(子代理派发暂停)
+# （v1.5: presearch/extract 已删除，搜索由 phase04 research_plan 子代理全权执行）
 python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
-# → 管线在 phase4_dispatch_prepare 暂停，返回 needs_dispatch=True + task_tool_instructions
+# → 先在 phase04_research_plan 暂停（派研究计划子代理），collect 后继续
+# → 最终在 phase07_dispatch_prepare 暂停，返回 needs_dispatch=True + task_tool_instructions
 
 # Phase 4: Coordinator 用 team sequential 模式逐个发射 wave
 MAX_RETRIES = 2

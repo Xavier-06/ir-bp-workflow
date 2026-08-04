@@ -1458,12 +1458,14 @@ def _run_research_plan_collect(runtime_root: Path, job_ctx: JobContext) -> dict[
 # ═══════════════════════════════════════════════════════════
 
 class ICProfile(PipelineProfile):
-    """IC (Industry Coverage) 行业研究管线 Profile — 20 Phase (v1.3).
+    """IC (Industry Coverage) 行业研究管线 Profile — 18 Phase (v1.5).
 
-    核心 phase 链: topic_intake → verify → presearch → research_plan → extract
+    核心 phase 链: topic_intake → verify → research_plan(子代理派发) → collect
     → precompute → dispatch → collect → fact_store → shared_state → evidence_gate
     → fact_store_merge → claim_coverage → cross_dimension_gate → debate_review
     → final_assembly → readability_review → investment_judgment → delivery
+
+    （v1.5: presearch/extract 已删除，搜索由 phase04 research_plan 子代理全权执行）
 
     Stage Tier:
       deep (默认): 全量 20 phase
