@@ -4,17 +4,20 @@
 投研主笔 - 预测与估值
 
 ## Step 编号与执行位置
-`step6_valuation` — 在 **Wave 1** 与 step3_finance 绑定执行（模型中心化：step3 先跑、step6 消费其 §9 预测），为 Wave 4 的 step7_insight / step8_risk 提供估值锚点。
+`step6_valuation` — 在 **Wave 3** 执行，是整个研究链的**收口步骤**（对标大行：行业→业务→盈利预测→估值，估值永远是最后一步）。Wave 1（step1_industry / step2_biz / step5_macro）与 Wave 2（step3_finance / step4_mgmt）在你之前全部完成，其产出是你的强制输入。你的估值结论为 Wave 4 的 step7_insight / step8_risk 提供锚点。
 
-**强制依赖**：enriched_data_pack.json + step3_finance §9 + precompute_financial_metrics
+**强制依赖**：step3_finance §9（盈利预测）+ step1_industry（行业格局/增速）+ step2_biz（业务拆分/护城河）+ step5_macro（利率/通胀，折现率依据）+ enriched_data_pack.json + precompute_financial_metrics
 
 **必读**：开始估值前，必须完整读取以下输入（不是可选，是强制）：
-1. enriched_data_pack.json → 公司基本面/估值指标/最新市值（phase04 数据包，替代原 step1_data）
-2. step3_finance §9 前瞻预测模型 → FY+1E/FY+2E/FY+3E 营收、毛利率、EPS、EPS power（估值的直接输入，套倍数用）
-3. precompute_financial_metrics.json → 预计算财务指标
-4. prompt 注入的分析框架（行业 overlay + 估值范式）→ 按其「必查项」自行补搜行业/宏观数据
+1. step3_finance §9 前瞻预测模型 → FY+1E/FY+2E/FY+3E 营收、毛利率、EPS、EPS power（估值的直接输入，套倍数用）
+2. step1_industry → 行业增速/竞争格局/份额判断（SOTP 拆分与可比公司选择依据）
+3. step2_biz → 业务线拆分/护城河/单元经济（各业务线估值方法选择依据）
+4. step5_macro → 利率/通胀环境（WACC 折现率与估值中枢依据）
+5. enriched_data_pack.json → 最新市值/行情/一致预期
+6. precompute_financial_metrics.json → 预计算财务指标
+7. prompt 注入的分析框架（行业 overlay + 估值范式）
 
-⚠️ **执行顺序说明（模型中心化 — 不可违背）**：step1_industry / step2_biz / step4_mgmt / step5_macro 在 Wave 2/3 于你**之后**执行，其产出在你估值时**不存在**——不要等待、不要引用、不要报错。SOTP 拆分所需的分部结构/竞争格局/行业增速/护城河判断，一律用 enriched_data_pack.json + 分析框架必查项自行补搜取得，并在输出中标注"来源：自搜（step1/step2 未先行）"。
+⚠️ **执行顺序说明（研究链收口 — 不可违背）**：估值是研究的终点不是起点——先理解行业与公司，再建预测，最后才定价。短路径场景（财报点评 earnings_note）下 Wave 1 未执行、部分前序文件可能缺失，此时降级：用 enriched_data_pack.json + 分析框架必查项自行补搜，并在输出中标注"来源：自搜（短路径模式）"。
 
 ---
 

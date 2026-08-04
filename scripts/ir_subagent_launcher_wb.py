@@ -192,48 +192,53 @@ STEP_ROLE = {
 IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp', 'ima-mcp']
 
 # 步间依赖关系
-# v2.1 (2026-07-29): 模型中心化重排 — 财务+估值是模型核心，最先跑；
-# 行业/业务按 P0 论点深挖（已知模型关键变量）；管理层/宏观是 P2 维度（弱依赖）。
+# v3.1 (2026-08-04): 回归大行真实研究链 — 基于 4 篇公司首发研报全文解剖
+#（爱建/先锋精科、交银国际/鸣鸣很忙、东方/中国太保、Bernstein/Booking）：
+# 估值永远是研究的收口步骤（行业→业务→盈利预测→估值），报告开头的目标价
+# 只是"结论前置"的成文技巧，不是研究顺序。旧版 v2.1 把估值放 Wave1 是误读。
 # 数据收集在 phase04 research plan 完成，产出 enriched_data_pack.json 供所有 step 引用。
 STEP_DEPS = {
-    'step3_finance': [],                                    # 财务是模型核心，最先跑
-    'step6_valuation': ['step3_finance'],                   # 估值绑定财务（消费 step3 预测）
-    'step1_industry': ['step6_valuation'],                  # 深挖时已知模型关键变量
-    'step2_biz': ['step6_valuation'],                       # 深挖时已知模型关键变量
-    'step4_mgmt': [],                                       # P2 维度，依赖弱
-    'step5_macro': [],                                      # P2 维度，依赖弱
-    'step7_insight': ['step6_valuation', 'step1_industry', 'step2_biz', 'step5_macro'],
-    'step8_risk': ['step6_valuation', 'step3_finance', 'step4_mgmt'],
+    'step1_industry': [],                                        # Wave 1 行业格局（背景层）
+    'step2_biz': [],                                             # Wave 1 商业模式（背景层）
+    'step5_macro': [],                                           # Wave 1 宏观环境（背景层）
+    'step3_finance': ['step1_industry', 'step2_biz'],            # Wave 2 预测假设必须可追溯到行业/业务
+    'step4_mgmt': ['step2_biz'],                                 # Wave 2 执行力验证需业务语境
+    'step6_valuation': ['step3_finance', 'step1_industry',       # Wave 3 估值收口：消费预测，
+                        'step2_biz', 'step5_macro'],             #   行业/业务/宏观供 SOTP/可比/折现率
+    'step7_insight': ['step1_industry', 'step2_biz', 'step3_finance',
+                      'step4_mgmt', 'step5_macro', 'step6_valuation'],  # Wave 4 全维度综合出预期差
+    'step8_risk': ['step3_finance', 'step4_mgmt', 'step5_macro', 'step6_valuation'],
 }
 
 # 并行发射波次
-# v2.1 (2026-07-29): 模型中心化 4 波 — 财务+估值绑定建模（Wave1），行业/业务按论点深挖（Wave2），
-# 管理层/宏观 P2 维度（Wave3），洞察/风险预期差收口（Wave4）。
+# v3.1 (2026-08-04): 研究链 4 波 — 背景（行业+业务+宏观）→ 预测与验证（财务+管理层）
+# → 估值收口 → 预期差收口。对标大行首发研报的真实研究顺序。
 # anchor / thesis 不是 step——它们在 research_plan（phase04）里已产出，所有 wave 共享读。
 LAUNCH_WAVES = [
-    ['step3_finance', 'step6_valuation'],        # Wave 1 模型核心（绑定建模）
-    ['step1_industry', 'step2_biz'],             # Wave 2 按 P0 论点深挖
-    ['step4_mgmt', 'step5_macro'],               # Wave 3 P2 维度（可裁剪）
-    ['step7_insight', 'step8_risk'],             # Wave 4 预期差收口
+    ['step1_industry', 'step2_biz', 'step5_macro'],  # Wave 1 背景层（并行）
+    ['step3_finance', 'step4_mgmt'],                 # Wave 2 预测与验证（消费 Wave 1）
+    ['step6_valuation'],                             # Wave 3 估值收口（消费预测，按公司特征选方法）
+    ['step7_insight', 'step8_risk'],                 # Wave 4 预期差收口
     # step8_master 已剥离为独立 synthesis 子代理（phase13）
 ]
 
-# ── 报告类型分流（v2.1, Batch 3；2026-08-03 修复断点B：接线 event_update）──
+# ── 报告类型分流（v2.1, Batch 3；2026-08-03 修复断点B；2026-08-04 v3.1 按新波次重配）──
 # report_type → active_waves（LAUNCH_WAVES 索引白名单，None=全量）。
-# ⚠️ 白名单必须是依赖闭包安全的：wave4(insight/risk) 依赖 wave2(industry/biz)+wave3(mgmt/macro)，
-#    因此想跑 wave4 就必须含 wave2+wave3。短路径只能裁到依赖链的干净前缀。
+# ⚠️ 白名单必须是依赖闭包安全的：Wave4(insight/risk) 依赖全部 Wave1-3 产出，
+#    短路径只能裁到依赖链的干净前缀（[0] / [0,1] / [0,1,2] / 全量）。
+#    白名单外的依赖由 deps_ready(active_steps) 自动降级（改读 enriched_data_pack + 自搜），
+#    不会阻塞发射——即大行财报点评模式：只更新模型与目标价，不重做全套背景研究。
 #   - deep_dive / company_deep_dive / industry_research : 全量 4 波
-#   - event_update : wave1+wave2（事件驱动快报：更新财务模型+估值，补行业/业务背景）
-#   - data_track   : wave1+wave2（数据跟踪，同 event_update 的短路径）
-#   - earnings_note: wave1（只对数字反应、更新模型与目标价；洞察/风险退到统稿收口）
+#   - event_update / data_track : wave1+2+3（背景+预测更新+估值更新，洞察/风险退到统稿）
+#   - earnings_note: wave2+3（只对数字反应：更新预测与目标价，step3 假设降级走数据包+自搜）
 REPORT_TYPE_ACTIVE_WAVES: dict[str, list[int] | None] = {
     'deep_dive': None,            # 全量
     'company_deep_dive': None,    # 兼容 research_plan 旧 report_type 取值
     'broker_ir': None,            # 兼容
     'industry_research': None,    # 兼容
-    'event_update': [0, 1],       # 事件快报（订单/新品/财报等）：财务估值+行业业务
-    'data_track': [0, 1],         # 财务+估值+行业+业务
-    'earnings_note': [0],         # 仅财务+估值模型
+    'event_update': [0, 1, 2],    # 事件快报：背景+预测更新+估值更新
+    'data_track': [0, 1, 2],      # 数据跟踪，同 event_update
+    'earnings_note': [1, 2],      # 财报点评：仅预测+估值（大行模式）
 }
 
 
@@ -242,6 +247,22 @@ def active_waves_for_report_type(report_type: str | None) -> list[int] | None:
     if not report_type:
         return None
     return REPORT_TYPE_ACTIVE_WAVES.get(report_type, None)
+
+
+def active_steps_for_report_type(report_type: str | None) -> set[str] | None:
+    """v3.1: 按 report_type 返回本报告类型会实际执行的 step 集合。
+
+    None=全量（所有 step 都执行，无短路径降级）；否则返回白名单波次内的 step 集合。
+    deps_ready 用它判定哪些依赖在当前报告类型下"不会执行、自动降级放行"。
+    """
+    waves = active_waves_for_report_type(report_type)
+    if waves is None:
+        return None
+    steps: set[str] = set()
+    for idx in waves:
+        if 0 <= idx < len(LAUNCH_WAVES):
+            steps.update(LAUNCH_WAVES[idx])
+    return steps
 
 # 超时
 STEP_TIMEOUTS = {
@@ -351,10 +372,17 @@ def pipeline_manifest_path(task_id: str) -> Path:
     return TASKS_DIR / f'{task_id}-pipeline-manifest.json'
 
 
-def deps_ready(task_id: str, step: str) -> tuple[bool, list[str]]:
-    """检查依赖步骤的输出文件是否已存在且完整（>100 bytes）"""
+def deps_ready(task_id: str, step: str, active_steps: set[str] | None = None) -> tuple[bool, list[str]]:
+    """检查依赖步骤的输出文件是否已存在且完整（>100 bytes）
+
+    v3.1 (2026-08-04): active_steps 用于短路径（报告类型分流）。不在 active_steps 内的
+    依赖在当前报告类型下不会执行，自动降级放行（子代理改读 enriched_data_pack.json + 自搜），
+    不计入 missing——对标大行财报点评模式：只更新模型与目标价，不重做全套背景研究。
+    """
     missing = []
     for dep in STEP_DEPS.get(step, []):
+        if active_steps is not None and dep not in active_steps:
+            continue  # 短路径降级：该依赖不在本报告类型执行范围内
         p = step_output_path(task_id, dep)
         if not p.exists() or p.stat().st_size < 100:
             missing.append(dep)
@@ -807,8 +835,13 @@ def launch_step(task_id: str, step: str, entity: str = '', query: str = '',
             'research_plan_gate': research_plan_gate,
         }
 
+    # v3.1: 从 research_plan 读 report_type，推导本报告类型实际执行的 step 集合，
+    # 让 deps_ready 对"不会执行的依赖"自动降级放行（短路径财报点评模式）。
+    _plan = load_research_plan(task_id, TASKS_DIR) or {}
+    _active_steps = active_steps_for_report_type(_plan.get('report_type'))
+
     # 检查依赖
-    ready, missing = deps_ready(task_id, step)
+    ready, missing = deps_ready(task_id, step, active_steps=_active_steps)
     if not ready:
         return {
             'step': step,
@@ -1311,26 +1344,44 @@ def ensure_research_plan_ready(task_id: str, entity: str = '', query: str = '', 
 
 
 def get_pipeline_status(task_id: str) -> dict:
-    """返回整个管线当前状态快照。"""
+    """返回整个管线当前状态快照。
+
+    v3.1: 感知报告类型分流——按 research_plan.report_type 计算本报告类型
+    应执行的 step 集合（active_steps）。短路径下未列入白名单的 step 标记
+    为 'skipped'（不参与完成度计数），all_steps_done 仅统计应执行集合。
+    """
+    _plan = load_research_plan(task_id, TASKS_DIR) or {}
+    _active_steps = active_steps_for_report_type(_plan.get('report_type'))
+
     steps_status = {}
     for step in STEP_DEPS:
+        if _active_steps is not None and step not in _active_steps:
+            steps_status[step] = 'skipped'
+            continue
         out = step_output_path(task_id, step)
         if out.exists() and out.stat().st_size >= 100:
             steps_status[step] = 'completed'
         else:
-            ready, missing = deps_ready(task_id, step)
+            ready, missing = deps_ready(task_id, step, active_steps=_active_steps)
             steps_status[step] = 'ready' if ready else f'blocked_by:{",".join(missing)}'
+
+    _expected = _active_steps if _active_steps is not None else set(STEP_DEPS)
+    expected_done = all(
+        (step_output_path(task_id, s).exists()
+         and step_output_path(task_id, s).stat().st_size >= 100)
+        for s in _expected
+    )
     wave_idx = get_current_wave_index(task_id)
-    all_done = wave_idx >= len(LAUNCH_WAVES)
     return {
         'task_id': task_id,
         'steps': steps_status,
-        'current_wave': wave_idx if not all_done else 'all_done',
+        'current_wave': wave_idx if not expected_done else 'all_done',
         'total_waves': len(LAUNCH_WAVES),
         'completed_count': sum(1 for v in steps_status.values() if v == 'completed'),
-        'total_steps': len(STEP_DEPS),
-        'all_steps_done': all_done,
-        'next_action': 'finalize' if all_done else f'launch_wave_{wave_idx}',
+        'total_steps': len(_expected),
+        'expected_steps': sorted(_expected),
+        'all_steps_done': expected_done,
+        'next_action': 'finalize' if expected_done else f'launch_wave_{wave_idx}',
     }
 
 
@@ -1389,6 +1440,14 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
     results = []
     has_more = False
 
+    # v3.1: 短路径降级集合——白名单外依赖自动放行（财报点评模式）
+    _active_steps: set[str] | None = None
+    if active_waves is not None:
+        _active_steps = set()
+        for _wi in active_waves:
+            if 0 <= _wi < len(LAUNCH_WAVES):
+                _active_steps.update(LAUNCH_WAVES[_wi])
+
     for i, step in enumerate(wave_steps):
         # 已完成的跳过
         out = step_output_path(task_id, step)
@@ -1396,7 +1455,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             results.append({'step': step, 'status': 'already_completed', 'output_path': str(out)})
             continue
 
-        ready, missing = deps_ready(task_id, step)
+        ready, missing = deps_ready(task_id, step, active_steps=_active_steps)
         if not ready:
             results.append({'step': step, 'status': 'blocked', 'missing': missing})
             # Sequential mode: skip blocked, continue looking for first launchable
@@ -1414,7 +1473,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 next_out = step_output_path(task_id, next_step)
                 if next_out.exists() and next_out.stat().st_size >= 100:
                     continue  # 已完成的跳过
-                ready_n, _ = deps_ready(task_id, next_step)
+                ready_n, _ = deps_ready(task_id, next_step, active_steps=_active_steps)
                 if ready_n:
                     has_more = True
                     break
@@ -1466,25 +1525,29 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'\n'
             )
 
-        # step6_valuation 额外提醒（v2.1 模型中心化：step6 在 Wave 1，仅依赖 step3；
-        # step1_industry/step5_macro 在 Wave 2/3 于其后执行，不可引用）
+        # step6_valuation 额外提醒（v3.1 研究链：估值是 Wave 3 收口，消费 Wave 1-2 全部产出）
         if step == 'step6_valuation':
             prompt_body += (
-                f'💡 估值提示：你与 step3_finance 同在 Wave 1（step3 先跑，其产出是你的核心输入）。\n'
-                f'行业竞争格局（step1_industry）/宏观利率（step5_macro）等维度在你之后执行，不可引用——\n'
-                f'估值所需行业/宏观数据请用 enriched_data_pack.json + prompt 中分析框架的必查项自行补搜。\n\n'
+                f'💡 估值提示：你是 Wave 3 收口步骤——估值是研究的终点，不是起点。\n'
+                f'step3_finance 的盈利预测（核心输入）+ step1_industry 的行业格局 + step2_biz 的业务拆解\n'
+                f'+ step5_macro 的宏观/利率环境均已完成，务必全部读取后再建模。\n'
+                f'⚠️ 估值方法必须按公司特征选择（对标大行）：成熟盈利公司 PE/PEG、保险 P/EV、\n'
+                f'周期/资源 NAV 或 EV/EBITDA、亏损成长 PS/管线/DCF、多业务 SOTP——不是统一套 DCF。\n'
+                f'短路径（财报点评）下部分前序文件可能缺失，此时降级用 enriched_data_pack.json + 自搜。\n\n'
             )
 
-        # step7_insight 额外提醒
+        # step7_insight 额外提醒（v3.1：Wave 4，Wave 1-3 全部产出可用）
         if step == 'step7_insight':
             prompt_body += (
-                f'💡 洞察提示：step6_valuation 的估值结论和 step5_macro 的宏观环境判断是形成投资洞察的核心输入，务必完整阅读后再下判断。\n\n'
+                f'💡 洞察提示：Wave 1-3 全部完成——行业/业务/宏观/财务/管理层/估值六份产出都是你的输入。\n'
+                f'核心方法：对照 step6_valuation 的目标价与 step1-3 的基本面判断，找出"市场定价 vs 基本面"的背离点，形成预期差。\n\n'
             )
 
-        # step8_risk 额外提醒
+        # step8_risk 额外提醒（v3.1：Wave 4，Wave 1-3 全部产出可用）
         if step == 'step8_risk':
             prompt_body += (
-                f'💡 风险提示：step4_mgmt 的管理层评估、step6_valuation 的估值敏感性和 step5_macro 的政策/宏观风险是风险分析的核心输入，务必完整阅读。\n\n'
+                f'💡 风险提示：Wave 1-3 全部完成——重点消费：step4_mgmt 管理层风险、step6_valuation 估值敏感性、\n'
+                f'step5_macro 宏观/政策风险、step3_finance 财务脆弱点。逐一读取后综合成风险矩阵。\n\n'
             )
 
         # ── 行业 Overlay + 估值范式联动（v2.1，2026-07-29）──
@@ -1631,10 +1694,11 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
     """
     from pathlib import Path as _P
 
-    # 确认所有 step 都完成
+    # 确认所有应执行的 step 都完成（v3.1：短路径下 skipped 的 step 不阻塞）
     status = get_pipeline_status(task_id)
     if not status['all_steps_done']:
-        incomplete = [s for s, v in status['steps'].items() if v != 'completed']
+        incomplete = [s for s, v in status['steps'].items()
+                      if v not in ('completed', 'skipped')]
         return {
             'status': 'not_ready',
             'incomplete_steps': incomplete,
@@ -1644,11 +1708,13 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
     result = {'status': 'finalizing', 'task_id': task_id}
 
     # 质量门禁（内联，避免导入 run_ir_pipeline 触发重量级模块链）
+    # v3.1: 只对应执行的 step 打分；阈值按执行数等比缩放（全量 8 step = 16/24）
     try:
         _OFFICIAL = ['sec.gov','hkexnews.hk','cninfo.com.cn','szse.cn','sse.com.cn','ir.','investor.']
         _REPUTABLE = ['reuters.com','bloomberg.com','wsj.com','ft.com','economist.com','scmp.com','caixin.com','36kr.com','cls.cn','eastmoney.com','xueqiu.com']
         _REDFLAGS = ['待补','待填','TODO','无法验证','无法获取','需要进一步']
-        _STEP_ORDER = ['step1_industry','step2_biz','step3_finance','step4_mgmt','step5_macro','step7_insight','step6_valuation','step8_risk']
+        _STEP_ORDER = [s for s in status.get('expected_steps', list(STEP_DEPS))
+                       if s in STEP_DEPS]
         scores, issues = {}, []
         for step in _STEP_ORDER:
             f = TASKS_DIR / f'{task_id}-{step}.md'
@@ -1669,7 +1735,10 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
             if fl >= 3 and sc > 1: sc = max(1, sc - 1); issues.append(f"❰{step}❱ {fl} 红旗")
             scores[step] = sc
         total = sum(scores.values())
-        qg = {'scores': scores, 'total': total, 'max': len(_STEP_ORDER) * 3, 'pass': total >= 16, 'issues': issues}
+        _max = len(_STEP_ORDER) * 3
+        _threshold = max(1, int(_max * 16 / 24))  # 等比：全量 8 step → 16
+        qg = {'scores': scores, 'total': total, 'max': _max,
+              'pass': total >= _threshold, 'issues': issues}
         result['quality_gate'] = qg
         print(f"  {'✅' if qg['pass'] else '⚠️'} 质量: {qg['total']}/{qg['max']}")
     except Exception as e:

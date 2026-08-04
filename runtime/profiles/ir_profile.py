@@ -440,13 +440,15 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 7. **Market Anchor (1个)**: 市场共识锚（Step 0.6 产出）
 8. **Report Type (1个)**: 报告类型分流（见下方判定表），决定管线跑全量 4 波还是短路径
 
-### Report Type 判定表（2026-08-03 新增 — 决定 wave 裁剪）
+### Report Type 判定表（2026-08-03 新增，2026-08-04 v3.1 更新 — 决定 wave 裁剪）
+
+波次含义（v3.1 研究链顺序）：Wave1 背景层（行业/业务/宏观）→ Wave2 预测与验证（财务/管理层）→ Wave3 估值收口 → Wave4 预期差收口（洞察/风险）。
 
 | report_type | 判定信号 | 管线行为 |
 |-------------|---------|---------|
 | `deep_dive` | 默认：无明确事件驱动的完整投研需求 | 全量 4 波 |
-| `event_update` | query 聚焦单一事件（订单/新品/财报/中标/合作）且要求快速跟踪 | 短路径 wave1+2 |
-| `earnings_note` | query 明确为财报/业绩点评，只要求更新模型与目标价 | 短路径 wave1 |
+| `event_update` | query 聚焦单一事件（订单/新品/财报/中标/合作）且要求快速跟踪 | 短路径 wave1+2+3（背景+预测更新+估值更新） |
+| `earnings_note` | query 明确为财报/业绩点评，只要求更新模型与目标价 | 短路径 wave2+3（仅预测+估值，大行财报点评模式） |
 
 判定依据：query 关键词（"订单""万台""新品发布""中标""合作"→event_update；"财报""业绩""点评""EPS"→earnings_note）+ Step 0.6 发现的最新动态性质。默认 `deep_dive`，拿不准就全量。
 
@@ -2740,10 +2742,12 @@ class IRProfile(PipelineProfile):
             "phase08_dispatch_prepare": [],
             "phase09_dispatch_collect": [],
             "phase09_wave_evidence_gate": [],
-            # v2.1: per-wave gate facts 按模型中心化 4 波组成
-            "phase09_wave1_evidence_gate": ["{task_id}-step3_finance-facts.json", "{task_id}-step6_valuation-facts.json"],
-            "phase09_wave2_evidence_gate": ["{task_id}-step1_industry-facts.json", "{task_id}-step2_biz-facts.json"],
-            "phase09_wave3_evidence_gate": ["{task_id}-step4_mgmt-facts.json", "{task_id}-step5_macro-facts.json"],
+            # v3.1 (2026-08-04): per-wave gate facts 按研究链 4 波组成
+            # Wave1 背景层(industry/biz/macro) → Wave2 预测与验证(finance/mgmt)
+            # → Wave3 估值收口(valuation) → Wave4 预期差收口(insight/risk)
+            "phase09_wave1_evidence_gate": ["{task_id}-step1_industry-facts.json", "{task_id}-step2_biz-facts.json", "{task_id}-step5_macro-facts.json"],
+            "phase09_wave2_evidence_gate": ["{task_id}-step3_finance-facts.json", "{task_id}-step4_mgmt-facts.json"],
+            "phase09_wave3_evidence_gate": ["{task_id}-step6_valuation-facts.json"],
             "phase09_wave4_evidence_gate": ["{task_id}-step7_insight-facts.json", "{task_id}-step8_risk-facts.json"],
             "phase10_fact_store_merge": ["{task_id}-fact_store.json", "{task_id}-fact_store_index.json"],
             "phase10_shared_state_refresh": ["{task_id}-shared_state.json", "{task_id}-shared_state_page.md"],
