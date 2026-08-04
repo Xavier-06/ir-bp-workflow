@@ -509,10 +509,12 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'',
         f'### ⏰ 数据时效性硬要求（最高优先级，违反即任务失败）',
         f'',
-        f'**第零轮搜索（在所有广度搜索之前必须执行，不可跳过，全部用 Bash search_deep）：**',
-        f'1. search_deep(Bash, "{entity} {{YYYY}}年{{M}}月 最新动态") — 锁定标的当前状态',
-        f'2. search_deep(Bash, "{entity} latest news {{YYYY}}") — 英文视角补充',
-        f'3. 如涉及产品/技术: search_deep(Bash, "{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
+        f'**第零轮搜索（在所有广度搜索之前必须执行，不可跳过）：**',
+        f'1. westock-mcp 直调: 若为上市公司，`mcp__westock-mcp__data_news(symbol="代码", type=3, limit=10)` — 公告/研报/新闻一站拉齐，锁定标的当前状态',
+        f'2. search_deep(Bash, "{entity} {{YYYY}}年{{M}}月 最新动态") — web 长尾补充',
+        f'3. search_deep(Bash, "{entity} latest news {{YYYY}}") — 英文视角补充',
+        f'4. 如涉及产品/技术: search_deep(Bash, "{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
+        f'5. 年报/定期报告原文: westock-mcp `data_news(symbol="代码", type=0)`（type=0 公告原文）或 IMA 自建研报库 fetch 全文——禁止用 search_deep 在 web 上瞎捞年报',
         f'',
         f'**搜索 query 必须含时间锚点：**',
         f'- ❌ "腾讯 AI 大模型" → ✅ "腾讯 混元 最新模型 2026年7月"',
@@ -540,11 +542,13 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'',
         f'**最低搜索量（质量门禁会校验，不达标 = 任务失败）：**',
         f'- ≥ 8 个独立搜索 query（不同角度：公司名+财务、公司名+行业、公司名+竞品、公司名+风险 等）',
-        f'- ≥ 3 个实际深读过的 URL（search_deep(fetch_top_n) 抓到的正文，不是只看 snippet）',
-        f'- ≥ 3 个独立来源域名（不能全是同一个站点的页面）',
+        f'- ≥ 1 次 IMA 研报库 search_knowledge + fetch_media_content 全文（行业/格局/估值类 step 强制）',
+        f'- ≥ 3 个实际深读过的来源（IMA fetch 全文 或 search_deep(fetch_top_n) 抓到的正文，不是只看 snippet）',
+        f'- ≥ 3 个独立来源域名/数据源（不能全是同一个站点的页面；IMA/NeoData/westock 各算独立源）',
         f'',
-        f'**搜索策略（必须按顺序执行）：**',
+        f'**搜索策略（必须按顺序执行，IMA/westock 显式 Step 在前，search_deep 仅作兜底）：**',
         f'0. **第零轮：时效锚定（最先执行，不可跳过）**',
+        f'   - westock-mcp（上市公司必做，MCP 直调）: `mcp__westock-mcp__data_news(symbol="代码", type=3, limit=10)` — 公告/研报/新闻',
         f'   - 腾讯新闻（Bash 调用）:',
         f'     ```bash',
         f'     cd ~/.workbuddy/ir_runtime && python3 -c "',
@@ -566,12 +570,24 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'   - search_deep(Bash): "{entity} {{当前年月}} 最新动态" — 锁定英文源和长尾信息',
         f'   - 如涉及产品/技术: search_deep(Bash, "{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
         f'   - 目的: 先知道"最新"是什么，后续分析才不会引用过期信息',
-        f'   - 三层组合: 腾讯新闻(分钟级) → NeoData doc(深度) → search_deep(兜底)',
-        f'1. **第一轮：广度扫描** — NeoData doc 拿研报/分析 + Bash 调 search_gateway prefer=multi 多关键词并行',
-        f'2. **第二轮：深度验证** — 对第一轮发现的关键 claim，用 search_deep(Bash, fetch_top_n) 读全文验证',
-        f'3. **第三轮：交叉验证/反证** — 搜竞品对比、负面信息、行业报告、分析师观点',
-        f'4. **TYC 天眼查必查项**（如标的涉及中国大陆企业）：工商信息、司法诉讼、专利、资质',
-        f'5. **金融数据必查**：NeoData api（Bash） → yfinance（Bash） 交叉验证',
+        f'   - 四层组合: westock-mcp(结构化) → 腾讯新闻(分钟级) → NeoData doc(深度) → search_deep(兜底)',
+        f'1. **第一轮：IMA 研报库深度扫描（最高优先级，不可跳过）**',
+        f'   - ★自建研报库（投行研报全文，第一优先）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{entity} 行业 竞争格局 估值")`',
+        f'   - 行研智库（行业深度/TAM）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业}} 市场规模 TAM 竞争格局")`',
+        f'   - search 命中后取最相关 1-3 篇 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")` 读全文（自建研报库/行研智库/精选报告均可 fetch）',
+        f'   - 时间过滤: 优先最近 30 天的投行研报（标题含日期如 -260703.pdf），大行优先（GS/MS/JPM/BofA/Citi/UBS/Bernstein）',
+        f'   - ⚠️ 行业分析/竞争格局/投资逻辑类查询必须搜 IMA——公开 web 搜不到的增量信息，跳过即视为质量不合格',
+        f'2. **第二轮：westock-mcp 结构化数据（行情/财务/研报/板块/产业链，MCP 直调）**',
+        f'   - 行情/估值: `mcp__westock-mcp__data_quote` | 财务: `data_finance` | 研报: `data_report`',
+        f'   - 板块/产业链: `data_sector` / `data_industry_chain` | 评级/共识: `data_rating`',
+        f'   - 公告/年报原文: `data_news(symbol="代码", type=0)`（type: 0公告 1研报 2新闻 3全部）',
+        f'   - 金融数据交叉验证: NeoData api（Bash） → yfinance（Bash）',
+        f'3. **第三轮：广度扫描** — NeoData doc 拿研报/分析 + Bash 调 search_gateway prefer=multi 多关键词并行',
+        f'4. **第四轮：深度验证** — 对前三轮发现的关键 claim，用 search_deep(Bash, fetch_top_n) 读全文验证',
+        f'5. **第五轮：交叉验证/反证** — 搜竞品对比、负面信息、分析师观点；机构调研纪要补搜 `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{entity} 调研 纪要")`',
+        f'6. **TYC 天眼查必查项**（如标的涉及中国大陆企业）：工商信息、司法诉讼、专利、资质',
+        f'',
+        f'⚠️ 若跳过第 1/2 轮（IMA + westock-mcp）直接用 search_deep，搜索审计将被判为不合格。',
         f'',
         f'**输出必须包含搜索审计（search_audit）：**',
         f'在你的 Markdown 输出末尾加一个 `## 搜索审计` 章节，记录：',
@@ -1595,6 +1611,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'| **机构调研纪要/专家交流/外资研报/行业深度报告** | **ima-mcp** | MCP 直接调用 `mcp__ima-mcp__search_knowledge(knowledge_base_id="KB_ID", query="查询词")` | search_deep(Bash) |\n'
             f'| 突发新闻/实时动态（中文） | **中文实时新闻** | Bash: `cd {ROOT} && python3 -c "from scripts.search_gateway import tencent_news_search; import json; print(json.dumps(tencent_news_search(\\"{{关键词}}\\", max_results=5), ensure_ascii=False))"`（CLI积分耗尽自动降级NeoData doc） | search_deep(Bash) |\n'
             f'| 上市公司公告/新闻/研报动态 | **腾讯自选股 `data_news`** | MCP: `mcp__westock-mcp__data_news(symbol="sh600519", type=3, limit=10)`（需股票代码，type: 0公告 1研报 2新闻 3全部） | tencent_news_search → search_deep(Bash) |\n'
+            f'| **公司年报/定期报告/公告原文** | **westock-mcp `data_news(type=0)`** | MCP: `mcp__westock-mcp__data_news(symbol="代码", type=0, limit=10)` 拉公告原文；投行对年报的解读研报走 ima-mcp | 巨潮/港交所官网 → search_deep(Bash) |\n'
             f'| 美股估值/财务 | **yfinance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "import yfinance as yf; print(yf.Ticker(\\"AAPL\\").info)"` | westock-mcp → search_deep(Bash) |\n'
             f'| **美股英文新闻/earnings/分析师动态** | **Yahoo Finance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import _yahoo_search; import json; print(json.dumps(_yahoo_search(\\"NVDA earnings\\", max_results=5), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| 学术论文/政策文件/英文技术文档 | **search_deep(Bash, fetch_top_n)** | Bash 调用，自动抓全文 | — |\n\n'
@@ -1625,9 +1642,10 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'- ⚠️ 买方研究要求：每项分析必须落到投资含义（对 thesis/估值/风险的影响），禁止纯描述性资料堆砌\n'
             f'- 禁止输出"Pre-search Results"格式的搜索备忘录——必须是正式分析报告\n'
             f'- ⚠️ 报告末尾必须包含「搜索审计」章节，列出：\n'
-            f'  - 每次搜索用了哪个数据源（westock-mcp / tyc-mcp / NeoData / 腾讯新闻 / yfinance / search_deep(Bash)）\n'
+            f'  - 每次搜索用了哪个数据源（ima-mcp / westock-mcp / tyc-mcp / NeoData / 腾讯新闻 / yfinance / search_deep(Bash)）\n'
             f'  - 查询关键词\n'
             f'  - 来源域名列表\n'
+            f'  - 是否执行了 brief 搜索策略第 1 轮（IMA 研报库）和第 2 轮（westock-mcp）——跳过即质量不合格\n'
             f'  - 如果全部来源都是通用搜索(search_deep)，说明为什么没用结构化数据源（没有合理理由将被视为质量不合格）'
         )
 
@@ -1725,6 +1743,14 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
             else: sc = 0
             fl = sum(1 for x in _REDFLAGS if x in txt)
             if fl >= 3 and sc > 1: sc = max(1, sc - 1); issues.append(f"❰{step}❱ {fl} 红旗")
+            # 数据源审计（v3.2）：研究类 step 未使用 IMA 研报库或 westock-mcp 任一结构化源 → 扣分
+            if step in ('step1_industry', 'step2_biz', 'step3_finance', 'step5_macro', 'step6_valuation'):
+                _used_structured = any(k in txt for k in (
+                    'IMA知识库', 'ima-mcp', '自建研报库', '行研智库', '机构调研纪要',
+                    'westock-mcp', '腾讯自选股', 'data_finance', 'data_quote', 'data_report', 'data_news'))
+                if not _used_structured and sc > 1:
+                    sc = max(1, sc - 1)
+                    issues.append(f"❰{step}❱ 未使用 IMA/westock 结构化源（搜索策略违规）")
             scores[step] = sc
         total = sum(scores.values())
         _max = len(_STEP_ORDER) * 3

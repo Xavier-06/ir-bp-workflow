@@ -291,7 +291,7 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 5. **一致预期数据缺失** — 需要搜分析师一致预期的营收/利润预测
 
 ### 本 step 补搜要点
-- 财务数据优先找年报/季报原文
+- 财务数据优先找年报/季报原文——获取路径：westock-mcp `data_news(symbol="代码", type=0)` 拉公告/定期报告原文（禁止用 search_deep 在 web 上捞年报），投行财务拆解走 ima-mcp 自建研报库 → fetch_media_content 读全文
 - 一致预期优先 `westock-mcp.data_consensus`，兜底具名券商研报
 
 ---
