@@ -33,7 +33,6 @@ try:
     from scripts.ir_research_planner import (
         load_research_plan,
         normalize_research_plan_contract,
-        prepare_research_plan,
         research_plan_path,
         validate_research_plan_ready,
     )
@@ -41,7 +40,6 @@ except ModuleNotFoundError:  # direct script execution from scripts/
     from ir_research_planner import (
         load_research_plan,
         normalize_research_plan_contract,
-        prepare_research_plan,
         research_plan_path,
         validate_research_plan_ready,
     )
@@ -1317,18 +1315,12 @@ def get_current_wave_index(task_id: str, active_waves: list[int] | None = None) 
 
 
 def ensure_research_plan_ready(task_id: str, entity: str = '', query: str = '', market: str = 'us') -> dict:
-    """Prepare and validate the dispatch-time Research Plan gate."""
+    """Validate the dispatch-time Research Plan gate.
+
+    v3.2 (2026-08-04): plan 完全由 phase04 research plan 子代理生成，脚本不再兜底。
+    plan 缺失/校验失败 → ready=False，拦截 dispatch，要求先跑 phase04。
+    """
     plan = load_research_plan(task_id, TASKS_DIR)
-    if plan is None:
-        prepare_research_plan(
-            task_id=task_id,
-            entity=entity,
-            query=query,
-            market=market,
-            tasks_dir=TASKS_DIR,
-            report_type='industry_research' if ('行业' in query or '赛道' in query) else 'company_deep_dive',
-        )
-        plan = load_research_plan(task_id, TASKS_DIR)
     plan = normalize_research_plan_contract(plan or {})
     validation = validate_research_plan_ready(plan)
     if plan:

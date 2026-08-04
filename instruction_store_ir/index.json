@@ -1,0 +1,73 @@
+{
+  "meta": {
+    "version": 10,
+    "created_at": "2026-03-17T15:15:00",
+    "updated_at": "2026-08-04T13:45:00",
+    "source": "notes/investment-research-agent-roles.md",
+    "changelog": "v10 (2026-08-04): 重建被 e4756f3 误删的 index（preflight check_instruction_store 硬依赖）。剔除已死的 投研_主笔_数据收集（step1_data 于 v3.0 删除，其职责并入 phase04 research plan 子代理的 enriched_data_pack）；新增 投研_研究计划 角色（ir_research_plan.md，phase04 子代理指令，从 ir_profile.py 内联 f-string 迁入）。"
+  },
+  "roles": [
+    {
+      "key": "投研_研究计划",
+      "name": "研究计划 Agent",
+      "file": "ir_research_plan.md"
+    },
+    {
+      "key": "投研_主笔_行业分析",
+      "name": "行业分析 Agent",
+      "file": "step1_industry.md"
+    },
+    {
+      "key": "投研_主笔_商业模式",
+      "name": "商业模式 Agent",
+      "file": "step2_biz.md"
+    },
+    {
+      "key": "投研_主笔_财务分析",
+      "name": "财务分析 Agent",
+      "file": "step3_finance.md"
+    },
+    {
+      "key": "投研_主笔_预测与估值",
+      "name": "预测与估值主笔",
+      "file": "step6_valuation.md"
+    },
+    {
+      "key": "投研_主笔_管理层",
+      "name": "管理层 Agent",
+      "file": "step4_mgmt.md"
+    },
+    {
+      "key": "投研_主笔_宏观分析",
+      "name": "宏观分析 Agent",
+      "file": "step5_macro.md"
+    },
+    {
+      "key": "投研_主笔_差异化洞察",
+      "name": "差异化洞察 Agent",
+      "file": "step7_insight.md"
+    },
+    {
+      "key": "投研_主笔_风险催化",
+      "name": "风险催化 Agent",
+      "file": "step8_risk.md"
+    },
+    {
+      "key": "_shared_output_protocol",
+      "name": "IR 共享输出协议",
+      "file": "_shared_output_protocol.md"
+    }
+  ],
+  "pipeline_bindings": {
+    "ir": {
+      "step1_industry": "step1_industry",
+      "step2_biz": "step2_biz",
+      "step3_finance": "step3_finance",
+      "step4_mgmt": "step4_mgmt",
+      "step5_macro": "step5_macro",
+      "step6_valuation": "step6_valuation",
+      "step7_insight": "step7_insight",
+      "step8_risk": "step8_risk"
+    }
+  }
+}

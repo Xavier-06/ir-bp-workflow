@@ -525,19 +525,19 @@ ir-bp-workflow/
 │   ├── bp_r09_catalyst.md                # R09/W4 催化剂
 │   ├── bp_r10_industry_research.md       # R10/W4 行业研报
 │   └── bp_s1_统稿.md                     # S1 统稿（唯一中文命名，最后派发）
-├── instruction_store_ir/                 # IR 角色指令库（8 个 step + 统稿）
-│   ├── index.json
+├── instruction_store_ir/                 # IR 角色指令库（研究计划 + 8 个 step + 统稿）
+│   ├── index.json                        # role → file 映射（preflight 校验）
 │   ├── _common_tool_guide.md
 │   ├── _shared_output_protocol.md
 │   ├── ir_统稿.md                        # IR 统稿（论点驱动叙事）
-│   ├── ir_research_plan_enrichment.md
+│   ├── ir_research_plan.md               # phase04 研究计划子代理指令（含大行研报骨架）
 │   ├── industry_overlays/                # 行业 Overlay（5 个）
 │   │   ├── semiconductor.md
 │   │   ├── consumer.md
 │   │   ├── internet.md
 │   │   ├── heavy_asset.md
 │   │   └── financial.md
-│   └── 投研_主笔_*.md                    # 8 个 step 指令文件
+│   └── step*.md                          # 8 个 step 指令文件
 ├── instruction_store_ic/                 # IC 角色指令库（16 角色）
 │   ├── index.json                        # archetype → role → file 三级映射
 │   ├── _common_tool_guide.md

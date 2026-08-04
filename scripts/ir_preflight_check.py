@@ -18,11 +18,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-try:
-    from scripts.ir_research_planner import prepare_research_plan
-except ModuleNotFoundError:  # direct script execution from scripts/
-    from ir_research_planner import prepare_research_plan
-
 ROOT = Path(__file__).resolve().parent.parent
 TASKS_DIR = ROOT / 'data' / 'tasks'
 IR_RUNTIME = ROOT / 'config' / 'ir-runtime.json'
@@ -33,25 +28,32 @@ TASK_LEDGER = TASKS_DIR / 'tasks.json'
 MIN_TEAM_SIZE = 6
 
 # Required roles for a complete research team
+# v3.2 (2026-08-04): 移除已死的 投研_主笔_数据收集（step1_data 于 v3.0 删除，
+# 数据采集职责并入 phase04 research plan 子代理的 enriched_data_pack.json）；
+# 新增 投研_研究计划（phase04 子代理指令，从 ir_profile.py 内联迁入指令库）
+# 与 投研_主笔_宏观分析/预测与估值（旧 REQUIRED_ROLES 漏列，roster 早已映射）。
 REQUIRED_ROLES = [
-    '投研_主笔_数据收集',
+    '投研_研究计划',
     '投研_主笔_行业分析',
     '投研_主笔_商业模式',
     '投研_主笔_财务分析',
     '投研_主笔_管理层',
+    '投研_主笔_宏观分析',
+    '投研_主笔_预测与估值',
     '投研_主笔_差异化洞察',
     '投研_主笔_风险催化',
 ]
 
 # Role → step mapping (for subagent dispatch)
+# 投研_研究计划 不进 roster（phase04 由 ir_profile 派发，非 launcher step）
 ROLE_STEP_MAP = {
-    '投研_主笔_数据收集': 'step1_data',
     '投研_主笔_行业分析': 'step1_industry',
     '投研_主笔_商业模式': 'step2_biz',
     '投研_主笔_财务分析': 'step3_finance',
     '投研_主笔_管理层': 'step4_mgmt',
-    '投研_主笔_差异化洞察': 'step7_insight',
+    '投研_主笔_宏观分析': 'step5_macro',
     '投研_主笔_预测与估值': 'step6_valuation',
+    '投研_主笔_差异化洞察': 'step7_insight',
     '投研_主笔_风险催化': 'step8_risk',
 }
 
@@ -300,22 +302,31 @@ def run_preflight(task_id: str, mode: str = 'subagent', entity: str = '', query:
 
     all_passed = all(c['passed'] for c in checks)
 
+    # v3.2 (2026-08-04): research plan 不再由脚本预建——由 phase04 子代理全权生成
+    #（指令见 instruction_store_ir/ir_research_plan.md）。此处只做状态检查：
+    # 已有 plan → 校验就绪性；无 plan → 标记 pending（不阻断，子代理随后产出）
     if all_passed and reg['passed']:
-        effective_query = query or task_info_query(task_id)
-        plan_path = prepare_research_plan(
-            task_id=task_id,
-            entity=entity or task_info_entity(task_id),
-            query=effective_query,
-            market=market,
-            tasks_dir=TASKS_DIR,
-            report_type=task_info_report_type(task_id, effective_query),
+        from scripts.ir_research_planner import (
+            load_research_plan,
+            normalize_research_plan_contract,
+            validate_research_plan_ready,
         )
-        checks.append({
-            'check': 'research_plan',
-            'passed': True,
-            'detail': f'Research plan at {plan_path}',
-        })
-        all_passed = all(c['passed'] for c in checks)
+        existing = load_research_plan(task_id, TASKS_DIR)
+        if existing is None:
+            checks.append({
+                'check': 'research_plan',
+                'passed': True,
+                'detail': 'pending_subagent_generation (phase04 research plan 子代理将生成)',
+            })
+        else:
+            validation = validate_research_plan_ready(normalize_research_plan_contract(existing))
+            checks.append({
+                'check': 'research_plan',
+                'passed': validation['ready'],
+                'detail': 'existing plan ready' if validation['ready']
+                          else f"existing plan not ready: {validation['errors']}",
+            })
+            all_passed = all(c['passed'] for c in checks)
 
     result = {
         'task_id': task_id,

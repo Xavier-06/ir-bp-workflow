@@ -43,19 +43,16 @@ def test_run_research_plan_writes_skeleton_and_returns_needs_dispatch(tmp_path):
 
 
 def test_run_research_plan_collect_financial_inference_fallback(tmp_path):
-    """v2.2: 子代理未产出 plan 时，collect 降级脚本生成 + 财务感知兜底。
+    """v3.2: 子代理未产出 plan 时，collect 硬失败（脚本骨架降级已删除）。
 
-    场景：company_verify 的 financial_data 含亏损信号（净亏损），且子代理 plan 缺失。
-    期望：fallback plan 的 valuation_paradigm 被推断为 preprofit_growth，
-    valuation_method_primary=PS/EV-Sales，PE/DCF 被禁，并打 thesis_source 标记。
-    （修复 MiniMax 类亏损标的被套上 PE 框架的缺陷）
+    场景：company_verify 存在但子代理 plan 缺失。
+    期望：ok=False，error=plan_missing，提示重跑 phase04。
     """
     from runtime.profiles.ir_profile import _run_research_plan_collect
 
     tasks_dir = tmp_path / "data" / "tasks"
     tasks_dir.mkdir(parents=True)
 
-    # 写含亏损信号的 company_verify（无子代理 ir_research_plan.json，触发降级）
     company_verify = {
         "task_id": "TASK-LOSS",
         "entity": "亏损科技公司",
@@ -74,21 +71,81 @@ def test_run_research_plan_collect_financial_inference_fallback(tmp_path):
     job_ctx = SimpleNamespace(job_id="TASK-LOSS", entity="亏损科技公司", query="深度研究", market="hk", metadata={}, workspace=None)
     result = _run_research_plan_collect(tmp_path, job_ctx)
 
-    assert result["ok"] is True
-    assert result["result"]["enrichment"] == "fallback_script"
-    assert result["result"]["thesis_source"] == "fallback_financial_inference"
+    assert result["ok"] is False
+    assert result["result"]["error"] == "plan_missing"
+    assert not (tasks_dir / "TASK-LOSS-research_plan.json").exists()
 
-    # 读取落盘的 fallback plan，验证财务感知推断生效
-    plan = json.loads(Path(result["result"]["plan_path"]).read_text(encoding="utf-8"))
-    assert plan["valuation_paradigm"] == "preprofit_growth"
-    assert plan["valuation_method_primary"] == "PS / EV-Sales"
-    assert "PE" in plan["valuation_forbidden"]
-    assert "DCF" in plan["valuation_forbidden"]
-    assert plan.get("thesis_source") == "fallback_financial_inference"
+
+def test_run_research_plan_collect_subagent_plan_backfills_paradigm(tmp_path):
+    """v3.2: 子代理产出 plan + 亏损 company_verify → Thesis 兜底为 preprofit_growth。
+
+    子代理 plan 缺 valuation_paradigm 时，collect 用财务推断补 preprofit_growth+PS，
+    禁 PE/DCF（修复 MiniMax 类亏损标的被套 PE 框架的缺陷）。
+    """
+    from runtime.profiles.ir_profile import _run_research_plan_collect
+
+    tasks_dir = tmp_path / "data" / "tasks"
+    tasks_dir.mkdir(parents=True)
+
+    company_verify = {
+        "task_id": "TASK-LOSS",
+        "entity": "亏损科技公司",
+        "market": "hk",
+        "financial_data": [
+            {"text": "公司2025年营收同比增长158%，经调整净亏损2.51亿美元。", "url": "", "metric": "毛利率25.4%"},
+        ],
+        "valuation_data": {}, "key_events": [], "source_urls": [],
+    }
+    (tasks_dir / "TASK-LOSS-ir_company_verify.json").write_text(
+        json.dumps(company_verify, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+    plan = {
+        "schema_version": "ir_research_plan.v5",
+        "task_id": "TASK-LOSS", "entity": "亏损科技公司", "market": "hk",
+        "plan_status": "ready",
+        "core_questions": [{
+            "question_id": "Q1", "question": "q", "priority": "high",
+            "owner_section": "step3_finance", "supporting_sections": [],
+            "required_fact_keys": ["revenue_trend"], "decision_relevance": "d",
+        }],
+        "strategic_questions": [{
+            "question_id": "SQ1", "question": "sq", "priority": "high",
+            "owner_section": "step6_valuation",
+            "required_fact_keys": ["valuation_multiples"], "decision_relevance": "d",
+        }],
+        "section_requirements": {
+            "step3_finance": {"must_answer": ["Q1"], "required_fact_keys": ["revenue_trend"],
+                              "required_outputs": ["claims", "facts_used", "data_gaps", "markdown_draft"]},
+            "step6_valuation": {"must_answer": ["SQ1"], "required_fact_keys": ["valuation_multiples"],
+                                "required_outputs": ["claims", "facts_used", "data_gaps", "markdown_draft"]},
+        },
+        "fact_requirements": [
+            {"fact_key": "revenue_trend", "description": "收入", "source_priority": ["annual_report"], "required_for": ["step3_finance"], "criticality": "high"},
+            {"fact_key": "valuation_multiples", "description": "估值倍数", "source_priority": ["market_data"], "required_for": ["step6_valuation"], "criticality": "high"},
+        ],
+        "coverage_matrix": {
+            "Q1": {"owner": "step3_finance", "supporting_sections": [], "required_fact_keys": ["revenue_trend"]},
+            "SQ1": {"owner": "step6_valuation", "supporting_sections": [], "required_fact_keys": ["valuation_multiples"]},
+        },
+    }
+    (tasks_dir / "TASK-LOSS-ir_research_plan.json").write_text(
+        json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+    job_ctx = SimpleNamespace(job_id="TASK-LOSS", entity="亏损科技公司", query="深度研究", market="hk", metadata={}, workspace=None)
+    result = _run_research_plan_collect(tmp_path, job_ctx)
+
+    assert result["ok"] is True
+    assert result["result"]["enrichment"] == "subagent_generated"
+    final = json.loads(Path(result["result"]["plan_path"]).read_text(encoding="utf-8"))
+    assert final["valuation_paradigm"] == "preprofit_growth"
+    assert final["valuation_method_primary"] == "PS / EV-Sales"
+    assert "PE" in final["valuation_forbidden"]
 
 
 def test_run_research_plan_collect_no_loss_keeps_default(tmp_path):
-    """v2.2 对照组：company_verify 无亏损信号时，fallback 保持默认 profitable_growth。"""
+    """v3.2 对照组：子代理 plan 缺 paradigm + company_verify 无亏损信号 → 默认 profitable_growth。"""
     from runtime.profiles.ir_profile import _run_research_plan_collect
 
     tasks_dir = tmp_path / "data" / "tasks"
@@ -101,22 +158,53 @@ def test_run_research_plan_collect_no_loss_keeps_default(tmp_path):
         "financial_data": [
             {"text": "公司2025年营收同比增长20%，归母净利润12亿元，毛利率40%。", "url": "", "metric": "毛利率40%"},
         ],
-        "valuation_data": {},
-        "key_events": [],
-        "source_urls": [],
+        "valuation_data": {}, "key_events": [], "source_urls": [],
     }
     (tasks_dir / "TASK-PROFIT-ir_company_verify.json").write_text(
         json.dumps(company_verify, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+    # 合法最小 plan（缺 valuation_paradigm，验证兜底默认值）
+    plan = {
+        "schema_version": "ir_research_plan.v5",
+        "task_id": "TASK-PROFIT", "entity": "盈利公司", "market": "cn",
+        "plan_status": "ready",
+        "core_questions": [{
+            "question_id": "Q1", "question": "q", "priority": "high",
+            "owner_section": "step3_finance", "supporting_sections": [],
+            "required_fact_keys": ["revenue_trend"], "decision_relevance": "d",
+        }],
+        "strategic_questions": [{
+            "question_id": "SQ1", "question": "sq", "priority": "high",
+            "owner_section": "step6_valuation",
+            "required_fact_keys": ["valuation_multiples"], "decision_relevance": "d",
+        }],
+        "section_requirements": {
+            "step3_finance": {"must_answer": ["Q1"], "required_fact_keys": ["revenue_trend"],
+                              "required_outputs": ["claims", "facts_used", "data_gaps", "markdown_draft"]},
+            "step6_valuation": {"must_answer": ["SQ1"], "required_fact_keys": ["valuation_multiples"],
+                                "required_outputs": ["claims", "facts_used", "data_gaps", "markdown_draft"]},
+        },
+        "fact_requirements": [
+            {"fact_key": "revenue_trend", "description": "收入", "source_priority": ["annual_report"], "required_for": ["step3_finance"], "criticality": "high"},
+            {"fact_key": "valuation_multiples", "description": "估值倍数", "source_priority": ["market_data"], "required_for": ["step6_valuation"], "criticality": "high"},
+        ],
+        "coverage_matrix": {
+            "Q1": {"owner": "step3_finance", "supporting_sections": [], "required_fact_keys": ["revenue_trend"]},
+            "SQ1": {"owner": "step6_valuation", "supporting_sections": [], "required_fact_keys": ["valuation_multiples"]},
+        },
+    }
+    (tasks_dir / "TASK-PROFIT-ir_research_plan.json").write_text(
+        json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8",
     )
 
     job_ctx = SimpleNamespace(job_id="TASK-PROFIT", entity="盈利公司", query="深度研究", market="cn", metadata={}, workspace=None)
     result = _run_research_plan_collect(tmp_path, job_ctx)
 
     assert result["ok"] is True
-    assert result["result"]["thesis_source"] == "fallback_default"
-    plan = json.loads(Path(result["result"]["plan_path"]).read_text(encoding="utf-8"))
-    assert plan["valuation_paradigm"] == "profitable_growth"
-    assert plan["valuation_method_primary"] == "PE / EV-EBITDA"
+    final = json.loads(Path(result["result"]["plan_path"]).read_text(encoding="utf-8"))
+    assert final["valuation_paradigm"] == "profitable_growth"
+    assert final["valuation_method_primary"] == "PE / EV-EBITDA"
 
 
 def test_run_fact_store_bootstrap_writes_empty_generic_store_when_no_sources(tmp_path):
