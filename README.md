@@ -510,21 +510,21 @@ ir-bp-workflow/
 │       ├── neodata_search.py             # NeoData 研报搜索
 │       ├── dedup.py                      # DOI + title 去重
 │       └── rate_limiter.py               # API 限速
-├── instruction_store_bp/                 # BP 角色指令库（10 角色 + 统稿）
-│   ├── index.json                        # 角色 → 文件映射
+├── instruction_store_bp/                 # BP 角色指令库（11 角色：R00-R10 + 统稿 S1，按派发顺序编号）
+│   ├── index.json                        # 角色 → 文件映射（含 wave / dispatch_order 编号）
 │   ├── _common_tool_guide.md             # 通用工具使用指南（含 IMA §3.6）
-│   ├── bp_company_team_compliance.md     # W1 团队合规
-│   ├── bp_product_commercial.md          # W1 产品商业
-│   ├── bp_tech_ip_moat.md                # W1 技术 IP
-│   ├── bp_market_supply_chain.md         # W1 市场供应链
-│   ├── bp_competition_positioning.md     # W3 竞争定位
-│   ├── bp_valuation_return.md            # W3 估值回报
-│   ├── bp_dealbreaker_risk.md            # W4 红队风险
-│   ├── bp_consensus_challenge.md         # W4 共识挑战
-│   ├── bp_catalyst.md                    # W4 催化剂
-│   ├── bp_industry_research.md           # W4 行业研报
-│   ├── bp_统稿.md                        # 统稿（唯一中文命名）
-│   └── bp_research_plan_enrichment.md    # 研究计划子代理指令
+│   ├── bp_research_plan.md               # R00/W0 研究计划生成（最先派发）
+│   ├── bp_company_team_compliance.md     # R01/W1 团队合规
+│   ├── bp_product_commercial.md          # R02/W1 产品商业
+│   ├── bp_tech_ip_moat.md                # R03/W1 技术 IP
+│   ├── bp_market_supply_chain.md         # R04/W1 市场供应链
+│   ├── bp_competition_positioning.md     # R05/W3 竞争定位
+│   ├── bp_valuation_return.md            # R06/W3 估值回报
+│   ├── bp_dealbreaker_risk.md            # R07/W4 红队风险
+│   ├── bp_consensus_challenge.md         # R08/W4 共识挑战
+│   ├── bp_catalyst.md                    # R09/W4 催化剂
+│   ├── bp_industry_research.md           # R10/W4 行业研报
+│   └── bp_统稿.md                        # S1 统稿（唯一中文命名，最后派发）
 ├── instruction_store_ir/                 # IR 角色指令库（8 个 step + 统稿）
 │   ├── index.json
 │   ├── _common_tool_guide.md

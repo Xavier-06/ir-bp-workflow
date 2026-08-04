@@ -66,7 +66,39 @@ def bp_build_research_plan_instruction(
     has_skeleton: bool,
     skeleton_path: Path | None,
 ) -> str:
-    """Build the main-AI instruction for dispatching the research plan subagent."""
+    """Build the main-AI instruction for dispatching the research plan subagent.
+
+    v13 (2026-08-04): 子代理 prompt 主体从硬编码英文字符串迁移到
+    instruction_store_bp/bp_research_plan.md 模板（与其它角色指令同库同骨架），
+    此处只做占位符替换。模板缺失时报配置缺口，不复用其它角色 prompt。
+    """
+    project_root = Path(__file__).resolve().parent.parent
+    template_path = project_root / "instruction_store_bp" / "bp_research_plan.md"
+    if not template_path.exists():
+        raise FileNotFoundError(
+            f"BP research plan instruction template missing: {template_path}. "
+            "Do not reuse another BP role prompt; stop and report this configuration gap."
+        )
+    prompt_body = template_path.read_text(encoding="utf-8")
+
+    skeleton_note = ""
+    if has_skeleton and skeleton_path:
+        skeleton_note = f"4. `{skeleton_path}` — legacy 脚本骨架（仅参考 claim 结构）\n"
+
+    # 占位符替换用 replace 链（模板含 JSON 大括号，不能用 str.format）
+    replacements = {
+        "{ENTITY}": entity,
+        "{MARKET}": market,
+        "{TASK_DIR}": str(task_dir),
+        "{TASK_ID}": job_id,
+        "{BRIEF_PATH}": str(brief_path),
+        "{PROJECT_ROOT}": str(project_root),
+        "{SKELETON_NOTE}": skeleton_note,
+    }
+    for placeholder, value in replacements.items():
+        prompt_body = prompt_body.replace(placeholder, value)
+    # stage_tier 在 schema 示例中留空待填；此处显式写入 brief 判定值
+    prompt_body = prompt_body.replace('"stage_tier": "",', f'"stage_tier": "{stage_tier}",')
 
     instruction = (
         "PHASE04 BP RESEARCH PLAN - Dispatch Subagent\n"
@@ -86,148 +118,7 @@ def bp_build_research_plan_instruction(
         "\n"
         "---\n"
         "\n"
-        f"You are an investment due diligence researcher. Generate a complete research plan for {entity}.\n"
-        "\n"
-        "## Input Files (must read)\n"
-        "\n"
-        f"1. `{brief_path}` - brief with entity info, stage tier, industry, founders\n"
-        f"2. `{task_dir / 'bp_ocr_text.txt'}` - BP pitch deck OCR full text\n"
-        f"3. `{task_dir / 'bp_step0_profile.json'}` - structured company profile\n"
-    )
-
-    if has_skeleton and skeleton_path:
-        instruction += f"5. `{skeleton_path}` - legacy script skeleton (reference claim structure only)\n"
-
-    instruction += (
-        "\n"
-        "## Step 0: Read ALL Input Files FIRST\n"
-        "\n"
-        "Before any search, you MUST read the files listed above. From the brief, extract:\n"
-        "- entity name, stage_tier, industry, sub_industry, founders, products, competitors\n"
-        "- Use stage_tier to determine how strict your verification should be\n"
-        "Then read bp_ocr_text.txt for the company's key claims and bp_step0_profile.json for structured data.\n"
-        "\n"
-        "## Search Strategy (execute strictly in this order)\n"
-        "\n"
-        "### Step 1: Company Verification (tyc-mcp)\n"
-        f'- tyc-mcp.search_companies: query "{entity}" -> get company_id\n'
-        "- tyc-mcp.get_company_basic_profile: full registration, shareholders, legal risks\n"
-        "- Key fields: registered capital, establishment date, business scope, shareholders, financing history, legal risks\n"
-        "- If tyc finds nothing (early stage company): note it, do NOT skip, move to Step 2\n"
-        "\n"
-        "### Step 2: Industry Data (westock-mcp)\n"
-        "- westock-mcp.data_sector: search by industry name from the brief (sub_industry field)\n"
-        "- westock-mcp.data_report: search research reports about the industry AND competitor names from the brief\n"
-        f'- Cross-check: does sector PE/valuation align with what {entity} claims in the BP?\n'
-        "\n"
-        "### Step 3: Web Supplement (use BOTH Chinese and English queries)\n"
-        f'- search_deep(Bash): "{entity} 融资 估值 投资人 2025 2026"\n'
-        f'- search_deep(Bash): "{entity} funding valuation investors 2025 2026"\n'
-        f'- search_deep(Bash): "{entity} 竞品 对比 市场份额"\n'
-        f'- search_deep(Bash): "{entity} vs competitors market share"\n'
-        f'- search_deep(Bash): "{entity} 客户 订单 交付 合同"\n'
-        f'- search_deep(Bash): "{entity} customers orders contracts revenue"\n'
-        f'- search_deep(Bash): "{entity} 专利 技术 壁垒 知识产权"\n'
-        f'- search_deep(Bash): "{entity} technology patents IP moat"\n'
-        f'- search_deep(Bash): "[industry from brief] 市场规模 增长 趋势"\n'
-        f'- search_deep(Bash): "[industry from brief] market size growth trend"\n'
-        "\n"
-        "### Step 4: Tencent News (real-time Chinese news via Bash)\n"
-        "Run these two Bash commands to get latest news:\n"
-        "```bash\n"
-        f'cd {task_dir.parent.parent} && python3 -c "\n'
-        "import json, sys; sys.path.insert(0, \'.\')\n"
-        "from scripts.search_gateway import tencent_news_search\n"
-        f'result = tencent_news_search(\'"{entity}" 融资 产品 合作 最新\', max_results=5)\n'
-        "print(json.dumps(result, ensure_ascii=False, indent=2))\n"
-        '"\n'
-        "```\n"
-        "```bash\n"
-        f'cd {task_dir.parent.parent} && python3 -c "\n'
-        "import json, sys; sys.path.insert(0, \'.\')\n"
-        "from scripts.search_gateway import tencent_news_search\n"
-        f'result = tencent_news_search(\'"[industry from brief]" 行业 政策 动态\', max_results=5)\n'
-        "print(json.dumps(result, ensure_ascii=False, indent=2))\n"
-        '"\n'
-        "```\n"
-        "\n"
-        "### Step 5: IMA Institutional Knowledge (ima-mcp — 自建研报库为主力源，全文可 fetch)\n"
-        "Search IMA knowledge bases for institutional-grade insights that web search cannot reach. 自建研报库是主力源（投行/券商研报全文可取），优先搜：\n"
-        "- ima-mcp.search_knowledge: knowledge_base_id='001a89fa4b807b92' (★自建研报库, GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报), query='{entity} OR [industry] 研报 目标价 估值 竞争格局' → sell-side research full text\n"
-        "- ima-mcp.search_knowledge: knowledge_base_id='7311568991699459' (行研智库), query='[industry] 市场规模 技术路线 竞争格局' → industry deep reports (补充)\n"
-        "- 时间过滤纪律：优先最近 30 天内的投行研报（超 1 个月参考价值显著下降）；标题常含日期（如 -260703.pdf=2026-07-03）；大行优先\n"
-        "- If search returns results, use ima-mcp.fetch_media_content on the top 1-3 most relevant media_id to get full text (自建研报库/行研智库均可 fetch)\n"
-        "- Record in search_summary: which KB was searched, query used, results found, content fetched\n"
-        "- IMA results are institution-grade alpha — investment bank research, broker phone call transcripts, expert exchanges\n"
-        "\n"
-        "## Competitor Extraction (MANDATORY — do NOT skip)\n"
-        "\n"
-        "After your searches (including IMA), you MUST populate a `competitors` field in the output JSON.\n"
-        "This field is consumed downstream by the valuation sub-agent (Wave3) to pick comparable companies.\n"
-        "If you skip it, the valuation step will have NO competitor list and will guess blindly.\n"
-        "\n"
-        "How to populate `competitors`:\n"
-        "1. Read the BP OCR text (bp_ocr_text.txt) — look for company names mentioned as competitors/benchmarks\n"
-        "2. Check the brief's `competitors` field if it already has names\n"
-        "3. From your tyc/westock/search_deep/IMA results — extract any named companies that compete with {entity}\n"
-        "4. Include BOTH listed and unlisted companies (e.g., DJI, Insta360, GoPro, Proscenic, Roborock)\n"
-        "5. For each competitor, record: name, ticker (if listed), and main business\n"
-        "\n"
-        "## Analysis & Output\n"
-        "\n"
-        "After completing all searches, synthesize findings into a research plan:\n"
-        "\n"
-        "1. **Claim Design**: Extract claims from BP OCR; cross-check with tyc/westock data; design at least 10 verification claims (BC001-BC01X)\n"
-        "2. **Strategic Questions**: Design 5 sharp questions (ESQ1-ESQ5) that could change the investment conclusion, using contradictions between BP claims and external data\n"
-        "3. **Fact Requirements**: Define at least 30 fact_keys needed to verify all claims\n"
-        "4. **Section Assignment**: Map claims/questions to 8 dimension sections\n"
-        "5. **Priority**: Set per claim based on BP emphasis, data coverage, and stage_tier\n"
-        "\n"
-        "## Stage Tier Rules\n"
-        "- T1/T2 (seed/angel/Pre-A/Series A): relax verification; focus on team+tech+market; tyc failure is acceptable\n"
-        "- T3/T4 (Series B+): strict verification; tyc/westock data is mandatory; focus on finance+customers+compliance\n"
-        "\n"
-        "## Output File\n"
-        "\n"
-        f"Write to `{task_dir / 'bp_research_plan.json'}` with this schema:\n"
-        "\n"
-        "```json\n"
-        "{\n"
-        f'  "schema_version": "bp_research_plan.v3",\n'
-        f'  "task_id": "{job_id}",\n'
-        f'  "entity": "{entity}",\n'
-        f'  "market": "{market}",\n'
-        f'  "stage_tier": "{stage_tier}",\n'
-        f'  "data_sources_used": ["tyc-mcp:company", "westock-mcp:industry/reports", "ima-mcp:institutional_research", "search_deep:public"],\n'
-        f'  "competitors": [{{"name": "Insta360影石", "ticker": "", "main_business": "运动相机/全景相机"}}, {{"name": "大疆DJI", "ticker": "", "main_business": "无人机/影像系统"}}, {{"name": "GoPro", "ticker": "GPRO", "main_business": "运动相机"}}],\n'
-        f'  "core_questions": [{{\n'
-        f'    "question_id": "CQ1",\n'
-        f'    "question": "Does the company legally exist and operate compliantly?",\n'
-        f'    "priority": "critical",\n'
-        f'    "owner_section": "bp_company_team_compliance",\n'
-        f'    "required_fact_keys": ["company_existence", "registration_info", "compliance_record"]\n'
-        f'  }}],\n'
-        f'  "strategic_questions": [\n'
-        f'    {{"question_id": "ESQ1", "question": "...", "priority": "high", "owner_section": "bp_xxx", "required_fact_keys": [...], "decision_relevance": "..."}}\n'
-        f'  ],\n'
-        f'  "fact_requirements": [\n'
-        f'    {{"fact_key": "company_existence", "label": "Business verification", "domain": "background", "required_for_stage": "T1-T4"}}\n'
-        f'  ],\n'
-        f'  "section_requirements": {{}},\n'
-        f'  "claim_matrix": [\n'
-        f'    {{"claim_id": "BC001", "claim": "...", "owner_section": "bp_xxx", "priority": "critical", "source": "bp_claim|external", "status": "planned", "required_fact_keys": [...]}}\n'
-        f'  ],\n'
-        f'  "plan_status": "ready",\n'
-        f'  "search_summary": {{"tyc_company_found": true, "westock_sector_available": true, "web_evidence_count": 0, "key_findings": []}}\n'
-        f'}}\n'
-        f'```\n'
-        f'\n'
-        f'## Constraints\n'
-        f'- All owner_section: bp_company_team_compliance, bp_product_commercial, bp_tech_ip_moat, bp_market_supply_chain, bp_competition_positioning, bp_valuation_return, bp_dealbreaker_risk\n'
-        f'- Minimum: 10 claims, 30 fact_keys, covering all 7 sections\n'
-        f'- If tyc cannot find company (T1/T2): note in search_summary and still generate full plan\n'
-        f'- **MANDATORY**: `competitors` field MUST contain at least 3 named companies (list of {{name, ticker, main_business}}). DO NOT leave it empty unless the BP has ZERO competitor mentions.\n'
-        f'- Write bp_research_plan.json directly; no need to notify main AI\n'
+        + prompt_body
     )
 
     return instruction

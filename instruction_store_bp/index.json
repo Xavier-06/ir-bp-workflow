@@ -1,132 +1,139 @@
 {
   "meta": {
-    "version": 12,
+    "version": 13,
     "created_at": "2026-03-31T16:37:00",
-    "updated_at": "2026-07-27T16:20:00",
+    "updated_at": "2026-08-04T11:00:00",
     "task_type": "bp_尽调类",
-    "description": "BP 尽调管线指令库 v12 — 研报级数据密度对齐：tech_ip_moat/industry_research/market_supply_chain 三维度新增工程spec硬参数+成本颗粒度+路线pros/cons+市场规模结构拆分+企业布局全景+前驱体路线经济学的硬性输出要求；bp_统稿 新增「技术/行业数据密度保留铁律」（6类硬数据禁止压缩为定性）；_common_tool_guide 新增全文提取纪律（fetch后逐表逐参数抄录）",
+    "description": "BP 尽调管线指令库 v13 — 指令库统一化：①全部角色按派发顺序编号（R00 研究计划 → R01-R04 Wave1 → R05-R06 Wave3 → R07-R10 Wave4 → S1 统稿），每个 md 文件头部带角色 ID 标识；②研究计划子代理指令从 Python 硬编码英文 prompt 迁入指令库（bp_research_plan.md），与其它角色同骨架同风格；③Wave 4 三个叙事角色（共识挑战/催化剂/行业研报）重写为与 8 个核心角色一致的骨架（投资尽调身份/角色边界/必须回答的问题/调查与写作要求/硬性要求/角色专属工具映射/搜索策略/禁区）；④删除 5 个 Legacy 幻影条目（文件早已不存在）+ deprecated 段 + v5.2 后无代码引用的死文件 bp_research_plan_enrichment.md；⑤修复 phase04 dispatch_info 缺 ima-mcp connector 的 bug",
     "changelog": [
       "v1 (2026-03-31): 初始版本，6 角色编组",
       "v2 (2026-04-02): 全部子代理新增 SearXNG 调用示例 + DDG fallback + 证据质量评分(🅰🅱🅲)",
       "v3 (2026-04-22): 全面升级对标投研报告标准。子代理从尽调checklist升级为投研报告章节写作。新增统稿角色。废弃护城河锚定（已合并到技术维度）。清理旧版BP_DD_*指令。搜索模板扩展。",
       "v4 (2026-05-09): 新增bp_估值维度（Wave 1 并行）。融资轮估值+可比公司+投资回报模型+Excel产出。移除neodata-financial-search数据源引用，改用yfinance+天眼查+web_search。",
-      "v5 (2026-06-06): 对齐当前 BP Phase 2 八角色。新增并绑定 bp_company_team_compliance、bp_product_commercial、bp_tech_ip_moat、bp_market_supply_chain、bp_competition_positioning、bp_valuation_return、bp_customer_revenue_validation、bp_dealbreaker_risk 独立指令，避免旧角色 prompt 复用串活。",
-      "v6 (2026-06-12): 7 个 v5 角色 prompt 新增'角色专属工具映射'章节。解决 v5 升级时角色级工具选型指导丢失的问题：子代理知道有什么工具可用（通用 Tool Usage Guide），但不知道自己维度该用哪个工具查什么。补回 TYC MCP/NeoData/yfinance/web_search 的角色级映射。涉及金融数据的角色（market_supply_chain、competition_positioning）补充完整 NeoData bash 调用命令和 yfinance 股票代码格式。bp_valuation_return 不改（PR3 已有完整估值数据源章节）。",
-      "v7 (2026-06-12): 修正所有角色工具映射中的 QCC 工具名为精确 API 函数名。v6 只写了 connector 名（如 mcp__tyc-mcp），LLM 不知道该调哪个 API。修正为实际函数名（如 get_shareholder_info / get_actual_controller / get_company_registration_info / get_company_risk_scan / get_patent_info 等）。同时 tyc-mcp connector 之前 SSE 握手失败导致工具列表为空，已在 UI 重新连接恢复。",
-      "v8 (2026-06-13): bp_company_team_compliance prompt 新增'OCR 提取人物专项调查'硬性要求。问题：子代理 prompt 虽然写了'逐人验证'但过于泛泛，brief 中 key_inputs 只 dump 了 founders JSON 没有强调必须逐一独立搜索。新增指令明确要求：读取 step0_profile 的 team_highlights + founders 合并去重，每人至少 2 次独立 web_search + 天眼查 executive 验证 + web_fetch 深读，搜不到必须标注而非忽略。同时修复 bp_presearch.py 只搜 first_founder 的 bug，改为对所有提取出的创始人（最多5人）都发起搜索。",
-      "v9 (2026-07-06): 企业数据 MCP 从天眼查（6 connector）全面替换为天眼查（tyc-mcp 单 connector 聚合网关）。1) bp_constants.py: BP_QCC_CONNECTOR_IDS → BP_TYC_CONNECTOR_IDS=['tyc-mcp']，保留旧名别名向后兼容。2) bp_profile.py: synthesis/repair manifest 的 connectorIds 改引用常量。3) bp_subagent_launcher_wb.py: wave 子代理 connectorIds 改引用常量。4) _common_tool_guide.md: QCC 工具段全面重写为 TYC 两阶段调用模式（search_companies → get_company_capabilities → call_tool），更新工具优先级表和脚注来源。5) 7 个维度 prompt 中所有 mcp__qcc-* 工具映射替换为 TYC 等效工具。6) bp_统稿.md 脚注示例和来源标注替换。天眼查聚合网关模式只需 1 个 connector 覆盖天眼查原来 6 个 connector 的全部能力。",
-      "v10 (2026-07-13): BP管线9项优化。1) bp_company_team_compliance.md: 工商信息摘要表+完整股权结构表(含持股平台穿透)+招投标汇总表三项硬性输出(缺失=不合格)。2) bp_product_commercial.md: 产品矩阵全覆盖(BP提及+官网展示全部产品)，每条标注产品状态和预计未来营收占比。3) bp_tech_ip_moat.md: 技术原理通俗化三段式(大白话→类比→专业细节)硬性格式，技术路线对比表加通俗解释列，场景性能门槛参数表用大白话解释含义。4) bp_competition_positioning.md: 竞品参数对比表专业参数列名加括号注释+📖术语通俗解释小节+通俗解读段落。5) bp_market_supply_chain.md: 行业路线加通俗解释(plain_explanation)。6) bp_valuation_return.md: 重写为估值情况分析师(删MOIC/IRR投资回报模型、删估值区间建议、删投资建议，加融资历史时间线表、可比公司主营业务重合≥60%四重过滤)。7) bp_统稿.md: 整合全部9项需求到统稿模板(工商信息表/股权表/持股平台/产品全覆盖/技术通俗化三段式/痛点四步格式/竞品对比表术语解释/招投标/估值情况删建议/来源参考独立Word)。8) index.json: bp_valuation_return改名为估值情况分析师。9) 新建scripts/build_bp_references_docx.py(来源参考Word生成器，按天眼查/NeoData/WebSearch/WebFetch分组+可点击超链接)。10) bp_profile.py: phase33 delivery集成来源参考DOCX生成+StateStore注册。",
-      "v11 (2026-07-15): 投资叙事层+维度指令增强。1) P0完成: bp_统稿.md +§14投资判断框架+§15创始人Q&A+5条叙事风格规则, bp_tech_ip_moat.md +法规定性+认知纠偏+路线天花板, bp_product_commercial.md +供应链准入门槛, bp_competition_positioning.md +头部财务出清, bp_market_supply_chain.md +第三方TAM交叉验证。2) P1新增4角色: bp_investment_hypothesis(Wave 0先行者,提假说+可验证问题), bp_consensus_challenge(Wave 4,共识挑战+预期差), bp_catalyst(Wave 4,催化剂事件+时间窗口+传导链), bp_industry_research(Wave 4,行业研报整合+6大类基准数据)。3) 管线编排: bp_constants.py加Wave0/Wave4扩展+connector+ALL_ROLE_SLUGS, bp_profile.py加_dispatch_role_specs 4角色spec+wave0 prepare phase+phase编号重排+wave4 prior含wave0, bp_subagent_launcher_wb.py加CURRENT_BP_ROLES+slug映射, bp_delivery_gate.py改动态导入_BP_ALL_SLUGS, bp_wave_evidence_gate.py加_NON_CLAIM_ROLES跳过假说类claim检查。",
-      "v12 (2026-07-27): 研报级数据密度对齐。根因：管线与人工研报用同一 IMA 库，但子代理只读摘要泛泛概括、统稿又把硬数据压缩成定性判断，导致技术/行业章密度远低于人工研报。修复三层：①维度指令加硬性颗粒度要求——tech_ip_moat 新增工程spec硬参数表(孔容/BET/电导率/压实密度/比容量/ICE+行业实用区间锚)+成本颗粒度(四档电芯价/材料吨价+差距倍数/降本时间线)+前驱体路线经济学+壁垒对标基准，facts schema 加 engineering_specs/cost_granularity/precursor_route_economics 字段+quality_gate 硬校验；industry_research 6大类→7大类(新增企业布局全景扫描)，成本/市场规模/企业布局三类颗粒度硬要求，字数3000→5000；market_supply_chain 新增上游材料/前驱体路线经济学段+material_cost schema。②bp_统稿 新增「技术/行业数据密度保留铁律」：6类硬数据(成本颗粒度/工程spec/路线pros-cons/市场规模拆分/企业布局/前驱体经济学)子代理输出有的必须完整保留，禁止压缩为定性，统稿前建硬数据清单逐项核对。③_common_tool_guide §3.6 新增全文提取纪律：fetch全文后必须逐表逐参数抄录硬数据写入sidecar，禁止只读introduction摘要后转述。"
+      "v5 (2026-06-06): 对齐当前 BP Phase 2 八角色。新增并绑定 8 个维度独立指令，避免旧角色 prompt 复用串活。",
+      "v6 (2026-06-12): 7 个 v5 角色 prompt 新增'角色专属工具映射'章节。",
+      "v7 (2026-06-12): 修正所有角色工具映射中的 QCC 工具名为精确 API 函数名。",
+      "v8 (2026-06-13): bp_company_team_compliance 新增 OCR 提取人物专项调查硬性要求 + bp_presearch.py 多创始人搜索 bug 修复。",
+      "v9 (2026-07-06): 企业数据 MCP 从天眼查 6 connector 全面替换为 tyc-mcp 单聚合网关。",
+      "v10 (2026-07-13): BP管线9项优化（工商信息表/股权表/产品全覆盖/技术通俗化三段式/竞品术语解释/招投标/估值情况删建议/来源参考Word）。",
+      "v11 (2026-07-15): 投资叙事层+维度指令增强。新增 bp_consensus_challenge/bp_catalyst/bp_industry_research 3 个 Wave 4 角色。",
+      "v12 (2026-07-27): 研报级数据密度对齐。tech_ip_moat/industry_research/market_supply_chain 加工程spec硬参数+成本颗粒度+路线经济学；bp_统稿 新增数据密度保留铁律；_common_tool_guide 新增全文提取纪律。",
+      "v13 (2026-08-04): 指令库统一化。①全角色派发编号：R00 研究计划（Wave 0）→ R01-R04（Wave 1: 团队合规/产品商业化/技术IP/市场供应链）→ R05-R06（Wave 3: 竞争/估值）→ R07-R10（Wave 4: 红队/共识挑战/催化剂/行业研报）→ S1 统稿，每个文件头部带 ID 标识块。②新增 bp_research_plan.md：研究计划子代理指令从 scripts/_bp_research_plan_subagent.py 硬编码英文 prompt 迁入指令库（中文统一骨架），bp_build_research_plan_instruction 改为模板加载+占位符替换。③Wave 4 三叙事角色重写为与核心角色一致骨架（原 v4.5 轻量风格与 v5-v12 核心骨架割裂是'像8个人写的'的根源之一）。④清理死内容：删 5 个 Legacy 幻影 role 条目（bp_团队与合规/bp_技术与产品/bp_行业与供应链/bp_估值/bp_竞争与结论，文件早已不存在，check_instruction_store 报 5 个 error）+ deprecated 段；删 bp_research_plan_enrichment.md（v5.2 改子代理派发后 apply_enrichment 零调用者，无任何活跃代码读取）。⑤market_supply_chain 删英文 Role Focus 残留；bp_统稿 开头英文 persona 行并入统一中文身份段。⑥修复 phase04 dispatch_info.subagent_connector_ids 缺 ima-mcp（prompt Step 5 要求用 IMA 但派发没给 connector）。⑦check_instruction_store.py 排除 _ 前缀辅助文件（_common_tool_guide.md 不再是 orphan 警告）。"
     ]
   },
   "roles": [
     {
+      "id": "R00",
+      "key": "bp_research_plan",
+      "name": "研究计划生成分析师",
+      "file": "bp_research_plan.md",
+      "wave": 0,
+      "dispatch_order": 1,
+      "description": "Wave 0 (phase04): 预搜结构化数据 + 生成 research_plan.json（claims/facts/strategic questions/competitors）"
+    },
+    {
+      "id": "R01",
       "key": "bp_company_team_compliance",
       "name": "公司主体、团队与合规分析师",
       "file": "bp_company_team_compliance.md",
+      "wave": 1,
+      "dispatch_order": 2,
       "description": "Wave 1: 公司主体、团队、治理、股权、融资历史、资质与合规风险信号验证"
     },
     {
+      "id": "R02",
       "key": "bp_product_commercial",
       "name": "产品商业化分析师",
       "file": "bp_product_commercial.md",
+      "wave": 1,
+      "dispatch_order": 3,
       "description": "Wave 1: 产品矩阵、商业化阶段、客户案例、订单/合同与产品收入线索验证"
     },
     {
+      "id": "R03",
       "key": "bp_tech_ip_moat",
       "name": "技术、IP 与壁垒分析师",
       "file": "bp_tech_ip_moat.md",
+      "wave": 1,
+      "dispatch_order": 4,
       "description": "Wave 1: 技术路线、知识产权、研发能力、认证、性能和技术壁垒验证"
     },
     {
+      "id": "R04",
       "key": "bp_market_supply_chain",
       "name": "市场、行业与供应链分析师",
       "file": "bp_market_supply_chain.md",
+      "wave": 1,
+      "dispatch_order": 5,
       "description": "Wave 1: 市场规模、TAM/SAM/SOM、行业格局、政策环境、供应链和产能约束"
     },
     {
+      "id": "R05",
       "key": "bp_competition_positioning",
       "name": "竞争定位分析师",
       "file": "bp_competition_positioning.md",
+      "wave": 3,
+      "dispatch_order": 6,
       "description": "Wave 3: 竞争格局、差异化定位、竞品能力验证、替代风险和可复制性判断"
     },
     {
+      "id": "R06",
       "key": "bp_valuation_return",
       "name": "估值情况分析师",
       "file": "bp_valuation_return.md",
+      "wave": 3,
+      "dispatch_order": 7,
       "description": "Wave 3: 融资历史各轮估值变化、可比公司估值对标（主营业务重合筛选）、估值事实呈现（不给估值建议）"
     },
     {
+      "id": "R07",
       "key": "bp_dealbreaker_risk",
       "name": "Deal Breaker 红队分析师",
       "file": "bp_dealbreaker_risk.md",
+      "wave": 4,
+      "dispatch_order": 8,
       "description": "Wave 4: Deal Breakers、反向论证、关键风险、尽调阻断项和缓释路径"
     },
     {
-      "key": "bp_团队与合规",
-      "name": "团队与合规分析师（Legacy）",
-      "file": "bp_团队与合规.md",
-      "description": "Legacy: 公司主体验证 + 团队深度分析 + 合规风险"
-    },
-    {
-      "key": "bp_技术与产品",
-      "name": "技术与产品分析师（Legacy）",
-      "file": "bp_技术与产品.md",
-      "description": "Legacy: 技术原理深度分析 + 产品拆解 + BP技术声称验证"
-    },
-    {
-      "key": "bp_行业与供应链",
-      "name": "行业与供应链分析师（Legacy）",
-      "file": "bp_行业与供应链.md",
-      "description": "Legacy: 市场规模独立推算 + 厂商格局 + 供应链分析"
-    },
-    {
-      "key": "bp_估值",
-      "name": "估值分析师（Legacy）",
-      "file": "bp_估值.md",
-      "description": "Legacy: 融资轮估值 + 可比公司估值 + 投资回报模型"
-    },
-    {
-      "key": "bp_竞争与结论",
-      "name": "竞争与结论分析师（Legacy）",
-      "file": "bp_竞争与结论.md",
-      "description": "Legacy: 竞争格局 + BP逻辑验证 + 风险五类 + 投资建议"
-    },
-    {
-      "key": "bp_统稿",
-      "name": "统稿分析师",
-      "file": "bp_统稿.md",
-      "description": "Synthesis: 读取 Wave 0-4 维度输出，按投研逻辑重组为完整报告"
-    },
-    {
+      "id": "R08",
       "key": "bp_consensus_challenge",
       "name": "共识挑战与预期差分析师",
       "file": "bp_consensus_challenge.md",
+      "wave": 4,
+      "dispatch_order": 9,
       "description": "Wave 4：归纳市场共识 → 逐条挑战 → 预期差分析"
     },
     {
+      "id": "R09",
       "key": "bp_catalyst",
       "name": "催化剂与事件分析师",
       "file": "bp_catalyst.md",
+      "wave": 4,
+      "dispatch_order": 10,
       "description": "Wave 4：识别前瞻性催化剂 + 时间窗口 + 概率/影响 + 传导链"
     },
     {
+      "id": "R10",
       "key": "bp_industry_research",
       "name": "行业深度研报整合分析师",
       "file": "bp_industry_research.md",
+      "wave": 4,
+      "dispatch_order": 11,
       "description": "Wave 4：行业研报整合：技术路线横评/成本结构/头部财务/法规标准/第三方TAM/产业化时间线"
-    }
-  ],
-  "deprecated": [
+    },
     {
-      "key": "bp_护城河锚定",
-      "file": "bp_护城河锚定.md.deprecated",
-      "reason": "v3 废弃，护城河分析已合并到技术与产品/技术IP壁垒维度"
+      "id": "S1",
+      "key": "bp_统稿",
+      "name": "统稿分析师",
+      "file": "bp_统稿.md",
+      "wave": "S",
+      "dispatch_order": 12,
+      "description": "Synthesis: 读取 Wave 0-4 维度输出，按投研逻辑重组为完整报告"
     }
   ],
   "pipeline_bindings": {
     "bp": {
+      "research_plan": "bp_research_plan",
       "company_team_compliance": "bp_company_team_compliance",
       "product_commercial": "bp_product_commercial",
       "tech_ip_moat": "bp_tech_ip_moat",
@@ -137,11 +144,6 @@
       "consensus_challenge": "bp_consensus_challenge",
       "catalyst": "bp_catalyst",
       "industry_research": "bp_industry_research",
-      "team": "bp_company_team_compliance",
-      "tech": "bp_tech_ip_moat",
-      "industry": "bp_market_supply_chain",
-      "valuation": "bp_valuation_return",
-      "competition": "bp_competition_positioning",
       "synthesis": "bp_统稿"
     }
   }

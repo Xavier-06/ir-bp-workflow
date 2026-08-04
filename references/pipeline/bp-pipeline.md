@@ -148,22 +148,18 @@ cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestra
 - 收到所有同 wave 输出文件后 → 自动调用 `execute(..., start_phase=...)` 推进下一 phase
 - **绝对不要等待用户说"继续"**
 
-## Phase03 Research Plan Enrichment（v5.0，2026-06-26 新增）
+## Phase04 Research Plan Subagent（v5.2，2026-07-08 改为子代理派发；v13，2026-08-04 指令迁入指令库）
 
-Phase03 从纯脚本升级为 needs_dispatch 模式（脚本管骨架，主 AI 管大脑）：
+研究计划生成（原 Phase03 enrichment）现为独立子代理派发（R00，全管线最先派发）：
 
-1. `_run_research_plan()` 生成确定性骨架（36 facts + 7 core Qs + 10 default claims with `required_fact_keys`）
-2. 返回 `needs_dispatch=True, has_more=False` + instruction
-3. 主 AI 读 `instruction_store_bp/bp_research_plan_enrichment.md` + BP 原文 + 骨架 → 输出 enrichment delta JSON
-4. 用 `start_phase='phase03_research_plan_collect'` 恢复管线
-5. `_run_research_plan_collect()` 调用 `apply_enrichment()` 合并 4 项增量：
-   - `strategic_questions`（5 条定制化问题，替代模板版）
-   - `claim_priority_deltas`（按 BP 内容调整 claim 优先级）
-   - `additional_claims`（BP 独有声称，BC011+）
-   - `excluded_fact_keys`（按行业裁剪无关 fact）
-6. `claim_matrix[*].required_fact_keys` 由 `_section_to_fact_keys()` 自动填充
-7. T1/T2 BC005 降级统一在 `build_claim_matrix()` 内处理
-8. `research/planner.py` 死代码已删除
+1. `_run_research_plan()`（phase04）构建 brief（`bp_phase04_brief.json`），生成 instruction
+2. instruction 主体来自 `instruction_store_bp/bp_research_plan.md` 模板（v13 起从 Python 硬编码英文 prompt 迁入指令库，与其它角色同骨架），`bp_build_research_plan_instruction()` 只做占位符替换
+3. 主 AI 用 Agent tool 派发 `bp-research-planner` 子代理（connectorIds: tyc-mcp + westock-mcp + ima-mcp）
+4. 子代理自主完成全部搜索（tyc 工商 / westock 行业研报 / search_deep 中英双语 / 腾讯新闻 / IMA 研报库）+ claim/fact/strategic question 设计 + competitors 提取，直接写 `bp_research_plan.json`
+5. `phase05_research_plan_collect` 读取子代理产出，`_normalize_research_plan_schema()` 归一化字段名后校验
+6. 子代理未产出或校验失败 → 降级走 `build_bp_research_plan()` 脚本骨架兜底（不终止管线）
+7. v13 修复：dispatch_info.subagent_connector_ids 补 ima-mcp（prompt Step 5 要求 IMA 搜索，原值只给 tyc+westock）
+8. 旧"主 AI 手动 enrichment"模式已废弃：`bp_research_plan_enrichment.md` 已删除，`apply_enrichment()` 零调用者
 
 ## Wave Evidence Gate Repair 机制（v4.4 新增，2026-06-22 更新）
 

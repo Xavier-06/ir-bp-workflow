@@ -44,11 +44,13 @@ def check_store(name: str, store_dir: Path):
         if not fp.exists():
             errors.append(f"[{name}] {f} 在 index.json 声明但文件不存在")
 
-    # 3. 磁盘上的 .md 文件必须在 index.json 里（排除 index.json、README 等）
+    # 3. 磁盘上的 .md 文件必须在 index.json 里（排除 index.json、README、_ 前缀辅助文件）
+    # _common_tool_guide.md 等下划线前缀文件是跨角色共享的工具指南，由 launcher 单独注入，
+    # 不作为角色指令注册（v13 起不再报 orphan 警告）。
     on_disk = {
         p.name
         for p in store_dir.glob("*.md")
-        if not p.name.startswith(".") and p.name != "index.md"
+        if not p.name.startswith(".") and not p.name.startswith("_") and p.name != "index.md"
     }
     orphans = on_disk - indexed_files
     if orphans:

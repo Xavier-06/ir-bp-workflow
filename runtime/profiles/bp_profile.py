@@ -277,7 +277,9 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
         "job_id": job_ctx.job_id,
         "dispatch_info": {
             "brief_path": str(brief_path),
-            "subagent_connector_ids": ["tyc-mcp", "westock-mcp"],
+            # v13 (2026-08-04): 补 ima-mcp — prompt Step 5 要求 IMA 研报库搜索，
+            # 原值只给 tyc+westock 导致子代理拿到指令也调不了 IMA。与 instruction 内 connectorIds 对齐。
+            "subagent_connector_ids": ["tyc-mcp", "westock-mcp", "ima-mcp"],
             "task_dir": str(task_dir),
         },
         "instruction": instruction,
