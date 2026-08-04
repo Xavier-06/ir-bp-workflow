@@ -82,67 +82,8 @@
 - 不要自己写死估值倍数，必须基于数据源
 - **每家可比公司必须说明主营业务重合度**：标的公司主营什么、可比公司主营什么、重合度百分比和判断依据
 
-## ⚠️ 工具限制
+## WebSearch 查询词参考（角色专属）
 
-- 你没有 Glob/Grep 工具。搜索文件 → `Bash: find {path} -name "*.json"`，读取文件 → `Read`，搜索内容 → `Bash: grep -r "keyword" {path}`。
-
-## 工具箱（你能用的）
-
-| 工具 | 调用方式 | 查什么 | 备注 |
-|------|---------|--------|------|
-| **TYC 融资记录** | `call_tool` (融资记录) | 历史各轮融资金额/估值/投资方 | **历史估值核心数据源** |
-| **NeoData(api)** | `neodata_search('关键词', data_type='api')` | A/HK 可比公司行情/财报/估值 | **可比公司估值主力** |
-| **NeoData(doc)** | `neodata_search('关键词', data_type='doc')` | 可比公司研报/融资新闻/退出案例 | 新闻+研报 |
-| **yfinance** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.search_gateway import yfinance_summary; ..."` | 美股可比公司估值快照 | 交叉验证 |
-| **enrich_valuation** | `cd {RUNTIME_ROOT} && python3 -c "from scripts.valuation_enricher import enrich_valuation; ..."` | 结构化估值快照 | 自动聚合 |
-| **westock-mcp (MCP)** | `data_sector`/`data_industry_chain`/`data_rating`/`data_fund_flow` | 可比公司板块/产业链/机构评级 | westock 维度 |
-| **WebSearch** | WorkBuddy 内置 | 可比交易/融资新闻/历史估值报道 | 非结构化 |
-| **WebFetch** | WorkBuddy 内置 | 深读融资新闻/估值报告 | 配合 WebSearch |
-
-### NeoData 调用（可比公司估值主力数据源）
-```bash
-cd {RUNTIME_ROOT} && python3 -c "
-import json, sys; sys.path.insert(0, '.')
-from scripts.search_gateway import neodata_search
-result = neodata_search('{可比公司名} 市值 市盈率 市销率 营收 净利润', data_type='all')
-print(json.dumps(result, ensure_ascii=False, indent=2))
-"
-```
-- `data_type`: `api`(行情/财报) / `doc`(研报) / `all`(两者)
-- 用途：每家可比上市公司必须有实时估值数据
-
-```bash
-# 研报：一级市场融资/IPO/并购估值案例（非上市可比交易锚点）
-cd {RUNTIME_ROOT} && python3 -c "
-import json, sys; sys.path.insert(0, '.')
-from scripts.search_gateway import neodata_search
-result = neodata_search('{行业/赛道名} 融资 估值 IPO 并购 投后', data_type='doc')
-print(json.dumps(result, ensure_ascii=False, indent=2))
-"
-```
-
-### yfinance 调用（美股可比 + 交叉验证）
-```bash
-cd {RUNTIME_ROOT} && python3 -c "
-import json, sys; sys.path.insert(0, '.')
-from scripts.search_gateway import yfinance_summary
-result = yfinance_summary('{ticker}')
-print(json.dumps(result, ensure_ascii=False, indent=2))
-"
-```
-- 返回：price / market_cap / pe_trailing / pe_forward / ps / pb / ev_ebitda / revenue / profit_margin / sector / industry
-
-### enrich_valuation 调用（结构化估值快照）
-```bash
-cd {RUNTIME_ROOT} && python3 -c "
-import json, sys; sys.path.insert(0, '.')
-from scripts.valuation_enricher import enrich_valuation
-v = enrich_valuation('{公司名}', market='auto')
-print(json.dumps(v, ensure_ascii=False, indent=2))
-"
-```
-
-### WebSearch 搜索模板（可比交易/融资/历史估值）
 ```
 # 历史融资估值
 # search_deep(Bash) 查询词: "{公司名}" 融资 估值 投后 轮次 投资方

@@ -1,8 +1,10 @@
-
+# 通用规范（所有 BP 维度子代理必读）
 
 ## 🚨 工具可用性硬约束（最高优先级，违反即崩溃）
 
-本环境子代理（general-purpose）**没有 `web_search` 和 `web_fetch` 工具**。调用它们会直接报错 `Tool web_search/web_fetch not found` 并中断任务。
+本环境子代理（general-purpose）**没有 `web_search`、`web_fetch`、Glob、Grep 工具**。调用它们会直接报错 `Tool web_search/web_fetch not found` 并中断任务。
+
+- 搜索文件 → `Bash: find {path} -name "*.json"`；读取文件 → `Read`；搜索内容 → `Bash: grep -r "keyword" {path}`。
 
 **唯一正确的做法：**
 - 通用网络搜索 → Bash 调 `search_deep`（见下方第 6 节）
