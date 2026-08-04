@@ -4,8 +4,8 @@ Agent tool 参数：
 - name = 'ir-research-planner'
 - team_name = 'ir-__JOB_ID__'
 - mode = 'bypassPermissions'
-- subagent_type = 'general-purpose'（⚠️ 必须！子代理需要 ima-mcp/westock-mcp/tyc-mcp 搜索能力，code-explorer 等受限类型会静默失败导致 plan 缺失）
-- connectorIds = ['westock-mcp', 'tyc-mcp', 'ima-mcp']
+- subagent_type = 'general-purpose'（⚠️ 必须！子代理需要 ima-mcp/westock-mcp 搜索能力，code-explorer 等受限类型会静默失败导致 plan 缺失）
+- connectorIds = ['westock-mcp', 'ima-mcp']（上市公司不授权 tyc — 2026-08-04）
 - prompt = 下面的完整 prompt
 
 ### 子代理 Prompt:
@@ -98,10 +98,11 @@ mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="Gold
 ## Step 2: 行业数据 (westock-mcp)
 - `data_sector` 查所属行业 → PE分位/成分股/涨跌幅
 
-## Step 2.5: 公司工商验证 (tyc-mcp)
-- `tyc-mcp.search_companies`: query "__ENTITY__" → 获取 company_id
-- `tyc-mcp.get_company_basic_profile`: 注册资本、成立日期、经营范围、股东结构、融资历史、法律风险
-- 如果 tyc 找不到（小市值/非上市公司）：记录在 search_summary 中，继续后续步骤
+## Step 2.5: 公司画像验证 (westock-mcp — IR 标的都是上市公司，别用 tyc)
+- `mcp__westock-mcp__data_profile(code)`: 公司全称、主营业务、所属行业、董事长、注册地、上市日期（symbol 不确定时先用 `data_search` 检索代码）
+- `mcp__westock-mcp__data_shareholder(code)`: 股东结构/大股东持仓
+- ⚠️ 禁止对上市公司用 tyc-mcp 查工商/股东——tyc 仅用于验证非上市主体（子公司/客户/供应商）或专利/司法专项
+- 如果 data_profile 拉不到（代码未收录）：记录在 search_summary 中，继续后续步骤
 
 ## Step 3: 资金面（大盘股可查，小盘股跳过）
 - `data_fund_flow` 查 __ENTITY__ → 主力资金净流入
@@ -145,7 +146,7 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 
 搜索策略：
 > **占位符说明**：`{行业关键词如半导体}` 是模板示例。子代理应根据 entity 实际所属行业替换。
-> 行业识别方法：用 westock-mcp `data_sector` 查 entity 的申万行业分类 → 用 tyc-mcp 经营范围推断 → 取交集即得行业关键词。
+> 行业识别方法：用 westock-mcp `data_sector` 查 entity 的申万行业分类 → 用 `data_profile` 主营业务/行业字段推断 → 取交集即得行业关键词。
 
 **⚠️ fetch 权限（v4.8）：4 个库全文均可 fetch。Xavier 研报库/行研智库/精选报告 100% 可 fetch；机构调研纪要仅 NOTE 类型可 fetch。**
 **⚠️ 时间过滤纪律：只拉最近 3 个月内的投行研报（超 3 个月参考意义不大，直接跳过）；标题常含日期（如 -260703.pdf=2026-07-03）；大行优先。**
@@ -241,7 +242,7 @@ step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuati
   "schema_version": "ir_research_plan.v5",
   "task_id": "__JOB_ID__", "entity": "__ENTITY__", "market": "__MARKET__",
   "query": "__QUERY__", "ticker": "__TICKER__", "english_name": "__ENGLISH_NAME__",
-  "data_sources_used": ["westock-mcp:行情/财务/研报/行业", "tyc-mcp:工商验证", "ima-mcp:机构研报/纪要", "search_deep:公开信息", "tencent_news:实时动态"],
+  "data_sources_used": ["westock-mcp:行情/财务/研报/行业/公司画像", "ima-mcp:机构研报/纪要", "search_deep:公开信息", "tencent_news:实时动态"],
   "benchmark_found": true,
   "benchmark_skeleton_ref": "__BENCHMARK_SKELETON_PATH__",
   "report_type": "deep_dive",

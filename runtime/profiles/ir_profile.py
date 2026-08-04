@@ -262,7 +262,8 @@ def _run_research_plan(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
         "dispatch_info": {
             "brief_path": str(brief_path),
             "subagent_type": "general-purpose",
-            "subagent_connector_ids": ["westock-mcp", "tyc-mcp", "ima-mcp"],
+            # 上市公司画像/股东走 westock-mcp，planner 不查工商 → 不授权 tyc（2026-08-04）
+            "subagent_connector_ids": ["westock-mcp", "ima-mcp"],
             "task_dir": str(tasks_dir),
         },
         "instruction": instruction,
