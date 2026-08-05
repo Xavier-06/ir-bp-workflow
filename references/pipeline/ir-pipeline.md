@@ -116,11 +116,15 @@ cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestra
 result = execute(job_id)  # → needs_dispatch=True，返回 research plan 子代理派发指令
 # dispatch_info: subagent_type=general-purpose, connectorIds=[westock-mcp, tyc-mcp, ima-mcp]
 
-# 阶段二：派发研究计划子代理（ir-research-planner），等其写完 ir_research_plan.json
+# 阶段二：派发研究计划子代理（ir-research-planner）
 Agent(name='ir-research-planner', team_name=f'ir-{task_id}', mode='bypassPermissions',
       subagent_type='general-purpose', prompt=result['instruction'])
+# ⚠️ 铁律：派发 ≠ 完成。三文件 READY 前禁止任何 execute / 推进（见下方「等待协议」）
+wait_ready([f'{task_id}-ir_research_plan.json',
+            f'{task_id}-benchmark_skeleton.json',
+            f'{task_id}-enriched_data_pack.json'])
 
-# 阶段三：继续 execute，collect 校验 plan → fact_store → precompute → Wave1 prepare 暂停
+# 阶段三：三文件 READY 后才可 execute，collect 校验 plan → fact_store → precompute → Wave1 prepare 暂停
 result = execute(job_id, start_phase='phase04_research_plan_collect')
 
 # 阶段四：team 模式 sequential 派发 4 波 8 step
@@ -131,18 +135,91 @@ while True:
     for inst in r['task_tool_instructions']:  # sequential 模式最多 1 个
         Agent(name=inst['name'], team_name=f"ir-{task_id}", mode='bypassPermissions',
               subagent_type='general-purpose', prompt=inst['prompt'])
-        # 轮询 inst['output_path'] 就绪后再派发下一个（超时重派，最多 2 次）
+        # ⚠️ 铁律：派发 ≠ 完成。三文件 READY 前禁止派发下一个 step / 调用 execute
+        wait_ready([inst['output_path'],                              # {step}.md
+                    inst['output_path'].replace('.md', '-facts.json'),
+                    inst['output_path'].replace('.md', '-section.json')])
 team_delete()
+
+# wait_ready 语义：30s 一次 `test -s` 轮询，单 step 最多等 15 分钟，超时重派一次再等。
+# 完整判定标准与硬性禁止清单见下方「等待协议（铁律）」。
 
 # 阶段五：质量链推进（fact_store_merge → gates → debate_review）
 execute(job_id, start_phase='phase10_fact_store_merge')   # → phase13 synthesis_prepare 暂停
 
-# 阶段六：派发统稿子代理（ir_统稿.md），完成后继续
+# 阶段六：派发统稿子代理（ir_统稿.md），等 final_report.md READY 后才可继续
+# Agent(...) 按 synthesis_prepare 返回的 instruction 派发
+wait_ready([f'{task_id}-final_report.md'])                # ⚠️ 铁律：同上
 execute(job_id, start_phase='phase13_synthesis_collect')  # → phase14 各 gate → phase15 delivery[heavy 自动等]
 
 # 阶段七：交付
 finalize_pipeline(task_id, entity, market)
 ```
+
+## ⚠️ 等待协议（铁律 — 违反 = 报告报废）
+
+> **背景**：2026-08-04 事故复盘。主代理派发子代理后未等输出就连续 execute，
+> collect 把还在写的 step 全部判为 incomplete，管线带着一堆 redispatch
+> 往下冲，最终报告缺料。**根因不是代码——代码正确返回了"没写完"，
+> 是 Coordinator 没等就推进。以下协议为硬性约束。**
+
+### READY 判定（三文件缺一不可）
+
+每个 step 子代理的交付物是**三个文件**，全部就绪才算 READY：
+
+| 文件 | 最低标准 |
+|------|---------|
+| `{TASK_ID}-{step}.md` | 存在且 ≥100 字节 |
+| `{TASK_ID}-{step}-facts.json` | 存在且 ≥10 字节 + JSON 可解析 |
+| `{TASK_ID}-{step}-section.json` | 存在且 ≥10 字节 + JSON 可解析 |
+
+判定命令（Bash，把变量换成实际路径）：
+
+```bash
+MD={TASK_ID}-{step}.md
+test -s "$MD" && [ $(stat -f%z "$MD") -ge 100 ] \
+  && python3 -c "import json;json.load(open('${MD%.md}-facts.json'));json.load(open('${MD%.md}-section.json'))" \
+  && echo READY || echo WAIT
+```
+
+### 轮询循环（派发后必做）
+
+```bash
+# 派发后每 30 秒检查一次，最多等 15 分钟
+for i in $(seq 1 30); do
+  test -s {output_path} && test -s {facts_path} && test -s {section_path} && echo READY && break
+  sleep 30
+done
+```
+
+- 15 分钟未 READY → 重派该 step（最多 2 次），重派后继续轮询
+- 重派 2 次仍未 READY → 记录原因，标记该 step 失败，才可跳过
+
+### 硬性禁止清单（文件 READY 前，以下全部禁止）
+
+1. ❌ 派发下一个 step（sequential = 等上一个 READY 才派下一个）
+2. ❌ 调用 `execute()`（任何 start_phase）
+3. ❌ 调用 `finalize_pipeline()`
+4. ❌ 以"collect 返回 needs_dispatch"为由直接推进下一 wave
+
+### needs_dispatch 的正确读法
+
+collect 返回 `needs_dispatch=True` + redispatch manifest 的含义是：
+**"这些 step 的文件缺失/损坏，重派它们并等 READY"**。
+
+- ✅ 正确：读 manifest → 重派对应 step → **轮询等三文件 READY** → 再 execute 恢复
+- ❌ 错误：把 needs_dispatch 当成普通阶段结果，跳过等待直接推进
+- ❌ 错误：对还没派发过的 step 生成/处理 redispatch（那是未来步骤，不是缺失）
+
+### 反模式示例（2026-08-04 实际发生）
+
+```
+15:07 派发 step3_finance
+15:07 立刻 execute → collect 判 incomplete → 写 redispatch manifest  ← ❌ 刚派发就验收
+15:17 step3_finance.md 才真正出现（子代理还在跑，但管线已经冲过去了）
+```
+
+**派发 ≠ 完成。派发之后 Coordinator 的唯一工作就是等。**
 
 ## 质量资产清单
 
@@ -177,8 +254,10 @@ enriched_data_pack、Fact Store 和共享输出协议（_shared_output_protocol.
   逐个派发等完成，避免并行触发 API 429
 - **禁止同步 `task()`**（无 name 参数）——code=10003 挂掉
 - `mode="bypassPermissions"` 确保子代理可写文件
-- **派发后主动轮询输出文件**（30s 一次 `test -s`），不依赖子代理消息
-- 输出超时未出现 → 重派（最多 2 次）；仍失败 → 记录原因，跳过该 step 继续
+- **派发后必须执行「等待协议」**：30s 一次轮询**三文件**（.md / -facts.json /
+  -section.json），全部 READY 前禁止派发下一个 step、禁止 execute、禁止推进。
+  不依赖子代理消息，只信文件。详见上方「等待协议（铁律）」
+- 15 分钟未 READY → 重派（最多 2 次）；仍失败 → 记录原因，跳过该 step 继续
 - 子代理输出必须含 Section Package JSON block，只写散文视为质量失败
 
 ## IR 交付规则

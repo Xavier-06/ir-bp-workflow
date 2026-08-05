@@ -1,5 +1,10 @@
 # IR 管线执行协议 (WorkBuddy Team sequential 模式)
 
+> ⚠️ **本文档已废弃（2026-08-05）**：描述的 5-wave/step1_data/step8_master 结构
+> 与 v3.2 管线不符。**唯一有效协议 = `references/pipeline/ir-pipeline.md`**，
+> 尤其其中的「等待协议（铁律）」——派发子代理后必须等三文件 READY 才能推进。
+> 本文件仅留作历史存档，勿按其执行。
+
 > **铁律：全自动推进，Zero Human Intervention。用户不需要发"继续"。**
 
 ## 触发条件
