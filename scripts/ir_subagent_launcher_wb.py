@@ -1623,6 +1623,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'- 公司基本面/估值/目标价方法论 → 「Xavier 研报库」\n'
             f'- 机构观点/电话会纪要/外资视角 → 「Xavier 研报库」+「机构调研纪要」\n'
             f'- 时间过滤：只拉最近 3 个月内的投行研报，超 3 个月参考意义不大直接跳过（标题含日期如 -260703.pdf），大行优先\n'
+            f'- ⚠️ 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。Xavier 研报库必须搜两轮：第 1 轮中文（"{{中文公司名}} {{行业}} 目标价 估值"）+ 第 2 轮英文（"{{公司英文名或ticker}} {{行业英文术语}} Goldman Sachs Morgan Stanley JPMorgan"），合并去重后再 fetch\n'
             f'- 每个查询建议搜 2-3 个 KB，取交叉验证后的高价值信息；全文提取 search→fetch_media_content\n'
             f'- 脚注格式：IMA知识库 — {{KB名称}} — "{{文档标题}}" (检索日期)\n'
             f'- ⚠️ fetch权限(v4.8)：★Xavier 研报库/行研智库/精选报告=100%可fetch全文→search后取media_id调fetch_media_content | 机构调研纪要=仅NOTE可fetch(失败用intro摘要)\n\n'

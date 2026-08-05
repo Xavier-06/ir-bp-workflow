@@ -1065,6 +1065,7 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
         check_step_quality,
         dispatch_rewrite,
         step_output_path,
+        step_spawn_receipt_path,
         get_pipeline_status,
         STEP_DEPS,
     )
@@ -1078,6 +1079,7 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
 
     completed_steps: list[str] = []
     incomplete_steps: list[dict] = []  # {step, missing_files, issue}
+    not_dispatched_steps: list[str] = []  # 2026-08-05 Bug2: 尚未派发的 step（未来步骤）
     step_quality: dict[str, dict[str, Any]] = {}
 
     # 2026-08-03 修复断点B：只校验本次报告类型激活的 step。
@@ -1087,8 +1089,15 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
     _expected_steps = _collect_expected_steps(runtime_root, job_ctx, STEP_DEPS)
 
     # ── 4层防线: 逐 step 验证三文件完整性 ──
+    # 2026-08-05 修复 Bug2: 从未派发的 step（无 spawn-receipt）不判 incomplete，
+    # 避免给未来步骤生成 redispatch manifest（08-04 事故：step8_risk 未派发却收到 redispatch）。
+    # sequential 模式下 collect 可能在仅部分 step 派发后被调用，未派发 step 由 wave 机制正常派发。
     for step_name in _expected_steps:
         md_path = step_output_path(job_ctx.job_id, step_name)
+        # 未派发且无输出 = 未来步骤，记入 not_dispatched_steps（不判 incomplete，不写 redispatch manifest）
+        if not md_path.exists() and not step_spawn_receipt_path(job_ctx.job_id, step_name).exists():
+            not_dispatched_steps.append(step_name)
+            continue
         facts_path = Path(str(md_path).replace(".md", "-facts.json"))
         section_path = Path(str(md_path).replace(".md", "-section.json"))
         
@@ -1224,6 +1233,34 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
                 "completed": len(completed_steps),
                 "incomplete": len(incomplete_steps),
                 "incomplete_steps": incomplete_steps,
+                "total_expected": total_expected,
+                "completion_rate": round(completion_rate, 2),
+            },
+        }
+
+    # ── 2026-08-05 修复 Bug2: incomplete 为空但仍有未派发 step → 派发未完成 ──
+    # 这些是未来步骤，不是缺失产出。不写 redispatch manifest、不跑质量门禁
+    # （step_gate 会对无文件的未来 step 判 MISSING → ok=False → 管线终止）。
+    # 正确路径：回 phase08_dispatch_prepare 继续派发。
+    if not_dispatched_steps and not incomplete_steps:
+        return {
+            "ok": True,
+            "needs_dispatch": True,
+            "has_more": False,
+            "mode": "wave_orchestration",
+            "phase": "phase09_dispatch_collect",
+            "job_id": job_ctx.job_id,
+            "instruction": (
+                f"派发未完成：还有 {len(not_dispatched_steps)} 个 step 尚未派发 "
+                f"({', '.join(not_dispatched_steps)})。\n"
+                f"这些是未来步骤，不是缺失产出——不生成 redispatch manifest。\n"
+                f"请用 execute(start_phase='phase08_dispatch_prepare') 继续派发，"
+                f"直到 launch_next_wave 返回 all_done=True，再回到本 phase 校验。"
+            ),
+            "result": {
+                "completed": len(completed_steps),
+                "incomplete": 0,
+                "not_dispatched": not_dispatched_steps,
                 "total_expected": total_expected,
                 "completion_rate": round(completion_rate, 2),
             },

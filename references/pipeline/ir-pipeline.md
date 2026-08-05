@@ -147,9 +147,12 @@ team_delete()
 # 阶段五：质量链推进（fact_store_merge → gates → debate_review）
 execute(job_id, start_phase='phase10_fact_store_merge')   # → phase13 synthesis_prepare 暂停
 
-# 阶段六：派发统稿子代理（ir_统稿.md），等 final_report.md READY 后才可继续
+# 阶段六：派发统稿子代理（ir_统稿.md），等 {task_id}-synthesis.md READY 后才可继续
+# ⚠️ 统稿子代理的输出是 synthesis.md（synthesis_prepare 的 output_path），
+#    不是 final_report.md——final_report.md 由 phase14 final_assembly 从 synthesis.md 组装，
+#    等待它会导致死等（子代理早已完成，主代理却在等一个永不出现的文件）。
 # Agent(...) 按 synthesis_prepare 返回的 instruction 派发
-wait_ready([f'{task_id}-final_report.md'])                # ⚠️ 铁律：同上
+wait_ready([f'{task_id}-synthesis.md'])                   # ⚠️ 铁律：同上
 execute(job_id, start_phase='phase13_synthesis_collect')  # → phase14 各 gate → phase15 delivery[heavy 自动等]
 
 # 阶段七：交付
@@ -232,7 +235,8 @@ collect 返回 `needs_dispatch=True` + redispatch manifest 的含义是：
 | Section Packages | `{TASK_ID}-section_packages.json` | phase11 抽取校验 |
 | Debate Review | `{TASK_ID}-debate_review.json` | phase12 |
 | Final Assembly | `{TASK_ID}-final_assembly.json` | phase14 |
-| 最终报告 | `{TASK_ID}-final_report.md` | phase13 统稿 |
+| 统稿报告 | `{TASK_ID}-synthesis.md` | phase13 统稿子代理 |
+| 最终报告 | `{TASK_ID}-final_report.md` | phase14 final_assembly（从 synthesis.md 组装，collect 时同步为 step8_master.md 供 DOCX 读取） |
 
 子代理 brief 自动注入 Research Plan（含 market_anchor/valuation_paradigm/key_debates）、
 enriched_data_pack、Fact Store 和共享输出协议（_shared_output_protocol.md）。
