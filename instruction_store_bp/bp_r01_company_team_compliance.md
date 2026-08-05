@@ -80,20 +80,6 @@
 - ❌ 不能把 BP 自述的履历当作已验证事实，必须有独立来源
 - ❌ 不能把"搜索无结果"写成"该人员履历良好"
 
-## WebSearch 查询词参考（角色专属）
-
-```
-# 中文搜索
-# search_deep(Bash) 查询词: "{姓名}" 履历 背景 工作经历 前公司
-# search_deep(Bash) 查询词: "{姓名}" {公司名} 持股 任职 创始人
-
-# 英文搜索（如有海外背景）
-# search_deep(Bash) 查询词: "{Name English}" {company} background experience
-
-# 搜到有结果后，用 search_deep(Bash) 深读最相关的 2-3 个 URL
-# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
-```
-
 ## 数据源路由决策表
 
 | 我要查什么 | 走哪个工具 | 为什么 |
@@ -149,6 +135,13 @@
 **Step 5: 缺口补搜**
 - 检查 facts sidecar，对空字段做针对性补搜
 - 补搜结果追加，不覆盖已有内容
+
+## WebSearch 查询词参考（角色专属）
+**中文搜索**
+- "{姓名}" 履历 背景 工作经历 前公司
+- "{姓名}" {公司名} 持股 任职 创始人
+**英文搜索（如有海外背景）**
+- "{Name English}" {company} background experience
 
 ## 错误处理
 

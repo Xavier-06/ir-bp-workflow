@@ -61,32 +61,6 @@
    - **每个门槛参数必须用大白话解释含义**（如"AEC-Q100 Grade 1 = 芯片能在 -40°C 到 125°C 的温度范围内稳定工作，相当于能在汽车发动机舱里正常使用"）
    - 目标产品在这些门槛上的达标状态
 
-## WebSearch 查询词参考（角色专属）
-
-```
-# 技术路线全景
-# search_deep(Bash) 查询词: "{技术领域}" 技术路线 对比 主流方案 发展趋势
-# search_deep(Bash) 查询词: "{技术A}" vs "{技术B}" comparison performance cost
-
-# 学术论文/第三方测试
-# search_deep(Bash) 查询词: "{技术关键词}" site:arxiv.org OR site:scholar.google.com
-# search_deep(Bash) 查询词: "{产品名}" 测试报告 第三方检测 性能评估
-
-# 行业标准/认证
-# search_deep(Bash) 查询词: "{行业}" 标准 认证 AEC-Q100 MIL-STD FDA 门槛
-# search_deep(Bash) 查询词: "{公司名}" 认证 资质 检测报告
-
-# 竞品技术能力验证（否定结论必须有搜索证据）
-# search_deep(Bash) 查询词: "{竞品名}" "{技术能力}" product capability
-# search_deep(Bash) 查询词: "{竞品名}" 认证 certification 资质
-
-# 布图设计（TYC 不覆盖）
-# search_deep(Bash) 查询词: "{公司名}" 集成电路布图设计 国家知识产权局
-
-# 搜到后深读
-# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
-```
-
 ## 数据源路由决策表
 
 | 我要查什么 | 走哪个工具 | 为什么 |
@@ -139,6 +113,22 @@
 - 综合 IP 数量/质量 + 技术路线位置 + 认证门槛 + 竞品对比
 - 判断壁垒来源：专利/know-how/设备/认证周期/客户切换成本/团队经验
 - 判断可复制性：复制所需时间、资金、认证周期
+
+## WebSearch 查询词参考（角色专属）
+**技术路线全景**
+- "{技术领域}" 技术路线 对比 主流方案 发展趋势
+- "{技术A}" vs "{技术B}" comparison performance cost
+**学术论文/第三方测试**
+- "{技术关键词}" site:arxiv.org OR site:scholar.google.com
+- "{产品名}" 测试报告 第三方检测 性能评估
+**行业标准/认证**
+- "{行业}" 标准 认证 AEC-Q100 MIL-STD FDA 门槛
+- "{公司名}" 认证 资质 检测报告
+**竞品技术能力验证（否定结论必须有搜索证据）**
+- "{竞品名}" "{技术能力}" product capability
+- "{竞品名}" 认证 certification 资质
+**布图设计（TYC 不覆盖）**
+- "{公司名}" 集成电路布图设计 国家知识产权局
 
 ## 错误处理
 

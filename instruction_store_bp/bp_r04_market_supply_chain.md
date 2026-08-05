@@ -52,30 +52,6 @@
 
 3. **材料级工程门槛**：客户对上游材料选型的硬指标（如孔容/比表面积/电导率/压实密度的实用区间），让读者知道材料环节的卡点在哪
 
-## WebSearch 查询词参考（角色专属）
-
-```
-# 市场规模
-# search_deep(Bash) 查询词: "{行业名}" 市场规模 TAM SAM 2024 2025
-# search_deep(Bash) 查询词: "{行业名}" market size forecast 2025 2030
-# search_deep(Bash) 查询词: "{产品名}" 市场规模 渗透率 增速
-
-# 行业报告/白皮书
-# search_deep(Bash) 查询词: "{行业名}" 行业报告 深度分析 白皮书
-# search_deep(Bash) 查询词: "{行业名}" industry report market analysis
-
-# 政策/标准
-# search_deep(Bash) 查询词: "{行业名}" 政策 补贴 扶持 国家标准
-# search_deep(Bash) 查询词: "{行业名}" policy regulation subsidy
-
-# 供应链/产能
-# search_deep(Bash) 查询词: "{上游材料/设备}" 产能 供应 价格 格局
-# search_deep(Bash) 查询词: "{供应商名}" 产能 扩产 市占率
-
-# 搜到后深读
-# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
-```
-
 ## 数据源路由决策表
 
 | 我要查什么 | 走哪个工具 | 为什么 |
@@ -128,6 +104,21 @@
 - A/HK 竞对走 NeoData 查行情/财报
 - 美股竞对走 yfinance 查估值快照
 - 交叉验证 BP 中的市场数据
+
+## WebSearch 查询词参考（角色专属）
+**市场规模**
+- "{行业名}" 市场规模 TAM SAM 2024 2025
+- "{行业名}" market size forecast 2025 2030
+- "{产品名}" 市场规模 渗透率 增速
+**行业报告/白皮书**
+- "{行业名}" 行业报告 深度分析 白皮书
+- "{行业名}" industry report market analysis
+**政策/标准**
+- "{行业名}" 政策 补贴 扶持 国家标准
+- "{行业名}" policy regulation subsidy
+**供应链/产能**
+- "{上游材料/设备}" 产能 供应 价格 格局
+- "{供应商名}" 产能 扩产 市占率
 
 ## 错误处理
 
@@ -204,6 +195,13 @@
 - `material_cost.ton_price`: 必须有材料吨价 + 降本时间线，不能只有"成本高/低"定性
 - `data_gaps`: 搜不到的字段必须列出
 
+## 新增要求（2026-07-15 — 第三方 TAM 交叉验证）
+
+自上而下的 TAM/SAM 推算必须引用 ≥2 个独立第三方来源（EVTank/GGII/IIM/券商研报等）。
+- 不同机构口径差异 >3 倍 → 必须拆解原因（按出货量 vs 按金额、窄口径 vs 宽口径等）
+- 优先用 westock-mcp data_report 搜券商研报
+- 每个 TAM 数据标注来源机构和年份
+
 ## 输出结构
 1. 市场定义与 TAM/SAM/SOM 口径
 2. 市场规模独立推算和口径对比
@@ -213,10 +211,3 @@
 6. 供应链、产能和产业链议价
 7. **第三方 TAM 交叉验证**（≥2 个独立第三方来源，口径差异 >3 倍须拆解原因）
 8. 本维度结论、counter_evidence、data_gaps
-
-## 新增要求（2026-07-15 — 第三方 TAM 交叉验证）
-
-自上而下的 TAM/SAM 推算必须引用 ≥2 个独立第三方来源（EVTank/GGII/IIM/券商研报等）。
-- 不同机构口径差异 >3 倍 → 必须拆解原因（按出货量 vs 按金额、窄口径 vs 宽口径等）
-- 优先用 westock-mcp data_report 搜券商研报
-- 每个 TAM 数据标注来源机构和年份

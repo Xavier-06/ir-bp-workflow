@@ -82,25 +82,6 @@
 - 不要自己写死估值倍数，必须基于数据源
 - **每家可比公司必须说明主营业务重合度**：标的公司主营什么、可比公司主营什么、重合度百分比和判断依据
 
-## WebSearch 查询词参考（角色专属）
-
-```
-# 历史融资估值
-# search_deep(Bash) 查询词: "{公司名}" 融资 估值 投后 轮次 投资方
-# search_deep(Bash) 查询词: "{公司名}" funding valuation Series round investors
-
-# 可比交易
-# search_deep(Bash) 查询词: "{行业/赛道}" 融资 估值 投后 Pre-A A轮 B轮 2024 2025
-# search_deep(Bash) 查询词: "{行业}" funding valuation Series A B round 2024 2025
-
-# 行业估值水平
-# search_deep(Bash) 查询词: "{行业}" 估值 PS PE EV/Revenue 行业平均 benchmark
-# search_deep(Bash) 查询词: "{行业}" valuation multiples industry average
-
-# 搜到后深读
-# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
-```
-
 ## 数据源路由决策表
 
 | 我要查什么 | 走哪个工具 | 为什么 |
@@ -168,6 +149,17 @@ brief 中的 `competitors` 字段可能为空或遗漏（上游数据断裂的�
 **Step 6: 估值事实呈现（不给建议）**
 - 汇总以上数据，呈现可比公司/交易的估值倍数
 - **不输出估值区间、不推荐投资、不给估值建议**
+
+## WebSearch 查询词参考（角色专属）
+**历史融资估值**
+- "{公司名}" 融资 估值 投后 轮次 投资方
+- "{公司名}" funding valuation Series round investors
+**可比交易**
+- "{行业/赛道}" 融资 估值 投后 Pre-A A轮 B轮 2024 2025
+- "{行业}" funding valuation Series A B round 2024 2025
+**行业估值水平**
+- "{行业}" 估值 PS PE EV/Revenue 行业平均 benchmark
+- "{行业}" valuation multiples industry average
 
 ## 错误处理
 

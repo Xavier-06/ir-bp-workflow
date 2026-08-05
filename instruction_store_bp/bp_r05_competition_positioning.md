@@ -41,29 +41,6 @@
    - 目标场景客户选型时，性能 > 价格 > 供应稳定性 > 认证 > 品牌的排序是什么？
    - 目标产品在客户决策的高权重维度上排第几？
 
-## WebSearch 查询词参考（角色专属）
-
-```
-# 竞品清单构建
-# search_deep(Bash) 查询词: "{行业/细分市场}" 主要厂商 竞品 市场份额 market share
-# search_deep(Bash) 查询词: "{产品类别}" competitors landscape players
-
-# 竞品产品/客户/新闻
-# search_deep(Bash) 查询词: "{竞品名}" 产品 客户 案例 签约
-# search_deep(Bash) 查询词: "{竞品名}" product customers revenue
-# search_deep(Bash) 查询词: "{竞品名}" 融资 估值 IPO
-
-# 竞品产品参数/价格
-# search_deep(Bash) 查询词: "{竞品名}" "{产品型号}" 参数 规格 价格
-# search_deep(Bash) 查询词: "{竞品名}" pricing datasheet specifications
-
-# 行业排名
-# search_deep(Bash) 查询词: "{行业}" 排名 ranking top players 市占率
-
-# 搜到后深读
-# 正文由 search_deep(fetch_top_n) 自动抓取 — URL: {搜索结果中的URL}
-```
-
 ## 数据源路由决策表
 
 | 我要查什么 | 走哪个工具 | 为什么 |
@@ -119,6 +96,20 @@
 **Step 6: 差异化判断 + 可复制性评估**
 - 综合以上数据判断差异化来源
 - 评估可复制性：时间/资金/认证/客户迁移/IP 防御
+
+## WebSearch 查询词参考（角色专属）
+**竞品清单构建**
+- "{行业/细分市场}" 主要厂商 竞品 市场份额 market share
+- "{产品类别}" competitors landscape players
+**竞品产品/客户/新闻**
+- "{竞品名}" 产品 客户 案例 签约
+- "{竞品名}" product customers revenue
+- "{竞品名}" 融资 估值 IPO
+**竞品产品参数/价格**
+- "{竞品名}" "{产品型号}" 参数 规格 价格
+- "{竞品名}" pricing datasheet specifications
+**行业排名**
+- "{行业}" 排名 ranking top players 市占率
 
 ## 错误处理
 
