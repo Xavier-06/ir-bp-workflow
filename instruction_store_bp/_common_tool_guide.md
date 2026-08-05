@@ -419,6 +419,22 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 ```
 > 机构调研纪要库若某条返回 `can_fetch_content=false`（非 NOTE 类型），退而用 introduction 摘要；其余 3 库直接 fetch 全文。
 
+**⚠️ 中英双语搜索纪律（2026-08-05 实测新增，违反 = 漏掉最值钱的外资研报）：**
+IMA 检索偏关键词匹配，**跨语言能力极弱**。实测同一库同一标的：
+- 中文 query → 命中的全是中文标题研报（含已译成中文标题的外资，如伯恩斯坦/交银国际）
+- 英文 query → 命中的全是英文原标题外资大行（Goldman Sachs-/Morgan Stanley-/JPMorgan-/UBS-/Nomura- 开头）
+- 两组结果**几乎零重叠**——只用中文搜，GS/MS/JPM 这批英文标题研报基本漏光
+
+因此 **Xavier 研报库（`001a89fa4b807b92`）每次必搜两轮**：
+```
+# 第 1 轮中文（命中标题已中文化的研报）
+ima-mcp.search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{中文公司名} {中文行业} 目标价 估值 研报")
+# 第 2 轮英文（命中原标题外资大行研报）
+ima-mcp.search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{公司英文名或ticker} {行业英文术语} Goldman Sachs Morgan Stanley JPMorgan")
+```
+两轮结果合并去重后再取最相关 5-8 篇 fetch。公司英文名取自 web 搜索/Yahoo Finance/ticker。
+行研智库/精选报告以中文报告为主，中文搜即可；机构调研纪要含外资内容，建议同样中英各一轮。
+
 **⚠️ 全文提取纪律（fetch 到全文后必须做，2026-07-27 新增）：**
 fetch 到研报全文不是终点，必须**逐表逐参数抄录**以下硬数据写入 facts sidecar，禁止只读 introduction 摘要后泛泛概括：
 - **成本颗粒度**：电芯/产品分档价（元/Wh）、关键材料吨价（万元/吨）+差距倍数、降本时间线（带年份节点）

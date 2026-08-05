@@ -137,6 +137,14 @@ WebSearch → WebFetch 爬取
 | **IMA 精选行业报告** | `ima-mcp.search_knowledge(KB="7302509206984644", query="关键词")` → `fetch_media_content` | 第三方白皮书：艾瑞/头豹/奥纬（可 fetch 全文） |
 | **IMA 机构调研纪要** | `ima-mcp.search_knowledge(KB="7300811407257275", query="关键词")` | 外资研报/专家交流（NOTE 可 fetch） |
 
+> ⚠️ **中英双语搜索（2026-08-05 实测新增）**：IMA 检索偏关键词匹配、跨语言能力极弱。
+> 实测自建研报库：中文 query 只命中中文标题研报（含已译中文标题的外资），英文 query 只命中
+> 英文原标题外资大行（Goldman Sachs-/Morgan Stanley-/JPMorgan-/UBS- 开头），两组结果几乎零重叠。
+> 因此 **自建研报库（001a89fa4b807b92）每次必搜两轮**：
+> 第 1 轮中文 `query="{中文主题/公司名} 研报 目标价 估值"`，
+> 第 2 轮英文 `query="{英文主题/公司名或ticker} {行业英文术语} Goldman Sachs Morgan Stanley JPMorgan"`，
+> 两轮合并去重后再取最相关结果 fetch。行研智库/精选报告中文为主可只搜中文；机构调研纪要含外资内容建议中英各一轮。
+
 > v4.8 已删除：长安投研 `7297585010204027` + 公司调研报告 `7302533890465245`（库主禁止导出，仅 200 字摘要，不再路由）。
 
 ### D. 企业情报

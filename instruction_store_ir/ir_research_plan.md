@@ -25,8 +25,15 @@ Agent tool 参数：
 **必须执行**：在 IMA Xavier 研报库搜索 __ENTITY__ 的大行研报（GS/MS/JPM/Citi/HSBC/UBS/BofA/Bernstein/Nomura/DB），找到最新的 1-2 篇全文研报并 fetch。
 
 ```
+# 第 1 轮：英文 query（命中原标题外资大行研报）
 mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="Goldman Sachs Morgan Stanley JPMorgan __ENTITY__ __TICKER__")
+# 第 2 轮：中文 query（命中标题已中文化的大行研报）
+mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="__ENTITY__ 高盛 摩根士丹利 大摩 研报 目标价")
 ```
+
+> ⚠️ 2026-08-05 实测：IMA 检索跨语言能力极弱，英文 query 只命中原标题外资研报
+> （Goldman Sachs-/Morgan Stanley- 开头），中文 query 只命中中文标题研报，两组几乎零重叠。
+> 两轮都要跑，合并去重后筛大行。公司英文名可替换 __ENTITY__（如"ZTT Group"/"CATL"）。
 
 从候选列表中筛选外资大行（标题含 Goldman/Morgan Stanley/JPMorgan/Citi/HSBC/UBS/BofA/Bernstein）+ 发布日期最近 + can_fetch_content=true 的条目，用 `mcp__ima-mcp__fetch_media_content(media_id="...")` 拿全文。
 
@@ -150,11 +157,13 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 
 **⚠️ fetch 权限（v4.8）：4 个库全文均可 fetch。Xavier 研报库/行研智库/精选报告 100% 可 fetch；机构调研纪要仅 NOTE 类型可 fetch。**
 **⚠️ 时间过滤纪律：只拉最近 3 个月内的投行研报（超 3 个月参考意义不大，直接跳过）；标题常含日期（如 -260703.pdf=2026-07-03）；大行优先。**
+**⚠️ 中英双语搜索（2026-08-05 实测新增）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中英文原标题外资大行（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。Xavier 研报库必须中英各搜一轮，合并去重后再 fetch。**
 
 1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="__ENTITY__ {行业关键词如半导体集成电路} 研报 目标价 估值")` — ★主力源：投行研报（**全文可fetch**：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
-2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{行业名如半导体} 市场规模 竞争格局")` — 行业深度报告（**全文可fetch**）
-3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="__ENTITY__ {行业关键词如半导体集成电路}")` — 机构观点/外资视角（NOTE 可 fetch 全文：取 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
-4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302509206984644", query="{行业名如半导体} 市场规模 TAM")` — 精选报告（**全文可fetch**）
+2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{公司英文名或ticker} {行业英文术语} Goldman Sachs Morgan Stanley JPMorgan")` — ★主力源第 2 轮：命中原标题外资大行研报（与第 1 轮结果合并去重）
+3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{行业名如半导体} 市场规模 竞争格局")` — 行业深度报告（**全文可fetch**）
+4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="__ENTITY__ {行业关键词如半导体集成电路}")` — 机构观点/外资视角（NOTE 可 fetch 全文：取 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
+5. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302509206984644", query="{行业名如半导体} 市场规模 TAM")` — 精选报告（**全文可fetch**）
 
 从 IMA 搜索中提取：
 - 投行观点（GS/MS/JPM 等大行的目标价方法论/评级/BOM 成本分析）

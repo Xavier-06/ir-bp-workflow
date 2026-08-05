@@ -409,6 +409,7 @@ ima-mcp.fetch_media_content(media_id="搜索结果中的 media_id")
 
 **搜索纪律：**
 - **自建研报库优先**：所有搜索第一优先搜 `001a89fa4b807b92`（投行研报全文可取），命中不足再补订阅库
+- **中英双语搜索（2026-08-05 实测新增）**：IMA 检索偏关键词匹配、跨语言能力极弱——实测中文 query 只命中中文标题研报（含译成中文标题的外资），英文 query 只命中原标题外资大行（Goldman Sachs-/Morgan Stanley-/JPMorgan-/UBS- 开头），两组结果几乎零重叠。自建研报库每次必搜两轮：第 1 轮中文（"{中文公司名} {中文行业} 目标价 估值"），第 2 轮英文（"{公司英文名或ticker} {行业英文术语} Goldman Sachs Morgan Stanley JPMorgan"），两轮合并去重后再取 top 结果。公司英文名取自 web 搜索/Yahoo Finance
 - **IMA 与结构化源（westock/tyc/NeoData）并行执行，不是兜底**——每个角色的数据源路由中已有显式 IMA 行，必须执行
 - 每次搜索最多取 top 5 结果（浏览标题+摘要选最相关的），全文提取最多 3 篇/库
 - IMA 搜索结果标注来源时必须写清库名+标题+投行名

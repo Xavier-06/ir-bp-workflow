@@ -185,6 +185,14 @@ search_deep / 腾讯新闻（web 兜底）
 #### ⚠️ IMA 使用纪律
 
 - **Xavier 研报库优先**：所有搜索第一优先搜 `001a89fa4b807b92`（投行研报全文可取），命中不足再补订阅库
+- **中英双语搜索（2026-08-05 实测新增，违反 = 漏掉最值钱的外资研报）**：IMA 检索偏关键词匹配、跨语言能力极弱——实测中文 query 命中的全是中文标题研报（含译成中文标题的伯恩斯坦/交银国际），英文 query 命中的全是英文原标题外资大行（Goldman Sachs-/Morgan Stanley-/JPMorgan-/UBS- 开头），两组结果**几乎零重叠**。因此 Xavier 研报库每次必搜两轮：
+  ```
+  # 第 1 轮中文
+  search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{中文公司名} {中文行业} 目标价 估值 研报")
+  # 第 2 轮英文
+  search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{公司英文名或ticker} {行业英文术语} Goldman Sachs Morgan Stanley JPMorgan")
+  ```
+  两轮合并去重后再取 5-8 篇 fetch。公司英文名取自 web 搜索/Yahoo Finance。机构调研纪要含外资内容，建议同样中英各一轮；行研智库/精选报告中文为主可只搜中文。
 - **不要只用一个 KB**：4 个 KB 内容互补，同一查询应搜 2-3 个相关 KB
 - **全文提取**：search 命中后取最相关 5-8 篇 media_id → fetch_media_content 读全文（Xavier 研报库/行研智库/精选报告均可 fetch）
 - **搜索结果可能很长**：提取关键数据点和结论即可，不要全文照搬
