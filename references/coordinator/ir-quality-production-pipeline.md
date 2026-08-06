@@ -1,5 +1,13 @@
 # IR 质量生产型管线
 
+> ⚠️ **编号对齐声明（2026-08-06）**：本文档的 step/phase 编号为历史版本
+>（step1_data/step2_industry/step_macro 等旧命名、phase0~phase47 旧清单），
+> 与现行管线脱节。现行唯一真相源：step 编号见 `scripts/ir_subagent_launcher_wb.py`
+> 的 STEP_DEPS（7 个研究 step，编号保留缺口不重排），phase 清单见
+> `runtime/profiles/ir_profile.py`（29 phase）+ README「IR 管线」章节。
+> 本文档只保留质量生产理念（Section Package / Fact Store / Debate Review 生产链），
+> 不再维护编号清单。
+
 本文件是 IR 管线的新质量协议。目标不是只在交付前拦截坏报告，而是让管线在生产过程中持续生成可验证、可复用、可统稿的研究资产。
 
 ## 核心原则
@@ -67,18 +75,18 @@ phase0_preflight
 
 ## 各 Agent 新职责
 
-| Agent / Step | 新职责 |
+| Agent / Step（现行编号） | 新职责 |
 |---|---|
-| step1_data | 生产市场数据底座和基础事实卡，不写最终行情散文 |
-| step2_industry | 回答行业是否支持投资主线，输出行业事实、竞争图谱、反证 |
-| step3_biz | 输出商业模式、产品矩阵、护城河和业务弱点的结构化判断 |
-| step4_finance | 输出财务质量、利润修复、现金流、ROIC/ROE 等事实绑定判断 |
-| step5_mgmt | 验证管理层与治理事实，禁止使用模型记忆补人名和履历 |
-| step_macro | 只输出与标的相关的宏观传导链，不写空泛宏观段落 |
-| step6b_valuation | 输出可复算估值、假设表、敏感性、防重复计价说明 |
-| step6_insight | 从事实中提炼市场分歧、variant view、催化剂和反证 |
-| step7_risk | 主动攻击投资主线，输出 bear case、risk triggers、估值影响 |
-| step8_master | 只做编辑组装，不新增事实、数字、人名、估值假设 |
+| phase04 研究计划子代理 | 生产市场数据底座（enriched_data_pack）和基础事实卡，不写最终行情散文 |
+| step1_industry | 回答行业是否支持投资主线，输出行业事实、竞争图谱、反证 |
+| step2_biz | 输出商业模式、产品矩阵、护城河和业务弱点的结构化判断 |
+| step3_finance | 输出财务质量、利润修复、现金流、ROIC/ROE 等事实绑定判断 + 成本端原材料价格锚定 |
+| step4_mgmt | 验证管理层与治理事实，禁止使用模型记忆补人名和履历 |
+| （step5_macro 已于 v3.6 删除） | 宏观传导链由消费方按需取数：step3（成本价格）/step6（折现率）/step8（风险） |
+| step6_valuation | 输出可复算估值、假设表、敏感性、防重复计价说明 |
+| step7_insight | 从事实中提炼市场分歧、variant view、催化剂和反证 |
+| step8_risk | 主动攻击投资主线，输出 bear case、risk triggers、估值影响 |
+| phase13 synthesis（统稿） | 只做编辑组装，不新增事实、数字、人名、估值假设 |
 
 ## Coordinator 调度要求
 

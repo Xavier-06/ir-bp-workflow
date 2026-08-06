@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-IR Gap Detector — 研报预搜索证据 vs 研报9个维度的缺口检测
+IR Gap Detector — 研报预搜索证据 vs 研报各维度的缺口检测
 
 用途:
   1. 跑完 ir_presearch 后，调用此脚本
-  2. 分析预搜索证据是否覆盖研报所需的 8 个维度 + 估值预测
+  2. 分析预搜索证据是否覆盖研报所需的各维度 + 估值预测
   3. 给每个维度 + 每条证据做质量评分
   4. 输出缺口清单 + 针对性搜索词，供后续迭代深钻用
 
 与 BP DD gap_detector 的区别:
   - BP DD: 从 BP OCR 提取定量声称 → 对比搜索验证
-  - IR: 从研报 8 个 step 维度 → 检查预搜索证据覆盖率
+  - IR: 从研报各维度 → 检查预搜索证据覆盖率
 
 用法:
   python3 scripts/ir_gap_detector.py --task-id TASK-XXX

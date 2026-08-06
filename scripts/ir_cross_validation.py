@@ -24,14 +24,19 @@ from pathlib import Path
 WORKSPACE = Path(__file__).resolve().parent.parent
 TASKS_DIR = WORKSPACE / 'data' / 'tasks'
 
-STEP_ORDER = [
-    'step1_data', 'step1_industry', 'step2_biz',
+# step 清单从调度层单一真相源动态派生（同 ir_quality_gate，防化石残留）
+_FALLBACK_STEP_ORDER = [
+    'step1_industry', 'step2_biz',
     'step3_finance', 'step4_mgmt', 'step7_insight', 'step6_valuation',
-    'step8_risk', 'step8_master',
+    'step8_risk',
 ]
+try:
+    from scripts.ir_subagent_launcher_wb import STEP_DEPS as _LAUNCHER_STEP_DEPS
+    STEP_ORDER = list(_LAUNCHER_STEP_DEPS)
+except Exception:
+    STEP_ORDER = list(_FALLBACK_STEP_ORDER)
 
 STEP_NAMES = {
-    'step1_data': '行情与基础数据',
     'step1_industry': '行业与市场格局',
     'step2_biz': '业务模式',
     'step3_finance': '财务分析',

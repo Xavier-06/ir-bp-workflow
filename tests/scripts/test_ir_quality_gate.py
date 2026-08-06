@@ -4,6 +4,8 @@ import json
 
 from scripts.ir_quality_gate import run_report_gate, run_section_gate, run_step_gate
 
+_VALID_URLS = "\nhttps://example.com/a\nhttps://example.com/b\nhttps://example.com/c\n"
+
 
 def test_run_step_gate_requires_markdown_facts_and_section_sidecars(tmp_path):
     task_id = "TASK-GATE"
@@ -77,3 +79,46 @@ def test_run_report_gate_fails_placeholders_and_missing_sources(tmp_path):
     assert result["passed"] is False
     assert any(issue["code"] == "REPORT_RED_FLAGS" for issue in result["issues"])
     assert any(issue["code"] == "REPORT_SOURCE_INSUFFICIENT" for issue in result["issues"])
+
+def test_run_report_gate_fails_rr_inconsistent_with_own_inputs(tmp_path):
+    """R/R 声称值与报告自给上下行输入矛盾 → FAIL（2026-08-06 中天复盘）。"""
+    task_id = "TASK-RR-INCONSISTENT"
+    report = (
+        "# 研报\n"
+        "现价 32.00 元，目标价 49 元。概率加权目标价 43.9 元"
+        "（牛 20%/61、基准 45%/49、熊 28%/31、极端 7%/14），"
+        "R/R ≈ 8.2–8.7:1（以熊市下沿 28 元为下行、base 49 为上行），"
+        "即下行 28 / 上行 49。\n" + _VALID_URLS
+    )
+    (tmp_path / f"{task_id}-final_report.md").write_text(report, encoding="utf-8")
+    result = run_report_gate(task_id, tasks_dir=tmp_path)
+    assert result["passed"] is False
+    assert any(issue["code"] == "NUMBER_INCONSISTENT_RR" for issue in result["issues"])
+
+
+def test_run_report_gate_fails_weighted_target_price_inconsistent(tmp_path):
+    """概率加权目标价按自给情景概率复算偏差 >10% → FAIL。"""
+    task_id = "TASK-WEIGHTED-INCONSISTENT"
+    report = (
+        "# 研报\n现价 32.00 元。概率加权目标价 60.0 元"
+        "（牛 50%/50、熊 50%/10），上行空间显著。\n" + _VALID_URLS
+    )
+    (tmp_path / f"{task_id}-final_report.md").write_text(report, encoding="utf-8")
+    result = run_report_gate(task_id, tasks_dir=tmp_path)
+    assert result["passed"] is False
+    assert any(issue["code"] == "NUMBER_INCONSISTENT" for issue in result["issues"])
+
+
+def test_run_report_gate_passes_when_numbers_consistent(tmp_path):
+    """数字自洽时不因一致性校验误伤（WARN 不阻断）。"""
+    task_id = "TASK-NUMBERS-CONSISTENT"
+    # 加权复算：0.5*50 + 0.5*10 = 30，与声称 30 一致；R/R：(50-30)/(30-10)=1.0，声称 1.0:1 一致
+    report = (
+        "# 研报\n现价 30.00 元。概率加权目标价 30.0 元"
+        "（牛 50%/50、熊 50%/10）。R/R ≈ 1.0:1（下行 10 / 上行 50）。\n" + _VALID_URLS
+    )
+    (tmp_path / f"{task_id}-final_report.md").write_text(report, encoding="utf-8")
+    result = run_report_gate(task_id, tasks_dir=tmp_path)
+    assert result["passed"] is True
+    assert not any(issue["code"] in ("NUMBER_INCONSISTENT", "NUMBER_INCONSISTENT_RR")
+                   for issue in result["issues"])

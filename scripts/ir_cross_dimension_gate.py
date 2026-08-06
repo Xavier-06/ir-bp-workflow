@@ -248,10 +248,15 @@ def evaluate_ir_cross_dimension_gate(task_dir: Path) -> dict[str, Any]:
     all_step_facts: dict[str, list[dict[str, Any]]] = {}
     step_texts: dict[str, str] = {}
 
-    step_names = [
-        "step1_data", "step1_industry", "step2_biz", "step3_finance",
-        "step4_mgmt", "step6_valuation", "step7_insight", "step8_risk",
-    ]
+    # step 清单从调度层单一真相源动态派生（防删 step 后化石残留），失败回退快照
+    try:
+        from scripts.ir_subagent_launcher_wb import STEP_DEPS as _LAUNCHER_STEP_DEPS
+        step_names = list(_LAUNCHER_STEP_DEPS)
+    except Exception:
+        step_names = [
+            "step1_industry", "step2_biz", "step3_finance",
+            "step4_mgmt", "step6_valuation", "step7_insight", "step8_risk",
+        ]
 
     for step_name in step_names:
         # facts sidecar

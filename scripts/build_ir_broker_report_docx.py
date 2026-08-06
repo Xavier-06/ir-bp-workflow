@@ -584,7 +584,7 @@ def main():
         raise RuntimeError(
             f"Phase 5 拦截：step8_master 统稿缺失（{len(memo) if memo else 0} 字符），"
             f"有效 step 产出仅 {step_count} 个。"
-            f"禁止生成半成品 DOCX。请先完成 Phase 4 全部 8 个 step。"
+            f"禁止生成半成品 DOCX。请先完成 Phase 4 全部研究 step。"
         )
 
     # 清洗内部信息

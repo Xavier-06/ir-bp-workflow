@@ -1,13 +1,17 @@
 # BP 管线详细流程（v4.5+双入口 — 2026-07-20 更新）
 
-## 管线阶段（30 phases，含 phase01b 双入口）
+## 管线阶段（31 phases — 完整清单以 README「BP 31 Phase 完整清单」为唯一真相源）
 
 ⚠️ **v4.5+双入口变更（2026-07-20）**：
 - 新增 Phase 01b 公司名搜索入库（双入口：PDF 模式 + 公司名模式）
 - Phase 01 无 input_file 时自动跳过（ok: True），交给 Phase 01b
 - Phase 01b 无 input_file 时派子代理搜索（tyc-mcp + westock-mcp + web）
-- 两条路径产出相同格式文件（bp_ocr_text.txt + bp_step0_profile.json），Phase 02-30 零改动
+- 两条路径产出相同格式文件（bp_ocr_text.txt + bp_step0_profile.json），后续 phase 零改动
 - v4.5 新增 Wave 0 投资假说先行者 + Wave 4 扩展（详见 codegraph-gate skill 速查）
+
+> **编号对齐说明（2026-08-06）**：下表曾按旧逻辑编号（01/01b/02...）组织，与真实
+> phase 号脱节，已废弃。真实 31 个 phase 及职责见 README 表格，本文件只保留
+> 路由/行为说明，不重复维护 phase 清单。
 
 ## 双入口路由
 
@@ -28,46 +32,9 @@ Phase 01b 子代理在搜索过程中会尝试发现公开的 BP PDF：
 3. coordinator 用 `start_phase=phase01_document_intake` 恢复管线
 4. Phase 01 handler 自动检测 `bp_discovered_pdf.pdf` → 执行完整 OCR + 结构化抽取
 5. Phase 01b 第二次经过时检测到 input_file → 自动跳过
-6. Phase 02-30 正常执行（此时有完整 OCR 数据）
+6. 后续 phase 正常执行（此时有完整 OCR 数据）
 
-```
-01 phase01_document_intake                    — VL OCR + Step0 结构化抽取（无 input_file 时跳过）
-01b phase02_company_intake                   — 公司名搜索入库（无 PDF 时 → needs_dispatch 子代理）★新增
-01b phase03_company_intake_collect            — 搜索入库收集（校验 bp_ocr_text.txt + bp_step0_profile.json）★新增
-02 phase02_company_verify                     — 天眼查工商验证（输出 stage_tier）[heavy_bg]
-03 phase03_research_plan                      — 研究计划骨架 → needs_dispatch（LLM enrichment）
-03c phase03_research_plan_collect             — 合并 enrichment delta 到骨架计划
-04 phase04_presearch                          — BP 预搜索 + URL 内容提取 [heavy_bg]
-05 phase06_bp_shared_page_init                — 初始化 shared state（含 stage_tier）
-06 phase07_search_plan_compile                — 研究计划编译为 claim 级搜索工单
-07 phase08_bp_fact_store_bootstrap            — 预搜索 fact 入库
-08 phase09_dispatch_prepare                   — Wave 1 manifest（4 维度），sequential 返回 needs_dispatch
-09 phase10_dispatch_collect                   — 检查 Wave 1 输出（三文件 + file_stable）
-10 phase11_wave1_evidence_gate                — Wave 1 证据门禁（FAIL → repair 子代理 → 重跑）
-11 phase12_bp_fact_store_merge                — Wave 1 后 Fact store 合并（仅 Wave 1 sidecar）
-12 phase13_wave1_shared_page_refresh          — Wave 1 后刷新 shared state
-13 phase14_wave3_prepare                      — Wave 3 manifest（competition + valuation）
-14 phase15_wave3_collect                      — 检查 Wave 3 输出
-15 phase16_wave3_evidence_gate                — Wave 3 证据门禁（FAIL → repair → 重跑）
-16 phase17_wave3_shared_page_refresh          — Wave 3 后刷新 shared state
-17 phase18_wave4_prepare                      — Wave 4 manifest（dealbreaker_risk）
-18 phase19_wave4_collect                      — 检查 Wave 4 输出
-19 phase20_wave4_evidence_gate                — Wave 4 证据门禁（FAIL → repair → 重跑）
-20 phase21_wave4_shared_page_refresh          — Wave 4 后刷新 shared state
-─── Quality Gates ───
-21 phase22_bp_claim_coverage_validation       — Claim 覆盖校验（repair → 最多 2 轮 → 降级放行）
-22 phase23_bp_cross_dimension_gate            — 跨维度一致性（HIGH→WARN 放行，仅 CRITICAL 阻断）
-23 phase24_bp_section_package_validation      — Section package 校验（v1→v2 自动升级）
-─── Synthesis ───
-24 phase25_synthesis_prepare                  — 统稿子代理 manifest（instruction store 加载）
-25 phase26_synthesis_collect                  — 统稿收集（脚注密度 repair → 最多 1 轮 → 降级）
-─── Final Assembly + Delivery ───
-26 phase27_bp_debate_review                   — 对抗评审（BLOCKING 硬阻断，其余 WARN 放行）
-27 phase28_bp_final_assembly                  — Assembler 生成快速浏览版（降级为附件）
-28 phase29_bp_readability_review              — 可读性审查（技术术语动态化）
-29 phase30_bp_investment_judgment             — 投资判断汇总（stage_tier 感知阈值）
-30 phase31_delivery                           — Delivery gate + DOCX 生成 + 维度 DOCX + 交付 [heavy_bg]
-```
+**完整 31 phase 清单见 `README.md`「BP 31 Phase 完整清单」表格**——phase 名即 phase 号（phase01_document_intake … phase31_delivery），不再使用旧逻辑编号。
 
 ## 提交任务
 

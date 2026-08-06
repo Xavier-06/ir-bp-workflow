@@ -10,14 +10,21 @@ from pathlib import Path
 WORKSPACE = Path(__file__).resolve().parent.parent
 TASKS_DIR_IR = WORKSPACE / 'data' / 'tasks'
 
-STEP_ORDER = [
-    'step1_data', 'step1_industry', 'step2_biz',
+# step 清单从调度层单一真相源（ir_subagent_launcher_wb.STEP_DEPS）动态派生，
+# 避免删/加 step 时多处硬编码漏改（v3.6 教训：step1_data/step8_master 化石残留）。
+# 派生失败（如循环依赖/文件缺失）回退到 7-step 快照。
+_FALLBACK_STEP_ORDER = [
+    'step1_industry', 'step2_biz',
     'step3_finance', 'step4_mgmt', 'step7_insight',
-    'step6_valuation', 'step8_risk', 'step8_master',
+    'step6_valuation', 'step8_risk',
 ]
+try:
+    from scripts.ir_subagent_launcher_wb import STEP_DEPS as _LAUNCHER_STEP_DEPS
+    STEP_ORDER = list(_LAUNCHER_STEP_DEPS)
+except Exception:
+    STEP_ORDER = list(_FALLBACK_STEP_ORDER)
 
 STEP_NAMES = {
-    'step1_data': '行情与基础数据',
     'step1_industry': '行业与市场格局',
     'step2_biz': '业务模式',
     'step3_finance': '财务分析',
@@ -28,7 +35,7 @@ STEP_NAMES = {
     'step8_master': '统稿',
 }
 
-MIN_OVERALL_SCORE = 18  # 9 维度，每维 0-3，≥18 才达标（平均 2/3）
+MIN_OVERALL_SCORE = max(1, len(STEP_ORDER) * 3 * 2 // 3)  # 每维 0-3，≥2/3 满分才达标（随 step 数动态缩放，不硬编码）
 
 RED_FLAGS = ['待补', '待填', 'TODO', '无法验证', '无法获取', '需要进一步', '[待补]']
 
@@ -221,6 +228,112 @@ def run_section_gate(task_id: str, tasks_dir=None) -> dict:
     return output
 
 
+def _check_number_consistency(text: str) -> list[dict]:
+    """数字自洽校验（2026-08-06，中天研报复盘新增）。
+
+    设计原则——定义唯一可复算的矛盾才 FAIL 阻断，定义有歧义的记 WARN：
+      - 概率加权目标价复算（定义唯一）：偏差 >10% → FAIL
+      - 情景三档单调性（牛>基准>熊）：违反 → WARN
+      - R/R 比值复算（下行价口径有歧义）：偏离任何合理口径 >50% → WARN
+      - "自有 DCF" 借鉴声明缺失 → WARN
+    提取失败一律跳过，不臆断。
+    """
+    import re
+    issues = []
+
+    # ── 1. 概率加权目标价复算：「概率加权 X 元（牛 p1%/v1、基准 p2%/v2、熊 p3%/v3…）」──
+    m = re.search(r"概率加权[目标价 ]*([\d.]+)\s*元?\s*[（(]([^）)]+)[)）]", text)
+    weighted_claim = None
+    if m:
+        weighted_claim = float(m.group(1))
+        body = m.group(2)
+        # 两种写法：「牛 20%/61」「牛 61×20%」
+        pairs = re.findall(r"(牛|基准|熊|极端|乐观|悲观)\s*([\d.]+)\s*[%％]\s*[/／]\s*([\d.]+)", body)
+        pairs = [(name, float(p) / 100.0, float(v)) for name, p, v in pairs]
+        if not pairs:
+            pairs2 = re.findall(r"(牛|基准|熊|极端|乐观|悲观)\s*([\d.]+)\s*[×x*]\s*([\d.]+)\s*[%％]", body)
+            pairs = [(name, float(p) / 100.0, float(v)) for name, v, p in pairs2]
+        if pairs and weighted_claim:
+            calc = sum(prob * val for _, prob, val in pairs)
+            prob_sum = sum(prob for _, prob, _ in pairs)
+            if prob_sum > 0 and abs(calc - weighted_claim) / weighted_claim > 0.10:
+                issues.append(_issue(
+                    'FAIL', 'NUMBER_INCONSISTENT',
+                    f'概率加权目标价自相矛盾：声称 {weighted_claim} 元，按报告自给情景概率复算 = {calc:.1f} 元'
+                    f'（偏差 {abs(calc - weighted_claim) / weighted_claim * 100:.0f}%）'))
+
+    # ── 2. 情景三档单调性：牛 > 基准 > 熊 ──
+    if m:
+        body = m.group(2)
+        vals = {}
+        for name, _, v in re.findall(r"(牛|基准|熊|极端|乐观|悲观)\s*([\d.]+)\s*[%％]\s*[/／]\s*([\d.]+)", body):
+            vals[name] = float(v)
+        bull = vals.get("牛", vals.get("乐观"))
+        bear = vals.get("熊", vals.get("悲观"))
+        base = vals.get("基准")
+        if bull is not None and base is not None and bear is not None:
+            if not (bull > base > bear):
+                issues.append(_issue(
+                    'WARN', 'SCENARIO_NOT_MONOTONIC',
+                    f'情景目标价不单调：牛 {bull} / 基准 {base} / 熊 {bear}，应为牛>基准>熊'))
+
+    # ── 3. R/R 复算（下行价口径有歧义，只记 WARN）──
+    rr_claims = [float(x) for x in re.findall(r"R/?R\s*[≈~]*\s*([\d.]+)\s*[:：]\s*1", text)]
+    rr_range = re.findall(r"R/?R\s*[≈~]*\s*([\d.]+)\s*[–\-~至]\s*([\d.]+)\s*[:：]?1", text)
+    for lo, hi in rr_range:
+        rr_claims += [float(lo), float(hi)]
+    if rr_claims:
+        # 提取现价与情景价，构造所有合理 R/R 口径
+        price_m = re.findall(r"现价\s*[^\d]{0,6}([\d.]+)\s*元", text)
+        prices = [float(p) for p in price_m if 1 < float(p) < 100000]
+        scen_prices = []
+        if m:
+            scen_prices = [float(v) for _, _, v in
+                           re.findall(r"(牛|基准|熊|极端|乐观|悲观)\s*([\d.]+)\s*[%％]\s*[/／]\s*([\d.]+)", m.group(2))]
+        # 显式标注口径：「下行 28 / 上行 49」「下行 28、上行 49」——报告自己声明的上下行价，
+        # 是复算 R/R 的最强口径（无歧义）
+        explicit = re.findall(r"下行\s*([\d.]+)\s*[/、，,]?\s*(?:base\s*)?上行\s*([\d.]+)", text)
+        recal = []
+        explicit_recal = []
+        cur = max(prices) if prices else None
+        for down_s, up_s in explicit:
+            down, up = float(down_s), float(up_s)
+            if cur and up > cur > down:
+                explicit_recal.append((up - cur) / (cur - down))
+        recal = explicit_recal[:]
+        # 兜底口径：情景价组合（上下行选择有歧义）
+        if not recal and cur and scen_prices:
+            for up in [v for v in scen_prices if v > cur]:
+                for down in [v for v in scen_prices if v < cur]:
+                    if cur > down:
+                        recal.append((up - cur) / (cur - down))
+        if recal:
+            claimed = max(rr_claims)
+            if all(abs(claimed - r) / r > 0.5 for r in recal):
+                if explicit_recal:
+                    # 报告自己声明了上下行输入还对不上 → 无歧义自相矛盾，FAIL 阻断
+                    issues.append(_issue(
+                        'FAIL', 'NUMBER_INCONSISTENT_RR',
+                        f'R/R 与报告自给输入矛盾：声称 {claimed:.1f}:1，按自标"下行 {explicit[0][0]} / '
+                        f'上行 {explicit[0][1]}"复算 = {explicit_recal[0]:.1f}:1'))
+                else:
+                    # 情景价推导口径有歧义 → WARN 留人工核对
+                    issues.append(_issue(
+                        'WARN', 'RR_RATIO_SUSPECT',
+                        f'R/R 声称 {claimed:.1f}:1 偏离可复算口径（'
+                        f'{min(recal):.1f}~{max(recal):.1f}:1），请核对上下行价取值'))
+
+    # ── 4. "自有 DCF" 借鉴声明：声称自有估值但未声明参数来源 → WARN ──
+    if re.search(r"自有\s*(交叉\s*)?DCF", text) and not re.search(r"参数(借鉴|参考|沿用)自|方法(借鉴|沿用)", text):
+        # 只有当文中出现过外部机构 WACC 参数时才有借鉴嫌疑
+        if re.search(r"WACC\s*[\d.]+%", text):
+            issues.append(_issue(
+                'WARN', 'VALUATION_BORROWING_UNDECLARED',
+                '声称"自有 DCF"但未声明 WACC 等参数来源——若参数借鉴外部研报，须注明"参数借鉴自 {机构} {报告}"'))
+
+    return issues
+
+
 def run_report_gate(task_id: str, tasks_dir=None, min_urls: int = 3) -> dict:
     tasks_dir = Path(tasks_dir or TASKS_DIR_IR)
     candidates = [
@@ -237,6 +350,9 @@ def run_report_gate(task_id: str, tasks_dir=None, min_urls: int = 3) -> dict:
         issues.append(_issue('FAIL', 'REPORT_RED_FLAGS', f'Final report contains red flags: {red_flags}'))
     if text.count('http') < min_urls:
         issues.append(_issue('FAIL', 'REPORT_SOURCE_INSUFFICIENT', f'Final report has fewer than {min_urls} source URLs'))
+    # 数字自洽校验（2026-08-06）：概率加权复算 FAIL 阻断；R/R/单调性/借鉴声明 WARN 记录
+    if text:
+        issues.extend(_check_number_consistency(text))
     output = {
         'task_id': task_id,
         'gate': 'report',

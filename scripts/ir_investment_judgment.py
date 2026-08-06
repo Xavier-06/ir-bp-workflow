@@ -19,7 +19,6 @@ from typing import Any
 
 # ── IR step → 中文标签（与 ir_subagent_launcher_wb.STEP_ROLE 对齐）──
 IR_STEP_LABELS = {
-    "step1_data": "数据收集",
     "step1_industry": "行业分析",
     "step2_biz": "商业模式",
     "step3_finance": "财务分析",
@@ -30,11 +29,15 @@ IR_STEP_LABELS = {
 }
 
 # 参与判断的核心 step（统稿由 phase13 synthesis 独立处理，不参与维度评分）
-# v3.6: step5_macro 已删除
-_JUDGE_STEPS = (
-    "step1_data", "step1_industry", "step2_biz", "step3_finance",
-    "step4_mgmt", "step7_insight", "step6_valuation", "step8_risk",
-)
+# step 清单从调度层单一真相源动态派生（防删 step 后化石残留），失败回退快照
+try:
+    from scripts.ir_subagent_launcher_wb import STEP_DEPS as _LAUNCHER_STEP_DEPS
+    _JUDGE_STEPS = tuple(_LAUNCHER_STEP_DEPS)
+except Exception:
+    _JUDGE_STEPS = (
+        "step1_industry", "step2_biz", "step3_finance",
+        "step4_mgmt", "step7_insight", "step6_valuation", "step8_risk",
+    )
 
 
 def _slug_to_label(step: str) -> str:

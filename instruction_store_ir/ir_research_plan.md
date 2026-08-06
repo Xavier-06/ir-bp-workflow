@@ -240,8 +240,8 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 
 判定依据：Step 1 财务数据（净利润正负+增速）+ Step 2 行业属性（周期/平台/资产驱动）+ 商业模式。
 
-## Step 分配规则（v3.6: 删除 step5_macro，8 步）
-step1_industry, step2_biz, step3_finance, step4_mgmt, step6_valuation, step7_insight, step8_risk, step8_master
+## Step 分配规则（v3.6: 删除 step5_macro）
+研究 step：step1_industry, step2_biz, step3_finance, step4_mgmt, step6_valuation, step7_insight, step8_risk（统稿由 phase13 synthesis 子代理独立处理，不在分配清单）
 
 > ⚠️ 宏观维度（利率/大宗价格/汇率）不设独立子代理，由消费方按需取数：step3_finance（成本端原材料实时价格）、step6_valuation（折现率利率环境）、step8_risk（宏观风险量化）。`dim_priority` 中**不要**再出现 step5_macro 键。
 

@@ -120,7 +120,7 @@ Wave 6（静态·串行）:
 | `scripts/ic_subagent_launcher.py` | 核心编排：模板引擎 + launch_next_wave + 动态生成 |
 | `scripts/ic_precompute.py` | IC 预计算引擎：行业规模 + 板块基准 + 关键公司指标 |
 | `scripts/build_ic_industry_report_docx.py` | IC 行业研报 DOCX 生成器 |
-| `runtime/profiles/ic_profile.py` | IC Profile，8 个 phase handler |
+| `runtime/profiles/ic_profile.py` | IC Profile，18 个 phase handler |
 | `runtime/entrypoints/run_ic_pipeline_entry.py` | 入口文件 |
 | `instruction_store_ic/` | 10 个角色指令文件 |
 
