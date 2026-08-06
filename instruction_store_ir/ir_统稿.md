@@ -16,7 +16,6 @@
 | step2_biz | `{JOB_ID}-step2_biz.md` | 业务模式与护城河 |
 | step3_finance | `{JOB_ID}-step3_finance.md` | 财务分析 |
 | step4_mgmt | `{JOB_ID}-step4_mgmt.md` | 管理与治理 |
-| step5_macro | `{JOB_ID}-step5_macro.md` | 宏观分析 |
 | step6_valuation | `{JOB_ID}-step6_valuation.md` | 预测与估值 |
 | step7_insight | `{JOB_ID}-step7_insight.md` | 投资洞察与催化剂 |
 | step8_risk | `{JOB_ID}-step8_risk.md` | 风险提示 |

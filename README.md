@@ -167,20 +167,20 @@ Phase 27-31: 交付
 
 **一句话**：标的进来 → 工商核验 → 预搜索 → 研究计划子代理 → 5 维度并行采集 → 估值 → 洞察 + 风险 → 统稿 → 对抗评审 → DOCX 交付。
 
-### IR 8 step + 统稿
+### IR 7 step + 统稿（v3.6）
 
 | Step | 角色 | Wave | 依赖 | 职责 |
 |------|------|------|------|------|
 | step1_industry | 投研_主笔_行业分析 | W1 | — | 行业规模 / 增速 / 格局 |
 | step2_biz | 投研_主笔_商业模式 | W1 | — | 商业模式 / 单元经济 |
-| step3_finance | 投研_主笔_财务分析 | W1 | — | 三表分析 / 财务健康度 |
-| step4_mgmt | 投研_主笔_管理层 | W1 | — | 管理层 / 治理 / 激励 |
-| step5_macro | 投研_主笔_宏观分析 | W1 | — | 宏观 / 政策 / 周期 |
-| step6_valuation | 投研_主笔_预测与估值 | W2 | step1 + step3 + step5 | 盈利预测 + 估值 |
-| step7_insight | 投研_主笔_差异化洞察 | W3 | step1 + step2 + step6 + step5 | 预期差 / 核心矛盾 |
-| step8_risk | 投研_主笔_风险催化 | W3 | step2 + step3 + step4 + step6 + step5 | 风险 + 催化剂 |
-| synthesis | ir_统稿 | — | 全部 step | 读 8 步输出 + Fact Store → 论点驱动叙事 |
+| step3_finance | 投研_主笔_财务分析 | W2 | step1 + step2 | 三表分析 / 前瞻预测 / **成本端原材料实时价格锚定** |
+| step4_mgmt | 投研_主笔_管理层 | W2 | step2 | 管理层 / 治理 / 激励 |
+| step6_valuation | 投研_主笔_预测与估值 | W3 | step1 + step2 + step3 | 估值收口 / **折现率利率环境自取数** |
+| step7_insight | 投研_主笔_差异化洞察 | W4 | step1-4 + step6 | 预期差 / 核心矛盾 |
+| step8_risk | 投研_主笔_风险催化 | W4 | step3 + step4 + step6 | 风险 + 催化剂 / **宏观与大宗风险动态取数** |
+| synthesis | ir_统稿 | — | 全部 step | 读 7 步输出 + Fact Store → 论点驱动叙事 |
 
+> **step5_macro（宏观分析）已于 v3.6 删除**：五维宏观评分与个股定价脱节。职责下沉——大宗原材料实时价格 → step3_finance（成本假设）+ step8_risk（风险量化）；利率/折现率环境 → step6_valuation 自取数。取数纪律统一写在 `_common_tool_guide.md`「宏观与大宗数据取数纪律」。
 > **step1_data（数据收集）已删除**，改用大行研报为骨架。原 step8_master（文档汇总）已剥离为独立 synthesis 子代理（phase13）。
 
 ### IR 行业 Overlay 系统
@@ -525,7 +525,7 @@ ir-bp-workflow/
 │   ├── bp_r09_catalyst.md                # R09/W4 催化剂
 │   ├── bp_r10_industry_research.md       # R10/W4 行业研报
 │   └── bp_s1_统稿.md                     # S1 统稿（唯一中文命名，最后派发）
-├── instruction_store_ir/                 # IR 角色指令库（研究计划 + 8 个 step + 统稿）
+├── instruction_store_ir/                 # IR 角色指令库（研究计划 + 7 个 step + 统稿）
 │   ├── index.json                        # role → file 映射（preflight 校验）
 │   ├── _common_tool_guide.md
 │   ├── _shared_output_protocol.md
@@ -537,7 +537,7 @@ ir-bp-workflow/
 │   │   ├── internet.md
 │   │   ├── heavy_asset.md
 │   │   └── financial.md
-│   └── step*.md                          # 8 个 step 指令文件
+│   └── step*.md                          # 7 个 step 指令文件（step5_macro 已于 v3.6 删除）
 ├── instruction_store_ic/                 # IC 角色指令库（16 角色）
 │   ├── index.json                        # archetype → role → file 三级映射
 │   ├── _common_tool_guide.md

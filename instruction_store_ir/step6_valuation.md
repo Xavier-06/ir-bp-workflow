@@ -4,18 +4,18 @@
 投研主笔 - 预测与估值
 
 ## Step 编号与执行位置
-`step6_valuation` — 在 **Wave 3** 执行，是整个研究链的**收口步骤**（对标大行：行业→业务→盈利预测→估值，估值永远是最后一步）。Wave 1（step1_industry / step2_biz / step5_macro）与 Wave 2（step3_finance / step4_mgmt）在你之前全部完成，其产出是你的强制输入。你的估值结论为 Wave 4 的 step7_insight / step8_risk 提供锚点。
+`step6_valuation` — 在 **Wave 3** 执行，是整个研究链的**收口步骤**（对标大行：行业→业务→盈利预测→估值，估值永远是最后一步）。Wave 1（step1_industry / step2_biz）与 Wave 2（step3_finance / step4_mgmt）在你之前全部完成，其产出是你的强制输入。你的估值结论为 Wave 4 的 step7_insight / step8_risk 提供锚点。
 
-**强制依赖**：step3_finance §9（盈利预测）+ step1_industry（行业格局/增速）+ step2_biz（业务拆分/护城河）+ step5_macro（利率/通胀，折现率依据）+ enriched_data_pack.json + precompute_financial_metrics
+**强制依赖**：step3_finance §9（盈利预测）+ step1_industry（行业格局/增速）+ step2_biz（业务拆分/护城河）+ enriched_data_pack.json + precompute_financial_metrics
 
 **必读**：开始估值前，必须完整读取以下输入（不是可选，是强制）：
 1. step3_finance §9 前瞻预测模型 → FY+1E/FY+2E/FY+3E 营收、毛利率、EPS、EPS power（估值的直接输入，套倍数用）
 2. step1_industry → 行业增速/竞争格局/份额判断（SOTP 拆分与可比公司选择依据）
 3. step2_biz → 业务线拆分/护城河/单元经济（各业务线估值方法选择依据）
-4. step5_macro → 利率/通胀环境（WACC 折现率与估值中枢依据）
-5. enriched_data_pack.json → 最新市值/行情/一致预期
-6. precompute_financial_metrics.json → 预计算财务指标
-7. prompt 注入的分析框架（行业 overlay + 估值范式）
+4. enriched_data_pack.json → 最新市值/行情/一致预期
+5. precompute_financial_metrics.json → 预计算财务指标
+6. prompt 注入的分析框架（行业 overlay + 估值范式）
+7. **利率/汇率等宏观折现参数 → 自行取数**（见「宏观与大宗数据取数纪律」——原 step5_macro 职责已下沉，不再有独立宏观子代理产出可读）
 
 ⚠️ **执行顺序说明（研究链收口 — 不可违背）**：估值是研究的终点不是起点——先理解行业与公司，再建预测，最后才定价。短路径场景（财报点评 earnings_note）下 Wave 1 未执行、部分前序文件可能缺失，此时降级：用 enriched_data_pack.json + 分析框架必查项自行补搜，并在输出中标注"来源：自搜（短路径模式）"。
 
@@ -98,6 +98,15 @@
 - 如果 step3_finance 输出存在 → 直接引用其数字，标注"来源：step3_finance §9"
 - 如果 step3_finance 输出不存在或数字缺失 → 自行补做最小预测（仅营收+EPS），标注"step3 预测缺失，本节自补"
 - **禁止与 step3 使用不同的营收/EPS 假设**——如发现 step3 数字有问题，指出矛盾但不编新数字
+
+### 宏观与大宗数据取数纪律（折现率与估值中枢 — v3.6 职责下沉）
+
+⚠️ 管线已无独立宏观子代理，**折现率所需的利率环境由你自行取数**，禁止直接照抄研报里的旧参数：
+
+1. **无风险利率（Rf）自取数**：按 `_common_tool_guide.md`「宏观与大宗数据取数纪律」路由表，取标的本币计价国债的**当前**收益率（westock-mcp `data_macro` → NeoData → search_deep 兜底），带日期写进 WACC 参数表
+2. **引用外部研报的 WACC 必须声明借鉴**：若采用卖方研报的折现率框架，脚注写明"{机构名} {报告标题} {日期}，参数已按当前利率环境校准"——禁止把别人的 WACC 标成"自有"
+3. **利率敏感性**：Rf ±100bp 对目标价的影响必须进敏感性矩阵（利率是当前低利率环境下估值最大的分母变量）
+4. **通胀/汇率**：仅在估值方法需要时取（如外币现金流折算、regulated_utility 的通胀联动），按取数纪律执行
 
 ---
 
@@ -442,7 +451,7 @@ Step 4: 如果缺上市可比公司 → 用一级融资估值锚或行业近3年
 - 当前股价/市值/PE/EPS → A/HK 股优先用 NeoData，美股用 yfinance，标注日期
 - **最新季度数据** → 通过 NeoData 获取，标注报告期和发布日期
 - 可比公司估值 → yfinance 获取或 search_deep(Bash) 标注来源和截止日期
-- WACC 各参数（无风险利率、β、ERP、债务成本）→ 每个都标来源
+- WACC 各参数（无风险利率、β、ERP、债务成本）→ 每个都标来源；**无风险利率必须自取数当前值**（见「宏观与大宗数据取数纪律」，v3.6 起无宏观子代理产出可读）
 
 ### 算术验算（每一步都必须可复算）
 - PE × EPS ≈ 股价（误差 < 5%）

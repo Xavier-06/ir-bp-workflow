@@ -250,7 +250,7 @@ def evaluate_ir_cross_dimension_gate(task_dir: Path) -> dict[str, Any]:
 
     step_names = [
         "step1_data", "step1_industry", "step2_biz", "step3_finance",
-        "step4_mgmt", "step5_macro", "step6_valuation", "step7_insight", "step8_risk",
+        "step4_mgmt", "step6_valuation", "step7_insight", "step8_risk",
     ]
 
     for step_name in step_names:

@@ -240,8 +240,10 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 
 判定依据：Step 1 财务数据（净利润正负+增速）+ Step 2 行业属性（周期/平台/资产驱动）+ 商业模式。
 
-## Step 分配规则（v3.0: 删除 step1_data，9 步）
-step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuation, step7_insight, step8_risk, step8_master
+## Step 分配规则（v3.6: 删除 step5_macro，8 步）
+step1_industry, step2_biz, step3_finance, step4_mgmt, step6_valuation, step7_insight, step8_risk, step8_master
+
+> ⚠️ 宏观维度（利率/大宗价格/汇率）不设独立子代理，由消费方按需取数：step3_finance（成本端原材料实时价格）、step6_valuation（折现率利率环境）、step8_risk（宏观风险量化）。`dim_priority` 中**不要**再出现 step5_macro 键。
 
 ## 输出
 写入 `__PLAN_PATH__`:
@@ -278,7 +280,7 @@ step1_industry, step2_biz, step3_finance, step4_mgmt, step5_macro, step6_valuati
       "owner_dims": ["step1_industry", "step3_finance"],
       "data_points": ["单台 BOM ¥18万", "年降幅 30%"]}
   ],
-  "dim_priority": {"step1_industry": "P0", "step3_finance": "P0", "step2_biz": "P1", "step4_mgmt": "P2", "step5_macro": "P2", "step6_valuation": "P0", "step7_insight": "P0", "step8_risk": "P1"},
+  "dim_priority": {"step1_industry": "P0", "step3_finance": "P0", "step2_biz": "P1", "step4_mgmt": "P2", "step6_valuation": "P0", "step7_insight": "P0", "step8_risk": "P1"},
   "fact_requirements": [...], "section_requirements": {},
   "coverage_matrix": {}, "plan_status": "ready",
   "search_summary": {"westock_quote_found": true, "benchmark_found": true, "analyst_views": 0, "web_evidence_count": 0},

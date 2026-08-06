@@ -48,8 +48,9 @@ DEFAULT_ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/coding/v3"
 DEFAULT_ARK_API_KEY = ""  # 请使用 --api-key CLI 参数或 VOLCES_ARK_API_KEY 环境变量
 
 # 核心 step（信息传导失败会导致阻断交付）
-# 对标论文 Table 3: 行业/财务/宏观→统稿是最关键的信号传导链路
-CORE_STEPS = {"step1_industry", "step2_biz", "step3_finance", "step5_macro"}
+# 对标论文 Table 3: 行业/财务→统稿是最关键的信号传导链路
+# v3.6: step5_macro 已从管线删除（宏观数据下沉到 step3/step6/step8 按需取数）
+CORE_STEPS = {"step1_industry", "step2_biz", "step3_finance"}
 
 # 所有前序 step → step8 映射
 # 对齐实际 IR 管线 STEP_DEPS (ir_subagent_launcher_wb.py)
@@ -59,7 +60,6 @@ STEP_TO_NAME = {
     "step2_biz": "业务模式 (step2_biz)",
     "step3_finance": "财务分析 (step3_finance)",
     "step4_mgmt": "管理与治理 (step4_mgmt)",
-    "step5_macro": "宏观环境分析 (step5_macro)",
     "step7_insight": "投资洞察 (step7_insight)",
     "step6_valuation": "预测与估值 (step6_valuation)",
     "step8_risk": "风险提示 (step8_risk)",
@@ -326,7 +326,7 @@ def format_report(check_result: Dict[str, Any]) -> str:
         "|---------|---------|-------------|",
         "| Quantitative → Sector | 0.397 (fine) | step3_finance → step8 |",
         "| Qualitative → Sector | 0.244 (fine) | step2_biz/step4_mgmt → step8 |",
-        "| Macro → PM | 0.203 (fine) | step5_macro → step8 |",
+        "| Macro → PM | 0.203 (fine) | 宏观数据下沉（step3 成本价格/step6 折现率/step8 风险量化，v3.6 起无独立 macro step） |",
         "| News → PM | 0.182 (fine) | step8_risk → step8 |",
         "| Sector → PM | 0.425 (fine) | step1_industry → step8 |",
         "",

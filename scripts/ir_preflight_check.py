@@ -51,7 +51,6 @@ ROLE_STEP_MAP = {
     '投研_主笔_商业模式': 'step2_biz',
     '投研_主笔_财务分析': 'step3_finance',
     '投研_主笔_管理层': 'step4_mgmt',
-    '投研_主笔_宏观分析': 'step5_macro',
     '投研_主笔_预测与估值': 'step6_valuation',
     '投研_主笔_差异化洞察': 'step7_insight',
     '投研_主笔_风险催化': 'step8_risk',

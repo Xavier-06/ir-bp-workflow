@@ -24,16 +24,16 @@ IR_STEP_LABELS = {
     "step2_biz": "商业模式",
     "step3_finance": "财务分析",
     "step4_mgmt": "管理层与治理",
-    "step5_macro": "宏观分析",
     "step7_insight": "差异化洞察",
     "step6_valuation": "预测与估值",
     "step8_risk": "风险与催化",
 }
 
 # 参与判断的核心 step（统稿由 phase13 synthesis 独立处理，不参与维度评分）
+# v3.6: step5_macro 已删除
 _JUDGE_STEPS = (
     "step1_data", "step1_industry", "step2_biz", "step3_finance",
-    "step4_mgmt", "step5_macro", "step7_insight", "step6_valuation", "step8_risk",
+    "step4_mgmt", "step7_insight", "step6_valuation", "step8_risk",
 )
 
 

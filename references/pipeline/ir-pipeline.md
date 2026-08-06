@@ -51,10 +51,10 @@ Coordinator 不需要轮询 bg_pid，但 Bash 必须设 `timeout=600000`（否�
 - **脚本不再生成 plan**：`ir_research_planner.py` 只剩契约校验（normalize/validate/load/path）。
   Coordinator 不要手动调任何 plan 生成函数。
 
-## Wave 编排（v3.1 研究链 4 波，2026-08-04 回归大行真实研究顺序）
+## Wave 编排（v3.1 研究链 4 波 · v3.6 删除 step5_macro）
 
 ```
-Wave 1: step1_industry, step2_biz, step5_macro     — 背景层（并行）
+Wave 1: step1_industry, step2_biz                  — 背景层（并行）
 Wave 2: step3_finance, step4_mgmt                  — 预测与验证（消费 Wave1）
 Wave 3: step6_valuation                            — 估值收口（消费预测）
 Wave 4: step7_insight, step8_risk                  — 预期差收口
@@ -63,6 +63,7 @@ Wave 4: step7_insight, step8_risk                  — 预期差收口
 
 > 估值是研究的**收口**不是起点——报告开头放目标价只是"结论前置"的成文技巧。
 > 依据：4 篇大行公司首发研报全文解剖（爱建/先锋精科、交银国际/鸣鸣很忙、东方/中国太保、Bernstein/Booking）。
+> **v3.6（2026-08-06）**：step5_macro 删除（五维宏观评分与个股定价脱节）。宏观/大宗数据按需下沉到消费方——step3_finance（成本端原材料实时价格）/ step6_valuation（折现率利率环境自取数）/ step8_risk（宏观风险量化）。取数纪律统一在 `_common_tool_guide.md`「宏观与大宗数据取数纪律」。
 
 ### Step 依赖
 
@@ -70,12 +71,11 @@ Wave 4: step7_insight, step8_risk                  — 预期差收口
 |------|------|---------|
 | step1_industry | — | step1_industry.md |
 | step2_biz | — | step2_biz.md |
-| step5_macro | — | step5_macro.md |
 | step3_finance | step1_industry, step2_biz | step3_finance.md |
 | step4_mgmt | step2_biz | step4_mgmt.md |
-| step6_valuation | step3_finance, step1_industry, step2_biz, step5_macro | step6_valuation.md |
+| step6_valuation | step3_finance, step1_industry, step2_biz | step6_valuation.md |
 | step7_insight | step1~step6 全部 | step7_insight.md |
-| step8_risk | step3_finance, step4_mgmt, step5_macro, step6_valuation | step8_risk.md |
+| step8_risk | step3_finance, step4_mgmt, step6_valuation | step8_risk.md |
 
 ### 报告类型分流（active_waves 白名单）
 

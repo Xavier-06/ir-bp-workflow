@@ -170,12 +170,15 @@ STEP_QUALITY_THRESHOLD = 3
 # Step 角色名
 # v3.0 (2026-07-28): 删除 step1_data，数据收集合并到 phase04 research plan
 # 下游 step 不再依赖 step1_data，改为读取 research plan 阶段产出的 enriched_data_pack.json
+# v3.6 (2026-08-06): 删除 step5_macro——五维宏观评分与个股定价脱节（中天实战：
+# 宏观产出沦为模板评分表，铜价/利率等真正有用的数据反而没取实时）。职责迁移：
+# 大宗原材料实时价格 → step3_finance（成本假设）+ step8_risk（风险量化）；
+# 利率/折现率环境 → step6_valuation 自取数。编号保留缺口，不重编号。
 STEP_ROLE = {
     'step1_industry': '投研_主笔_行业分析',
     'step2_biz': '投研_主笔_商业模式',
     'step3_finance': '投研_主笔_财务分析',
     'step4_mgmt': '投研_主笔_管理层',
-    'step5_macro': '投研_主笔_宏观分析',
     'step7_insight': '投研_主笔_差异化洞察',
     'step6_valuation': '投研_主笔_预测与估值',
     'step8_risk': '投研_主笔_风险催化',
@@ -198,22 +201,23 @@ IR_SUBAGENT_CONNECTOR_IDS = ['tyc-mcp', 'westock-mcp', 'ima-mcp']
 STEP_DEPS = {
     'step1_industry': [],                                        # Wave 1 行业格局（背景层）
     'step2_biz': [],                                             # Wave 1 商业模式（背景层）
-    'step5_macro': [],                                           # Wave 1 宏观环境（背景层）
     'step3_finance': ['step1_industry', 'step2_biz'],            # Wave 2 预测假设必须可追溯到行业/业务
     'step4_mgmt': ['step2_biz'],                                 # Wave 2 执行力验证需业务语境
     'step6_valuation': ['step3_finance', 'step1_industry',       # Wave 3 估值收口：消费预测，
-                        'step2_biz', 'step5_macro'],             #   行业/业务/宏观供 SOTP/可比/折现率
+                        'step2_biz'],                             #   行业/业务供 SOTP/可比；折现率自取数
     'step7_insight': ['step1_industry', 'step2_biz', 'step3_finance',
-                      'step4_mgmt', 'step5_macro', 'step6_valuation'],  # Wave 4 全维度综合出预期差
-    'step8_risk': ['step3_finance', 'step4_mgmt', 'step5_macro', 'step6_valuation'],
+                      'step4_mgmt', 'step6_valuation'],           # Wave 4 全维度综合出预期差
+    'step8_risk': ['step3_finance', 'step4_mgmt', 'step6_valuation'],
 }
 
 # 并行发射波次
 # v3.1 (2026-08-04): 研究链 4 波 — 背景（行业+业务+宏观）→ 预测与验证（财务+管理层）
 # → 估值收口 → 预期差收口。对标大行首发研报的真实研究顺序。
+# v3.6 (2026-08-06): step5_macro 删除（见 STEP_ROLE 注释），Wave 1 剩行业+业务；
+# 宏观数据按需下沉到消费方（step3 成本价格/step6 折现率/step8 风险），不单独设代理。
 # anchor / thesis 不是 step——它们在 research_plan（phase04）里已产出，所有 wave 共享读。
 LAUNCH_WAVES = [
-    ['step1_industry', 'step2_biz', 'step5_macro'],  # Wave 1 背景层（并行）
+    ['step1_industry', 'step2_biz'],                 # Wave 1 背景层（并行）
     ['step3_finance', 'step4_mgmt'],                 # Wave 2 预测与验证（消费 Wave 1）
     ['step6_valuation'],                             # Wave 3 估值收口（消费预测，按公司特征选方法）
     ['step7_insight', 'step8_risk'],                 # Wave 4 预期差收口
@@ -268,7 +272,6 @@ STEP_TIMEOUTS = {
     'step2_biz': 900,
     'step3_finance': 900,
     'step4_mgmt': 900,
-    'step5_macro': 900,
     'step7_insight': 900,
     'step6_valuation': 900,
     'step8_risk': 900,
@@ -280,7 +283,6 @@ _STEP_KEYWORDS = {
     'step2_biz': 'business model product revenue customer supply chain 商业模式 产品线 客户 收入结构',
     'step3_finance': 'financial report revenue profit margin cash flow ROE debt 财报 营收 毛利率 净利润 现金流',
     'step4_mgmt': 'management board governance ownership ESG compensation 管理层 董事会 股权结构 治理',
-    'step5_macro': 'CPI PMI interest rate LPR GDP inflation monetary policy 宏观 利率 通胀 PMI 社融',
     'step7_insight': 'catalyst valuation target price investment thesis risk-reward 催化剂 估值 目标价 投资亮点',
     'step6_valuation': 'DCF valuation PE PB PS EV/EBITDA target price WACC comparable company valuation model 目标价 估值',
     'step8_risk': 'risk regulatory litigation competition macro threat 风险 监管 诉讼 竞争威胁 宏观',
@@ -308,11 +310,6 @@ _STEP_QUERY_TEMPLATES = {
         '"{entity}" CEO management team leadership governance',
         '"{entity}" executive changes board ownership',
         '"{entity}" 管理层 董事会 股权结构 治理',
-    ],
-    'step5_macro': [
-        '"{entity}" sector macro impact CPI PMI interest rate',
-        'China macro economy GDP inflation monetary policy latest',
-        '宏观 利率 通胀 PMI 社融 最新数据',
     ],
     'step7_insight': [
         '"{entity}" investment thesis valuation target price catalyst',
@@ -782,22 +779,8 @@ def build_step_prompt(step: str, entity: str, market: str = 'us') -> str:
             '2. COMPETITOR COMPLIANCE EVENTS: For competition-related risks, search whether major competitors '
             'have recent regulatory penalties — this may reduce competitive pressure on the target.\n'
         ),
-        'step5_macro': (
-            'ANTI-DEFECT RULES:\n'
-            '1. MACRO DATA TIMELINESS: Every macro indicator cited (CPI, PMI, LPR, GDP, etc.) must have '
-            'a publication date. Indicators older than 60 days must be marked with "⚠ 数据滞后 X 天". '
-            'Search "{indicator} 最新 {year}" to verify you have the latest release.\n'
-            '2. POLICY STATUS CURRENCY: When citing monetary/fiscal policy, verify it is CURRENT. '
-            'Search "{policy} 现行 最新 {year}" to confirm. Policies announced but not yet implemented '
-            'must be labeled as "待实施".\n'
-            '3. CROSS-MARKET IMPACT: For A/HK stocks, analyze BOTH China domestic macro AND global/'
-            'US macro spillover effects (Fed rates, USD/CNY). Do not analyze only one dimension.\n'
-            '4. IMPACT PATHWAY: Every macro judgment must include a concrete transmission mechanism '
-            'to the target company\'s sector. "利好" without an impact pathway is insufficient — '
-            'explain HOW (e.g., "降息→融资成本下降→资本密集型行业受益").\n'
-            '5. CONFIDENCE CALIBRATION: If a key indicator (e.g. PMI) is from a single source with no '
-            'cross-verification, set confidence to "medium" max. "high" requires ≥2 independent sources.\n'
-        ),
+        # v3.6: step5_macro 的 ANTI-DEFECT 数据时效规则已迁入 step3_finance/step6_valuation/
+        # step8_risk 指令的「宏观与大宗数据取数纪律」段（谁消费谁负责取数）。
     }
 
     rules = step_rules.get(step, '')
@@ -1538,7 +1521,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             prompt_body += (
                 f'💡 估值提示：你是 Wave 3 收口步骤——估值是研究的终点，不是起点。\n'
                 f'step3_finance 的盈利预测（核心输入）+ step1_industry 的行业格局 + step2_biz 的业务拆解\n'
-                f'+ step5_macro 的宏观/利率环境均已完成，务必全部读取后再建模。\n'
+                f'均已完成，务必全部读取后再建模。折现率所需的利率/汇率等宏观参数由你自行取数（见指令「宏观与大宗数据取数纪律」）。\n'
                 f'⚠️ 估值方法必须按公司特征选择（对标大行）：成熟盈利公司 PE/PEG、保险 P/EV、\n'
                 f'周期/资源 NAV 或 EV/EBITDA、亏损成长 PS/管线/DCF、多业务 SOTP——不是统一套 DCF。\n'
                 f'短路径（财报点评）下部分前序文件可能缺失，此时降级用 enriched_data_pack.json + 自搜。\n\n'
@@ -1547,7 +1530,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
         # step7_insight 额外提醒（v3.1：Wave 4，Wave 1-3 全部产出可用）
         if step == 'step7_insight':
             prompt_body += (
-                f'💡 洞察提示：Wave 1-3 全部完成——行业/业务/宏观/财务/管理层/估值六份产出都是你的输入。\n'
+                f'💡 洞察提示：Wave 1-3 全部完成——行业/业务/财务/管理层/估值五份产出都是你的输入。\n'
                 f'核心方法：对照 step6_valuation 的目标价与 step1-3 的基本面判断，找出"市场定价 vs 基本面"的背离点，形成预期差。\n\n'
             )
 
@@ -1555,7 +1538,7 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
         if step == 'step8_risk':
             prompt_body += (
                 f'💡 风险提示：Wave 1-3 全部完成——重点消费：step4_mgmt 管理层风险、step6_valuation 估值敏感性、\n'
-                f'step5_macro 宏观/政策风险、step3_finance 财务脆弱点。逐一读取后综合成风险矩阵。\n\n'
+                f'step3_finance 财务脆弱点。宏观/政策风险与大宗价格风险由你自行取数量化（见指令「宏观与大宗数据取数纪律」）。逐一读取后综合成风险矩阵。\n\n'
             )
 
         # ── 行业 Overlay + 估值范式联动（v2.1，2026-07-29）──
@@ -1746,8 +1729,9 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
             else: sc = 0
             fl = sum(1 for x in _REDFLAGS if x in txt)
             if fl >= 3 and sc > 1: sc = max(1, sc - 1); issues.append(f"❰{step}❱ {fl} 红旗")
-            # 数据源审计（v3.2）：研究类 step 未使用 IMA 研报库或 westock-mcp 任一结构化源 → 扣分
-            if step in ('step1_industry', 'step2_biz', 'step3_finance', 'step5_macro', 'step6_valuation'):
+            # 数据源审计（v3.2；v3.6 改为从 STEP_DEPS 动态派生，删 step 不再漏改）：
+            # 研究类 step（除管理层治理外）未使用 IMA 研报库或 westock-mcp 任一结构化源 → 扣分
+            if step in set(STEP_DEPS) - {'step4_mgmt'}:
                 _used_structured = any(k in txt for k in (
                     'IMA知识库', 'ima-mcp', 'Xavier 研报库', '行研智库', '机构调研纪要',
                     'westock-mcp', '腾讯自选股', 'data_finance', 'data_quote', 'data_report', 'data_news'))

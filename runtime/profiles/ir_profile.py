@@ -377,7 +377,7 @@ def _backfill_thesis_fields(plan: dict[str, Any], inferred: dict[str, Any] | Non
     if not plan.get("dim_priority"):
         plan["dim_priority"] = {
             "step1_industry": "P1", "step2_biz": "P1", "step3_finance": "P1",
-            "step4_mgmt": "P1", "step5_macro": "P1", "step6_valuation": "P1",
+            "step4_mgmt": "P1", "step6_valuation": "P1",
             "step7_insight": "P1", "step8_risk": "P1",
         }
         warnings.append("dim_priority_missing_fallback")
@@ -1581,9 +1581,10 @@ def _run_debate_review_phase(runtime_root: Path, job_ctx: JobContext) -> dict[st
 # Phase 13: Synthesis — 独立统稿子代理（对标 BP phase27-28）
 # ═══════════════════════════════════════════════════════════
 
+# v3.6: step5_macro 已删除（宏观数据下沉到 step3/step6/step8 按需取数）
 _SYNTHESIS_STEPS = [
     "step1_industry", "step2_biz", "step3_finance",
-    "step4_mgmt", "step5_macro", "step6_valuation", "step7_insight", "step8_risk",
+    "step4_mgmt", "step6_valuation", "step7_insight", "step8_risk",
 ]
 
 
@@ -2404,11 +2405,11 @@ def _run_delivery_inner(runtime_root: Path, job_ctx: JobContext) -> dict[str, An
 # ═══════════════════════════════════════════════
 _STEP_DOCX_STEPS = (
     "step1_industry", "step2_biz", "step3_finance",
-    "step4_mgmt", "step5_macro", "step7_insight", "step6_valuation", "step8_risk",
+    "step4_mgmt", "step7_insight", "step6_valuation", "step8_risk",
 )
 _STEP_DOCX_LABELS = {
     "step1_industry": "行业分析", "step2_biz": "商业模式",
-    "step3_finance": "财务分析", "step4_mgmt": "管理层与治理", "step5_macro": "宏观分析",
+    "step3_finance": "财务分析", "step4_mgmt": "管理层与治理",
     "step7_insight": "差异化洞察", "step6_valuation": "预测与估值", "step8_risk": "风险与催化",
 }
 
@@ -2544,9 +2545,10 @@ class IRProfile(PipelineProfile):
             "phase09_dispatch_collect": [],
             "phase09_wave_evidence_gate": [],
             # v3.1 (2026-08-04): per-wave gate facts 按研究链 4 波组成
-            # Wave1 背景层(industry/biz/macro) → Wave2 预测与验证(finance/mgmt)
+            # Wave1 背景层(industry/biz) → Wave2 预测与验证(finance/mgmt)
             # → Wave3 估值收口(valuation) → Wave4 预期差收口(insight/risk)
-            "phase09_wave1_evidence_gate": ["{task_id}-step1_industry-facts.json", "{task_id}-step2_biz-facts.json", "{task_id}-step5_macro-facts.json"],
+            # v3.6: step5_macro 删除，Wave1 facts 只剩 industry/biz
+            "phase09_wave1_evidence_gate": ["{task_id}-step1_industry-facts.json", "{task_id}-step2_biz-facts.json"],
             "phase09_wave2_evidence_gate": ["{task_id}-step3_finance-facts.json", "{task_id}-step4_mgmt-facts.json"],
             "phase09_wave3_evidence_gate": ["{task_id}-step6_valuation-facts.json"],
             "phase09_wave4_evidence_gate": ["{task_id}-step7_insight-facts.json", "{task_id}-step8_risk-facts.json"],
