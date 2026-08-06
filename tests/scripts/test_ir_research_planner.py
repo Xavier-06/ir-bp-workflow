@@ -121,6 +121,27 @@ def test_normalize_accepts_legacy_status_and_string_questions():
     assert result["ready"] is True
 
 
+def test_normalize_core_questions_all_strings_no_crash():
+    """回归 TASK-20260806-002 上午 bug：core_questions 全是字符串时
+    validate 曾在 question.get(...) 抛 AttributeError（'str' has no attribute 'get'）。
+    归一化器必须把纯字符串列表补成 dict（带 owner_section + required_fact_keys）。"""
+    plan = _valid_plan()
+    # 完全模拟子代理产出：core / strategic 都是纯字符串列表
+    plan["core_questions"] = ["光纤涨价周期能持续多久？", "光通信毛利率到底是 45% 还是 26%？"]
+    plan["strategic_questions"] = ["海缆在手订单能否按期转化？"]
+
+    normalized = normalize_research_plan_contract(plan)
+    result = validate_research_plan_ready(normalized)
+
+    # 无 AttributeError，且全部转为 dict
+    assert all(isinstance(item, dict) for item in normalized["core_questions"])
+    assert all(isinstance(item, dict) for item in normalized["strategic_questions"])
+    # 补上 owner_section / required_fact_keys（默认兜底）
+    assert normalized["core_questions"][0]["owner_section"]
+    assert normalized["core_questions"][0]["required_fact_keys"]
+    assert result["ready"] is True
+
+
 def test_research_plan_path_and_load_roundtrip(tmp_path):
     path = research_plan_path("TASK-RT", tmp_path)
     assert path == tmp_path / "TASK-RT-research_plan.json"

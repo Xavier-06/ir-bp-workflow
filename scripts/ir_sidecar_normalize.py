@@ -111,7 +111,10 @@ def normalize_fact(fact: Any, idx: int, md_lines: list[str] | None = None) -> tu
             f["claim"] = alt
             changes.append("claim_fallback")
 
-    # source_quote：真实出处字段别名 → md 报告原文找回；都找不到留空（不编造）
+    # source_quote：真实出处字段别名 → md 报告原文找回 → source_url 兜底（真实字段，非编造）；
+    # 都找不到留空（交给 gate 拒收）。
+    # v3.6+ (2026-08-06 下午 TASK-20260806-002)：子代理 facts 普遍只有 source_url、无引用句，
+    # 旧版留空导致 merge 一次 invalid 34 条。source_url 本身是真实出处，作最后兜底合法。
     if not (f.get("source_quote") or "").strip():
         alt = _first_str(f, _QUOTE_KEYS)
         if alt:
@@ -122,6 +125,11 @@ def normalize_fact(fact: Any, idx: int, md_lines: list[str] | None = None) -> tu
             if recovered:
                 f["source_quote"] = recovered
                 changes.append("source_quote_from_md")
+            else:
+                url = _first_str(f, ("source_url", "url", "link"))
+                if url:
+                    f["source_quote"] = url
+                    changes.append("source_quote_from_url")
 
     # value：已有则保留；缺失且 claim 无数字 → 定性事件标记（非编造）；
     # claim 有数字但 value 空 → 留空（traceability gate 拒收，暴露子代理录入缺陷）

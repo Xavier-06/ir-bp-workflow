@@ -173,6 +173,12 @@ def test_merge_step_fact_sidecars_rejects_missing_required_traceability_fields(t
     result = merge_step_fact_sidecars("TASK-BAD", tasks_dir=tmp_path)
     fact_store = json.loads((tmp_path / "TASK-BAD-fact_store.json").read_text(encoding="utf-8"))
 
-    assert result["merged_count"] == 0
-    assert result["invalid_count"] == 3
-    assert fact_store["facts"] == []
+    # v3.6 变更（2026-08-06）：归一化器现在用真实 source_url 回填空的 source_quote
+    # （source_quote_from_url，真实出处非编造）。因此 bad_003（有 source_url 但 source_quote
+    # 为空）不再被拒收，而是回填后合并。仍拒收的是真正缺字段的 bad_001（空 claim）
+    # 和 bad_002（claim 有数字但 value 为空）。
+    assert result["merged_count"] == 1
+    assert result["invalid_count"] == 2
+    assert len(fact_store["facts"]) == 1
+    assert fact_store["facts"][0]["fact_id"] == "step4_finance.bad_003"
+    assert fact_store["facts"][0]["source_quote"] == "https://example.com/margin"

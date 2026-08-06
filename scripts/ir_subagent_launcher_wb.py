@@ -1480,13 +1480,29 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
         output_path = r.get('output_path', '')
 
         # 构建 prompt
+        # v3.8 (2026-08-06 下午, TASK-20260806-002)：三文件协议固化进活派发 prompt。
+        # 旧版只要求写 .md，sidecar 要求只存在于 manifest system_prompt 里——
+        # coordinator 照 prompt_body 派发时子代理收不到三文件指令，step1/step2 必然漏写。
+        _facts_path = f'{output_path[:-3]}-facts.json' if output_path.endswith('.md') else f'{output_path}-facts.json'
+        _section_path = f'{output_path[:-3]}-section.json' if output_path.endswith('.md') else f'{output_path}-section.json'
         prompt_body = (
             f'你是投研分析师，负责 {role}（{step}）。\n\n'
-            f'【输出路径 - 必须严格遵守】\n'
-            f'你必须将完整 Markdown 报告写入以下文件（绝对路径）：\n'
-            f'{output_path}\n'
+            f'【输出路径 - 三文件协议，缺一不可】\n'
+            f'你的交付物是**三个文件**（先写 .md，再写两个 sidecar JSON；只写 .md = 质量生产失败）：\n'
+            f'1. Markdown 报告（绝对路径）：{output_path}\n'
+            f'2. Facts sidecar：{_facts_path}\n'
+            f'   格式：{{"step": "{step}", "facts": [{{"fact_id": "F-001", "claim": "…", "value": "…", '
+            f'"unit": "…", "period": "…", "source_url": "…", "source_quote": "…", '
+            f'"source_tier": "analyst/official/reputable", "confidence": "high/medium/low", '
+            f'"retrieved_date": "YYYY-MM-DD"}}]}}\n'
+            f'3. Section sidecar：{_section_path}\n'
+            f'   格式：{{"schema_version": "ir_section_package.v1", "section_id": "{step}", '
+            f'"section_title": "…", "key_messages": ["…"], '
+            f'"claims": [{{"claim": "…", "fact_ids": ["F-001"], "reasoning": "…", '
+            f'"confidence": "high", "source_quality": "analyst"}}], "facts_used": ["F-001"], '
+            f'"counter_evidence": ["…"], "data_gaps": ["…"], "markdown_draft": "…"}}\n'
             f'禁止写入任何其他路径（如 search-stepX.md、bref-stepX.md 等）。\n'
-            f'唯一完成条件：上述文件成功写入且内容完整。\n\n'
+            f'唯一完成条件：上述三个文件全部成功写入且内容完整。\n\n'
         )
 
         # ── 统一注入：数据包路径（v3.0 替代 step1_data）──

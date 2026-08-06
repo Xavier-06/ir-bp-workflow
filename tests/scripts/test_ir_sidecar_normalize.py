@@ -39,13 +39,28 @@ def test_source_quote_recovered_from_md():
     assert "source_quote_from_md" in changes
 
 
-def test_source_quote_not_fabricated():
-    """traceability 保护：md 里找不到出处时留空（交给 gate 拒收），不编造。"""
+def test_source_quote_from_url_fallback():
+    """v3.6+ 下午：md 找不到出处但 source_url 存在 → 用真实 URL 兜底（非编造）。
+
+    TASK-20260806-002 实战：子代理 facts 普遍只有 source_url、无引用句，
+    旧版留空导致 merge 一次 invalid 34 条。source_url 本身是真实出处，
+    作最后兜底合法，traceability 链保留。
+    """
     root = {"facts": [{"fact_id": "F1", "claim": "铜价 13800 美元", "value": "13800",
                         "source_url": "https://x.com"}]}
     out, changes = normalize_facts_sidecar(root, "step5_macro", md_lines=[])
+    assert out["facts"][0].get("source_quote", "") == "https://x.com"
+    assert "source_quote_from_url" in changes
+    assert "source_quote_from_md" not in changes
+
+
+def test_source_quote_empty_when_no_source_at_all():
+    """traceability 保护：既无 md 出处又无 source_url 时才留空（交 gate 拒收），不编造。"""
+    root = {"facts": [{"fact_id": "F1", "claim": "铜价 13800 美元", "value": "13800"}]}
+    out, changes = normalize_facts_sidecar(root, "step5_macro", md_lines=[])
     assert out["facts"][0].get("source_quote", "") == ""
     assert "source_quote_from_md" not in changes
+    assert "source_quote_from_url" not in changes
 
 
 def test_value_not_fabricated_from_claim():

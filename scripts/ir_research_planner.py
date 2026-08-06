@@ -34,39 +34,75 @@ def _strategic_question(
     }
 
 
+def _coerce_question_items(items: Any, prefix: str,
+                           owner: str, fact_keys: list[str]) -> list[dict[str, Any]]:
+    """把字符串形式的 question 列表转成 dispatch 契约要求的 dict 列表。
+
+    v3.2+ (2026-08-06 下午, TASK-20260806-002)：phase04 子代理曾把
+    core_questions/strategic_questions 写成纯字符串列表，validate 在
+    question.get(...) 处崩溃（'str' object has no attribute 'get'）。
+    这里按 _strategic_question 同一 schema 补齐 owner_section/required_fact_keys。
+    """
+    if not isinstance(items, list):
+        return []
+    converted: list[dict[str, Any]] = []
+    for idx, item in enumerate(items, 1):
+        if isinstance(item, dict):
+            converted.append(item)
+            continue
+        converted.append(_strategic_question(
+            f"{prefix}{idx}",
+            str(item),
+            owner,
+            list(fact_keys),
+            "String question normalized to the dispatch-time question schema.",
+        ))
+    return converted
+
+
 def normalize_research_plan_contract(plan: dict[str, Any]) -> dict[str, Any]:
     """Normalize legacy or hand-written research plans to the dispatch contract.
 
     Older plan producers used ``status`` instead of ``plan_status`` and sometimes
-    emitted ``strategic_questions`` as a list of strings. The dispatch gate needs
-    the newer ``plan_status`` field plus section-owned question objects.
+    emitted ``core_questions`` / ``strategic_questions`` as a list of strings.
+    The dispatch gate needs the newer ``plan_status`` field plus section-owned
+    question objects (``owner_section`` + ``required_fact_keys``).
+
+    v3.2+ (2026-08-06 下午, TASK-20260806-002)：之前只归一 strategic_questions，
+    core_questions 仍是字符串列表导致 validate 在 question.get(...) 崩溃
+    （'str' object has no attribute 'get'）。两个列表统一用 _coerce_question_items 处理。
     """
     normalized = dict(plan or {})
     if not normalized.get("plan_status") and normalized.get("status"):
         normalized["plan_status"] = normalized.get("status")
 
+    core_questions = normalized.get("core_questions") or []
+    # 默认 owner/fact_keys：从 core_questions 中已有的 dict 提取；
+    # 否则 owner 取 plan.section_requirements 里第一个真实 section（避免 owner_section_invalid），
+    # fact_keys 取 plan 中实际定义过的 fact_keys（避免 undefined_fact_keys），最后才回退硬编码。
+    section_keys = list((normalized.get("section_requirements") or {}).keys())
+    default_owner = section_keys[0] if section_keys else "step1_industry"
+    defined_fact_keys = [
+        item.get("fact_key")
+        for item in (normalized.get("fact_requirements") or [])
+        if isinstance(item, dict) and item.get("fact_key")
+    ]
+    default_fact_keys = defined_fact_keys[:3] or ["revenue_trend", "growth_rate", "risk_triggers"]
+    first_dict = next((q for q in core_questions if isinstance(q, dict)), None)
+    if first_dict is not None:
+        default_owner = first_dict.get("owner_section") or default_owner
+        first_fk = first_dict.get("required_fact_keys")
+        if first_fk:
+            default_fact_keys = first_fk
+
+    if core_questions and any(not isinstance(item, dict) for item in core_questions):
+        normalized["core_questions"] = _coerce_question_items(
+            core_questions, "CQ", default_owner, list(default_fact_keys))
+
     strategic_questions = normalized.get("strategic_questions") or []
     if strategic_questions and any(not isinstance(item, dict) for item in strategic_questions):
-        core_questions = normalized.get("core_questions") or []
-        default_owner = "step7_insight"
-        default_fact_keys = ["revenue_trend", "growth_rate", "risk_triggers"]
-        if core_questions and isinstance(core_questions[0], dict):
-            default_owner = core_questions[0].get("owner_section") or default_owner
-            default_fact_keys = core_questions[0].get("required_fact_keys") or default_fact_keys
-
-        converted: list[dict[str, Any]] = []
-        for idx, item in enumerate(strategic_questions, 1):
-            if isinstance(item, dict):
-                converted.append(item)
-                continue
-            converted.append(_strategic_question(
-                f"SQ{idx}",
-                str(item),
-                default_owner,
-                list(default_fact_keys),
-                "Legacy string question normalized to the dispatch-time strategic question schema.",
-            ))
-        normalized["strategic_questions"] = converted
+        normalized["strategic_questions"] = _coerce_question_items(
+            strategic_questions, "SQ", default_owner, list(default_fact_keys))
 
     return normalized
 
