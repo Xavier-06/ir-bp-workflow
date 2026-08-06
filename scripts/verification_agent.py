@@ -177,8 +177,8 @@ def extract_claims(text: str) -> list[dict]:
             'context': context[:200],
         })
 
-    # 百分比
-    pct_pattern = r'(\d{1,3}\.\d{1,2}|\d{1,3})\s*%'
+    # 百分比（加数字/小数点负向后顾，防止 "1.7127%" 被误切出 "127%"）
+    pct_pattern = r'(?<![\d.])(\d{1,3}(?:\.\d{1,4})?)\s*%'
     for m in re.finditer(pct_pattern, text):
         pct = m.group(1)
         start = max(0, m.start() - 80)
@@ -286,7 +286,18 @@ class AdversarialVerifier:
         negative_signals = ['不建议', '回避', '卖出', '减持', '不推荐', '慎入']
         positive_signals = ['买入', '推荐', '增持', '强烈推荐', '看好']
 
-        neg_found = [w for w in negative_signals if w in text]
+        def _has_affirmative_hit(word: str) -> bool:
+            """关键词命中但被否定前缀修饰（如"无减持""不减持"）不算负面信号。"""
+            neg_prefixes = ('无', '不', '未', '非', '免', '零', '承诺无', '承诺不')
+            idx = text.find(word)
+            while idx != -1:
+                pre = text[max(0, idx - 4):idx]
+                if not any(pre.endswith(p) for p in neg_prefixes):
+                    return True
+                idx = text.find(word, idx + 1)
+            return False
+
+        neg_found = [w for w in negative_signals if _has_affirmative_hit(w)]
         pos_found = [w for w in positive_signals if w in text]
 
         if neg_found and pos_found:
@@ -330,22 +341,50 @@ class AdversarialVerifier:
         对标 free-code 的 "test suite results are context, not evidence" ——
         跨 step 对账不只是检查是否有数字，而是检查数字是否打架。
         """
-        # 简单版本：检查不同 step 对同一家公司营收的引用是否一致
-        revenues = {}
+        # 按年份分组对账：只有"同一年份的公司总营收出现不同数值"才是真矛盾。
+        # 误报防护（2026-08-06）：
+        # ① 旧实现贪婪正则 `营收.*?(\d+)亿` 把同行任意后续数字都当营收，必误报；
+        # ② 分部营收（"海洋营收 63.49 亿"）不是公司总营收，命中前带分部/业务名
+        #    的匹配直接排除；
+        # ③ 卖方口径并存（MS 624.8 vs 自有 686.4）在投研报告中属正常并列，
+        #    差异 ≤10% 视为口径差异不报，>10% 才判矛盾。
+        _SEGMENT_NAMES = ('海洋', '光通信', '电网', '新能源', '海缆', '光纤', '光缆',
+                          '铜', '分部', '板块', '业务', '海风')
+        by_year: dict[str, dict[str, list]] = {}
+        pattern = r'(20\d{2})\s*[Ee]?\s*年?营收[^。\n]{0,12}?(\d+\.?\d*)\s*(亿|万|百万)'
         for step, content in steps.items():
-            matches = re.findall(r'营收.*?(\d+\.?\d*)\s*(亿|万|百万)', content)
-            for val, unit in matches:
+            for m in re.finditer(pattern, content):
+                year, val, unit = m.group(1), m.group(2), m.group(3)
+                # 排除分部营收：定位匹配内的"营收"，其前 15 字符（清洗掉年份/括号/
+                # 空白后）含业务名则跳过——兼容"海洋板块（2025 营收 63.49 亿"形式
+                rev_idx = content.rfind('营收', m.start(), m.end())
+                if rev_idx != -1:
+                    before_raw = content[max(0, rev_idx - 15):rev_idx]
+                    before_clean = re.sub(r'[\d\s（）()年月日Ee\.\-]', '', before_raw)
+                    if any(s in before_clean for s in _SEGMENT_NAMES):
+                        continue
                 key = f'{val}{unit}'
-                if key not in revenues:
-                    revenues[key] = []
-                revenues[key].append(step)
+                by_year.setdefault(year, {}).setdefault(key, [])
+                if step not in by_year[year][key]:
+                    by_year[year][key].append(step)
 
-        # 如果同一个数字在不同 step 中被引用 → good
-        # 如果不同数字都被描述为"营收" → contradiction
-        if len(revenues) > 3:
+        for year, values in sorted(by_year.items()):
+            if len(values) <= 1:
+                continue
+            # 归一到亿，按口径差异分组：max/min ≤ 1.10 视为口径差异
+            def _to_yi(key: str) -> float:
+                v = float(key.rstrip('亿万百万'))
+                if key.endswith('万'):
+                    v /= 10000.0
+                elif key.endswith('百万'):
+                    v /= 100.0
+                return v
+            nums = [_to_yi(k) for k in values]
+            if max(nums) / max(min(nums), 1e-9) <= 1.10:
+                continue  # 口径差异（如卖方 vs 自有预测），不报矛盾
+            detail = '；'.join(f'{k}（{",".join(v)}）' for k, v in values.items())
             contradictions.append(
-                f'跨 step 数据：发现 {len(revenues)} 种不同的营收表述，'
-                f'需人工确认一致性'
+                f'跨 step 数据：{year} 年营收出现 {len(values)} 种差异 >10% 的表述：{detail}'
             )
 
     # ────────── L4: 数字声明可验证性 ──────────
@@ -372,13 +411,56 @@ class AdversarialVerifier:
 
         # 检查金额是否有来源标注
         amounts_no_source = []
+        lines_all = text.split('\n')
+
+        def _table_block_context(value: str) -> str:
+            """表格行内的数字：返回整张表格 + 前后紧邻非表格段（脚注通常在引导段）。"""
+            for i, ln in enumerate(lines_all):
+                if value in ln and ln.lstrip().startswith('|'):
+                    start, end = i, i
+                    while start > 0 and lines_all[start - 1].lstrip().startswith('|'):
+                        start -= 1
+                    while end < len(lines_all) - 1 and lines_all[end + 1].lstrip().startswith('|'):
+                        end += 1
+                    # 向前找引导段（最多 3 行非表格非空行）
+                    pre, s = [], start - 1
+                    while s >= 0 and len(pre) < 3:
+                        if lines_all[s].lstrip().startswith('|'):
+                            break
+                        if lines_all[s].strip():
+                            pre.append(lines_all[s])
+                        s -= 1
+                    # 向后同样找 3 行
+                    post, e = [], end + 1
+                    while e < len(lines_all) and len(post) < 3:
+                        if lines_all[e].lstrip().startswith('|'):
+                            break
+                        if lines_all[e].strip():
+                            post.append(lines_all[e])
+                        e += 1
+                    return '\n'.join(pre[::-1] + lines_all[start:end + 1] + post)
+            return ''
+
         for c in claims:
             val = c['value']
             # Skip trivial matches
             if len(val) < 3:
                 continue
             ctx = c['context']
-            if not any(kw in ctx for kw in
+            # 脚注引用标记（[^N]）视为来源标注：买方研报用 markdown 脚注标注出处
+            has_footnote = bool(re.search(r'\[\^\d+\]', ctx))
+            if not has_footnote:
+                # 整行检测：长段落行脚注常在行首、数字在行尾，±100 字符窗口不够
+                bare = val.rstrip('亿万%')
+                for ln in lines_all:
+                    if bare in ln and re.search(r'\[\^\d+\]', ln):
+                        has_footnote = True
+                        break
+            if not has_footnote:
+                # 表格行内数字：脚注可能在表格引导段，扩大为整块表格上下文再判
+                tctx = _table_block_context(val.rstrip('亿万%'))
+                has_footnote = bool(re.search(r'\[\^\d+\]', tctx))
+            if not has_footnote and not any(kw in ctx for kw in
                       ['来源', '据', '摘自', '财报', '公告', 'SEC', 'HKEX',
                        '招股书', '年报', 'Q', 'H1', 'H2', 'FY', 'http',
                        'Wind', 'Bloomberg', '彭博', '万得']):

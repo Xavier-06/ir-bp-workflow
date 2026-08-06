@@ -48,6 +48,7 @@ def _rows_from_fact_store(task_id: str, tasks_dir: Path) -> list[dict]:
             'claim': fact.get('claim', ''),
             'source_title': fact.get('source_title', '') or fact.get('source_tier', ''),
             'source_url': fact.get('source_url', ''),
+            'source_quote': fact.get('source_quote', ''),
             'confidence': fact.get('confidence', ''),
             'source_tier': fact.get('source_tier', ''),
         })
@@ -93,11 +94,16 @@ def build_source_audit(task_id: str, tasks_dir: Path = TASKS) -> dict:
         if source_url.startswith('http'):
             source_urls.add(source_url)
         else:
-            if fact_id:
+            # 无外部 URL ≠ 无来源：研报/专家/机构侧引用通过 source_quote 承载出处，
+            # 或 source_tier 已标注可信层级。只有 tier 为 unknown 且无引用才是真无来源。
+            has_quote = bool((r.get('source_quote') or '').strip())
+            attributed_tier = source_tier and source_tier not in ('unknown', 'low', 'auxiliary', '')
+            if fact_id and not has_quote and not attributed_tier:
                 claims_without_sources.append(fact_id)
         if source_tier in OFFICIAL_TIERS:
             official_source_count += 1
-        if not source_url.startswith('http') or source_tier in ('unknown', 'low', 'auxiliary'):
+        if (not source_url.startswith('http') and not (r.get('source_quote') or '').strip()) \
+                or source_tier in ('low', 'auxiliary'):
             low_quality_source_count += 1
         out_rows.append({
             'idx': i,
