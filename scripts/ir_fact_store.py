@@ -255,13 +255,26 @@ def merge_step_fact_sidecars(task_id: str, tasks_dir: Path = TASKS_DIR,
     invalid: list[dict[str, str]] = []
     sidecar_paths = sorted(tasks_dir.glob(f"{task_id}-*-facts.json"))
 
+    # 归一化器（2026-08-06）：把子代理写出的 schema 变体（裸 list 根/statement 字段/
+    # 缺 source_quote/缺 value 等）统一成标准 {step, facts:[...]}，
+    # 从源头消灭 phase10 merge 连环报错（TASK-20260805-003 实战 bug①②③④）。
+    from scripts.ir_sidecar_normalize import normalize_facts_sidecar, _load_md_lines
+
     for path in sidecar_paths:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:
             invalid.append({"path": str(path), "error": str(exc)})
             continue
-        step = str(payload.get("step") or path.name.replace(f"{task_id}-", "").replace("-facts.json", ""))
+        step_hint = path.name.replace(f"{task_id}-", "").replace("-facts.json", "")
+        # md 句子库：把缺 source_quote 的 fact 从报告原文真实找回（不编造）
+        md_lines = _load_md_lines(step_hint, tasks_dir, task_id)
+        try:
+            payload, _norm_changes = normalize_facts_sidecar(payload, step_hint, md_lines=md_lines)
+        except Exception as exc:
+            invalid.append({"path": str(path), "error": f"normalize: {exc}"})
+            continue
+        step = str(payload.get("step") or step_hint)
         for raw in payload.get("facts", []) or []:
             try:
                 fact = _normalize_sidecar_fact(raw, store.entity or entity, step)
@@ -279,6 +292,17 @@ def merge_step_fact_sidecars(task_id: str, tasks_dir: Path = TASKS_DIR,
 
     output_path = write_fact_store(store, tasks_dir=tasks_dir)
     index_path = write_fact_store_index(store, tasks_dir=tasks_dir)
+
+    # 2026-08-06 报错聚合：旧实现下游只透出"第一个失败 step"，
+    # 实际可能多个 sidecar 同时缺字段，误导排查（TASK-20260805-003：报 step1
+    # 缺 source_quote，实际 6 个 step 都缺）。这里按文件聚合全量失败项。
+    invalid_by_step: dict[str, list[str]] = {}
+    for item in invalid:
+        p = item.get("path", "")
+        step_key = Path(p).name.replace(f"{task_id}-", "").replace("-facts.json", "") or "(unknown)"
+        invalid_by_step.setdefault(step_key, []).append(item.get("error", ""))
+    failed_steps = sorted(invalid_by_step.keys())
+
     return {
         "task_id": task_id,
         "output_path": output_path,
@@ -288,5 +312,9 @@ def merge_step_fact_sidecars(task_id: str, tasks_dir: Path = TASKS_DIR,
         "duplicate_count": duplicate_count,
         "invalid_count": len(invalid),
         "invalid": invalid,
+        # 聚合视图：失败 step 全量清单（不只第一个）
+        "failed_steps": failed_steps,
+        "failed_step_count": len(failed_steps),
+        "invalid_by_step": invalid_by_step,
         "total_facts": len(store.facts),
     }

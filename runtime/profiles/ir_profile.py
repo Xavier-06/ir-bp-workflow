@@ -793,6 +793,13 @@ def _run_fact_store_merge(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
         entity=job_ctx.entity,
         market=job_ctx.market,
     )
+    # 聚合报错：打印全量失败 step（旧实现只透出第一个，误导排查）
+    _failed = result.get("failed_steps", [])
+    if _failed:
+        print(
+            f"  ⚠️ fact_store_merge 失败 step 全量清单（{len(_failed)} 个）: {', '.join(_failed)}",
+            flush=True,
+        )
     ws = _workspace_for(job_ctx)
     if ws is not None:
         try:
@@ -1147,23 +1154,36 @@ def _run_dispatch_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str, 
             })
             continue
         
-        # L2 硬约束: JSON 合法性 + file_stable (8秒稳定性)
+        # L2 硬约束: JSON 合法性 + file_stable (mtime 静默检测)
         try:
             facts_data = json.loads(facts_path.read_text(encoding="utf-8"))
             section_data = json.loads(section_path.read_text(encoding="utf-8"))
-            
-            # file_stable: 检查文件大小在 8 秒内无变化
-            size1 = facts_path.stat().st_size
-            time.sleep(8)
-            size2 = facts_path.stat().st_size
-            if size1 != size2:
+
+            # file_stable: 短确认检测（2026-08-06 修复）。
+            # 旧实现对每个 step 无条件 sleep(8) 比对文件大小，8 step 累积 64s+
+            # 触发环境资源上限被 SIGKILL（TASK-20260805-003 实战 bug）。
+            # 新逻辑：上文 json.loads 已成功解析 facts+section，即为内容完整性的主要证明；
+            # 仅当 facts 文件 mtime 距今极近（<1s，疑似子代理仍在写）时做一次 0.3s
+            # 短确认，比对大小不再变化。早已写完/刚写完的文件零等待。最坏 0.3s/step，
+            # 8 step 累积 ≤2.4s，不会触发超时。
+            settled = True
+            try:
+                st = facts_path.stat()
+                if time.time() - st.st_mtime < 1.0:
+                    size1 = st.st_size
+                    time.sleep(0.3)
+                    if facts_path.stat().st_size != size1:
+                        settled = False
+            except OSError:
+                settled = False
+            if not settled:
                 incomplete_steps.append({
                     "step": step_name,
                     "missing_files": [],
                     "issue": "file_unstable (子代理仍在写入)",
                 })
                 continue
-            
+
             completed_steps.append(step_name)
             _sync_step_to_workspace(job_ctx, step_name, md_path)
             quality = check_step_quality(job_ctx.job_id, step_name)
@@ -1695,6 +1715,24 @@ def _run_synthesis_collect(runtime_root: Path, job_ctx: JobContext) -> dict[str,
     # 检查统稿输出
     synthesis_path = tasks_dir / f"{job_ctx.job_id}-synthesis.md"
     if synthesis_path.exists() and synthesis_path.stat().st_size > 500:
+        # ── 交付前自动清洗（2026-08-06）──
+        # 消灭 phase15 三类真命中：内部 step 编号泄露 / 脚注无 URL / 三文件不同步。
+        # 幂等：重复执行不重复添加 URL。
+        try:
+            from scripts.ir_synthesis_sanitize import sanitize_synthesis
+            _san = sanitize_synthesis(job_ctx.job_id, tasks_dir=tasks_dir)
+            if _san.get("changed"):
+                print(
+                    f"  🧹 synthesis 自动清洗: step编号{_san.get('step_names_cleaned')}处, "
+                    f"泄露模式{_san.get('leak_patterns_cleaned')}处, "
+                    f"URL回填{_san.get('urls_backfilled')}条(总{_san.get('total_url_count')})",
+                    flush=True,
+                )
+            if _san.get("residual_leaks"):
+                print(f"  ⚠️ 清洗后残留泄露模式: {_san['residual_leaks']}", flush=True)
+        except Exception as _san_exc:
+            print(f"  ⚠️ synthesis 自动清洗失败(不阻断): {_san_exc}", flush=True)
+
         ws = _workspace_for(job_ctx)
         if ws is not None:
             try:
