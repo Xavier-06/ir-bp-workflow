@@ -389,6 +389,20 @@ def _backfill_thesis_fields(plan: dict[str, Any], inferred: dict[str, Any] | Non
     elif isinstance(anchor, dict) and anchor.get("stale"):
         warnings.append(f"market_anchor_stale_age_{anchor.get('source_age_days', '?')}d")
 
+    # information_richness（v3.9, 2026-08-07 借鉴 ai-berkshire）：
+    # 缺失/非法 rating → B 级兜底（保守默认：推算数据标置信度），不阻断。
+    _RICHNESS_RATINGS = {"A", "B", "C"}
+    richness = plan.get("information_richness")
+    if not isinstance(richness, dict) or richness.get("rating") not in _RICHNESS_RATINGS:
+        plan["information_richness"] = {
+            "rating": "B",
+            "reason": "子代理未产出合法 information_richness，降级默认 B 级（保守：推算数据标置信度）",
+            "ai_trap": "用合理推测填补空白制造虚假确定性",
+            "strategy": "推算数据全部标置信度",
+            "fallback": True,
+        }
+        warnings.append("information_richness_missing_fallback")
+
     return warnings
 
 

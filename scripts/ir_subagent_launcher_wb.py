@@ -1554,7 +1554,9 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
         if step == 'step8_risk':
             prompt_body += (
                 f'💡 风险提示：Wave 1-3 全部完成——重点消费：step4_mgmt 管理层风险、step6_valuation 估值敏感性、\n'
-                f'step3_finance 财务脆弱点。宏观/政策风险与大宗价格风险由你自行取数量化（见指令「宏观与大宗数据取数纪律」）。逐一读取后综合成风险矩阵。\n\n'
+                f'step3_finance 财务脆弱点。宏观/政策风险与大宗价格风险由你自行取数量化（见指令「宏观与大宗数据取数纪律」）。逐一读取后综合成风险矩阵。\n'
+                f'⚠️ 指令「0. 失败路径枚举」是必做章节：≥5 条具体失败路径（含最早可观测信号）+ 搜索看空观点\n'
+                f'回答"聪明人在担心什么" + 1-2 个历史类比。禁止跳过直接写风险清单。\n\n'
             )
 
         # ── 行业 Overlay + 估值范式联动（v2.1，2026-07-29）──
@@ -1576,6 +1578,22 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'【估值范式（{_paradigm}）】\n\n'
                 f'⚠️ 本标的估值范式为 {_paradigm}，所有分析框架和估值方法选择以此为准。\n'
                 f'（行业 overlay 未命中，但范式已从 research_plan 获取。）\n\n'
+            )
+
+        # ── 信息丰富度评级注入（v3.9, 2026-08-07 借鉴 ai-berkshire）──
+        # phase04 产出 information_richness（A/B/C），决定子代理研究姿势：
+        # A 级做反共识检验、B 级推算标置信度、C 级第一性原理。响应协议全文在
+        # _common_tool_guide.md「信息丰富度评级响应协议」段（随 brief 注入），这里只注入评级结论。
+        _richness = _plan.get('information_richness') or {}
+        _rating = _richness.get('rating') if isinstance(_richness, dict) else None
+        if _rating in ('A', 'B', 'C'):
+            _fallback_note = '（子代理未产出，管线按 B 级兜底）' if _richness.get('fallback') else ''
+            prompt_body += (
+                f'【信息丰富度评级：{_rating} 级】{_fallback_note}\n'
+                f'评级依据：{_richness.get("reason", "（无）")}\n'
+                f'AI 研究陷阱警示：{_richness.get("ai_trap", "（无）")}\n'
+                f'⚠️ 你必须在报告首段声明本评级及其对你分析姿势的影响，并严格执行\n'
+                f'工具手册「信息丰富度评级响应协议」中 {_rating} 级对应的响应策略。\n\n'
             )
 
         prompt_body += (

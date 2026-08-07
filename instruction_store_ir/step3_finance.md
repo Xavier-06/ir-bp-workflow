@@ -42,6 +42,29 @@
 4. 财务健康度能否扛过一轮下行周期？
 5. 我的预测与市场一致预期差在哪？
 
+## ⚠️ 数值验算硬约束（生产时验算，禁止心算）
+
+**你产出的所有关键数字，写入报告前必须用验算工具复算，禁止 LLM 心算**——心算错一个小数点或搞混币种单位，下游 step6 估值、统稿全链路都会跟着错。
+
+```bash
+# 市值验算（正文出现市值时必须跑：股价×股本 vs 引用市值）
+cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py verify-market-cap \
+  --price {股价} --shares {总股本} --reported {引用市值} --currency {币种}
+
+# 关键财务数据多源比对（营收/净利润等从 ≥2 个来源取数后跑）
+cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py cross-validate \
+  --field {字段} --values '{"来源1": 数值, "来源2": 数值}' --unit {单位}
+
+# 衍生指标复算（ROIC/增速/利润率等比率，用 calc 代替心算）
+cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py calc --expr '{算式}'
+```
+
+**执行要求**：
+1. 市值、营收、净利润、ROIC、EPS——每个数字至少过一次工具
+2. 工具输出 ❌/⚠️ 时必须排查原因，不得带病写入报告
+3. 验算结果摘要写进报告末尾「搜索审计」章节（跑了哪些验算、有无偏差）
+4. 数据源之间打架的处理规则见工具手册「数据冲突处理协议」（误差分级 + 口径差异清单）
+
 ---
 
 ## 输出格式

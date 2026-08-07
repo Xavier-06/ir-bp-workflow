@@ -61,6 +61,34 @@ mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="__EN
 
 **如果找不到大行研报**（未覆盖标的或 IMA 无全文），跳过此步，在 search_summary 中标注 `"benchmark_found": false`，后续回退到从零搜索模式。
 
+## Step 0.55: 信息丰富度评级（information_richness — v3.9 新增，必须执行）
+
+**核心洞察：资料多 ≠ 确定性高。评级决定下游所有 step 的研究姿势（反面检验/推算标注/第一性原理），必须在派发维度子代理前完成。**
+
+依据 Step 0.5 的搜索结果（大行研报命中数量、中英文覆盖密度）+ westock `data_report`/`data_rating` 的机构覆盖数量，判定标的信息丰富度：
+
+| 评级 | 判定信号 |
+|------|---------|
+| `A` | 3 个月内 ≥3 篇大行/主流券商研报覆盖；中英文资料都丰富；行业热门标的 |
+| `B` | 有 1-2 篇研报或仅内资覆盖；部分分部/预测数据需推算；次新股或转型期公司 |
+| `C` | 3 个月内无机构研报（benchmark_found=false 通常指向 C 级）；冷门股/新上市/跨市场小盘 |
+
+在输出的 `information_richness` 字段写入：
+
+```json
+{
+  "rating": "B",
+  "reason": "仅 1 篇内资券商研报（2026-06），无大行覆盖；分部收入需从产能×单价推算",
+  "ai_trap": "用合理推测填补分部空白，制造虚假确定性",
+  "strategy": "推算数据全部标置信度；A 级则做反共识检验；C 级则第一性原理提问"
+}
+```
+
+**铁律**：
+- 评级只影响研究姿势，不降低研究深度要求——C 级标的也要把能查的查透
+- reason 必须引用具体证据（研报篇数/覆盖机构名），禁止凭感觉打分
+- 该字段会注入每个下游 step 的派发 prompt，缺失时管线按 B 级兜底并记 warning
+
 ## Step 0.6: 提取市场共识锚（market_anchor — v2.1 新增）
 
 **目的**：所有下游 step 动手前先有"市场现在怎么定价"的锚点。
@@ -214,6 +242,7 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 6. **Valuation Paradigm (1个)**: 6 选 1 估值范式（见下方判定表），决定全报告的估值方法和骨架
 7. **Market Anchor (1个)**: 市场共识锚（Step 0.6 产出）
 8. **Report Type (1个)**: 报告类型分流（见下方判定表），决定管线跑全量 4 波还是短路径
+9. **Information Richness (1个)**: 信息丰富度评级 A/B/C（Step 0.55 产出），决定下游研究姿势
 
 ### Report Type 判定表（2026-08-03 新增，2026-08-04 v3.1 更新 — 决定 wave 裁剪）
 
@@ -258,6 +287,12 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
   "benchmark_skeleton_ref": "__BENCHMARK_SKELETON_PATH__",
   "report_type": "deep_dive",
   "report_type_reason": "依据判定表选择 deep_dive / event_update / earnings_note，并写明理由",
+  "information_richness": {
+    "rating": "B",
+    "reason": "仅 1 篇内资券商研报，无大行覆盖；分部收入需推算",
+    "ai_trap": "用合理推测填补空白制造虚假确定性",
+    "strategy": "推算数据全部标置信度"
+  },
   "valuation_paradigm": "preprofit_growth",
   "paradigm_reason": "优必选亏损+高增长，用 PS/EV-Sales + TAM 份额推导，禁用 PE/DCF",
   "valuation_method_primary": "PS / EV-Sales",

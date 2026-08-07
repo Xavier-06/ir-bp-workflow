@@ -453,12 +453,37 @@ Step 4: 如果缺上市可比公司 → 用一级融资估值锚或行业近3年
 - 可比公司估值 → yfinance 获取或 search_deep(Bash) 标注来源和截止日期
 - WACC 各参数（无风险利率、β、ERP、债务成本）→ 每个都标来源；**无风险利率必须自取数当前值**（见「宏观与大宗数据取数纪律」，v3.6 起无宏观子代理产出可读）
 
-### 算术验算（每一步都必须可复算）
+### 算术验算（每一步都必须可复算 — 必须用工具，禁止心算）
+
+**估值是全报告数字的收口，算错一个数下游全错。以下验算必须实际执行工具命令并把输出摘要写进报告，禁止只在脑中"验算过"：**
+
+```bash
+# ① 市值验算（最优先——防单位/币种错误）
+cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py verify-market-cap \
+  --price {股价} --shares {总股本} --reported {引用市值} --currency {币种}
+
+# ② 估值指标验算（PE/PB/PS/股息率，输入报告用的所有倍数前必跑）
+cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py verify-valuation \
+  --price {股价} --eps {EPS} --bvps {每股净资产} --sps {每股营收}
+
+# ③ 三情景目标价（节点5 输出目标价三档时必跑，替代心算情景复算）
+cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py three-scenario \
+  --price {现价} --eps {EPS} --growth {乐观} {中性} {悲观} --pe {乐观PE} {中性PE} {悲观PE} --years {N}
+
+# ④ 其余比率/加权/风险收益比（任何超过一步的算式都用 calc）
+cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py calc --expr '{算式}'
+```
+
+验算项清单（逐项过工具）：
 - PE × EPS ≈ 股价（误差 < 5%）
-- **市值 = 股价 × 总股本**（误差 > 10% 必须说明原因）
-- **PS = 市值 ÷ 营收**（必须用自己验算过的市值）
+- **市值 = 股价 × 总股本**（误差 > 5% 触发修正流程，见异常处理规则）
+- **PS = 市值 ÷ 营收**（必须用工具验算过的市值）
+- 目标价三档的 EPS 外推与倍数相乘（用 three-scenario）
+- 风险收益比、概率加权目标价（用 calc）
 - DCF 中间步骤必须可复算
 - 敏感性矩阵中 base case 必须对应正文的基准目标价
+
+工具输出 ❌/⚠️ 时必须排查后重算，不得带偏差进入节点5。验算执行记录写进报告末尾「搜索审计」章节。
 
 ### 禁止编造可比公司数据
 - 可比公司的 PE/PB/PS 必须有来源
