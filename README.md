@@ -508,6 +508,10 @@ ir-bp-workflow/
 │   │   ├── pdfplumber_extractor.py
 │   │   ├── marker_extractor.py
 │   │   └── web_scraper.py
+│   ├── enterprise/                       # 天眼查企业数据查询
+│   │   ├── company_profile.py            # 企业画像
+│   │   ├── tyc_company_lookup.py         # 天眼查公司查询
+│   │   └── tyc_patent_search.py          # 天眼查专利检索
 │   └── search/                           # LIT 搜索
 │       ├── unified_search.py             # 多源并行搜索 + 去重
 │       ├── neodata_search.py             # NeoData 研报搜索
@@ -540,13 +544,14 @@ ir-bp-workflow/
 │   │   ├── internet.md
 │   │   ├── heavy_asset.md
 │   │   └── financial.md
-│   └── step*.md                          # 7 个 step 指令文件（step5_macro 已于 v3.6 删除）
+│   └── step*.md                          # 7 个 step 指令文件（step1_industry/2_biz/3_finance/4_mgmt/6_valuation/7_insight/8_risk，编号不连续，无 step5）
 ├── instruction_store_ic/                 # IC 角色指令库（16 角色）
 │   ├── index.json                        # archetype → role → file 三级映射
 │   ├── _common_tool_guide.md
 │   ├── ic_research_plan_enrichment.md
 │   ├── roles/                            # 16 个角色指令文件
-│   └── archetypes/                       # 5 个原型模板 JSON
+│   ├── archetypes/                       # 5 个原型模板 JSON
+│   └── archived/                         # 已归档角色指令（旧版）
 ├── instruction_store_lit/                # LIT 角色指令库（7 角色）
 │   ├── index.json
 │   ├── _common_tool_guide.md
@@ -572,13 +577,19 @@ ir-bp-workflow/
 ├── content/                              # 内容抓取 + PDF 提取
 ├── routing/                              # 数据源路由
 ├── config/                               # 运行时配置
+├── rules/                                # 管线规则文档
+├── sources/                              # 数据源解析/实体画像/喂入器
+├── tasks/                                # 任务工具
+├── tools/                                # 工具脚本
 ├── memory/                               # 记忆系统
 ├── docs/                                 # 文档
 ├── tests/                                # 测试
 ├── setup.sh                              # 一键安装
 ├── ir_runtime.py                         # CLI 管理入口
 ├── run_bp.py                             # BP 管线运行脚本
-└── run_ic_topic_shim.py                  # IC 课题管线驱动 shim（修复 phase_runner pipeline 误判）
+├── run_ic_topic_shim.py                  # IC 课题管线驱动 shim（修复 phase_runner pipeline 误判）
+├── TOOLS.md                              # 工具使用说明（搜索/记忆/OCR 等）
+└── requirements.txt                      # Python 依赖
 ```
 
 ---
