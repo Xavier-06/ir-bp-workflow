@@ -1596,6 +1596,31 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
                 f'工具手册「信息丰富度评级响应协议」中 {_rating} 级对应的响应策略。\n\n'
             )
 
+        # ── 财报点评专用注入（earnings_note 模式 step3/step4，v3.10 借鉴 ai-berkshire）──
+        # 短路径下子代理默认行为是全量分析，必须显式切换到"点评姿势"：
+        # 一手资料获取 + 双锚判定 + 语气分析，而不是重建全套预测模型。
+        _report_type = _plan.get('report_type') or ''
+        if _report_type == 'earnings_note' and step == 'step3_finance':
+            prompt_body += (
+                f'【⚠️ 财报点评模式（earnings_note）】\n'
+                f'本期是财报点评场景——核心任务是对刚出的财报做判定，执行指令中「财报点评专项」段：\n'
+                f'1. 一手资料获取：westock-mcp data_news(type=0) 拉本期业绩公告原文 + IMA 机构调研纪要库\n'
+                f'   （7300811407257275，中英各一轮）搜业绩会纪要，并从上期资料提取管理层对本期指引\n'
+                f'2. 双锚 Beat/Miss 判定：实际 vs 卖方一致预期（research_plan.json 的 market_anchor）\n'
+                f'   + 实际 vs 管理层上期指引；判定三选一输出（超预期/符合/低于），禁止"基本符合"式模糊\n'
+                f'3. 指引偏差表 + 5 项财报异常信号核查 + 4 季度关键指标趋势表\n'
+                f'4. 预测更新只改受本期财报影响的假设，用 ir_financial_rigor.py three-scenario 重算目标价\n\n'
+            )
+        elif _report_type == 'earnings_note' and step == 'step4_mgmt':
+            prompt_body += (
+                f'【⚠️ 财报点评模式（earnings_note）】\n'
+                f'本期是财报点评场景——核心任务是本季业绩会的语气与承诺分析，执行指令中「业绩会语气分析专项」段：\n'
+                f'1. 资料获取：IMA 机构调研纪要库（7300811407257275）中英各搜一轮，取本期 + 上期业绩会纪要\n'
+                f'2. 语气五信号（坦诚/清晰 🟢 vs 模糊/转移/归因外部化 🔴）+ Q&A 尖锐问题回答质量评分\n'
+                f'3. 季度承诺追踪：上期业绩会承诺 vs 本期兑现逐条表（连续 2 期未达标须降级指引可信度）\n'
+                f'找不到纪要 → 声明"一手资料不足"降级处理，禁止用训练记忆编造上期承诺。\n\n'
+            )
+
         prompt_body += (
             f'【执行步骤】\n'
             f'1. 读取 brief 文件：{brief_path}\n'
