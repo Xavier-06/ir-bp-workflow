@@ -488,6 +488,9 @@ ir-bp-workflow/
 │   ├── ic_evidence_gate.py               # IC 证据门禁
 │   ├── ic_precompute.py                  # IC 行业预计算
 │   ├── ic_topic_intake.py                # IC 课题元数据解析
+│   ├── fix_ir_sidecars_facts.py          # 修复 IR sidecar 元数据（补 source_url/绑定 fact_ids，历史任务用）
+│   ├── rebuild_ir_facts_sidecars.py      # 重建 IR facts sidecar（phase10 合规，历史任务用）
+│   ├── rebuild_ir_section_pkgs.py        # 重建 IR section package（phase11 合规，历史任务用）
 │   ├── _bp_research_plan_subagent.py     # BP 研究计划子代理
 │   ├── _bp_company_intake_subagent.py    # BP 公司名搜索入库子代理
 │   ├── heavy_phase_bg.py                 # heavy phase 后台启动器
@@ -574,7 +577,8 @@ ir-bp-workflow/
 ├── tests/                                # 测试
 ├── setup.sh                              # 一键安装
 ├── ir_runtime.py                         # CLI 管理入口
-└── run_bp.py                             # BP 管线运行脚本
+├── run_bp.py                             # BP 管线运行脚本
+└── run_ic_topic_shim.py                  # IC 课题管线驱动 shim（修复 phase_runner pipeline 误判）
 ```
 
 ---
