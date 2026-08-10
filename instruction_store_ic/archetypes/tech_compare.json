@@ -8,33 +8,46 @@
     {
       "index": 0,
       "name": "投研假说",
-      "steps": ["step_executive_hypothesis"],
+      "steps": [
+        "step_executive_hypothesis"
+      ],
       "parallel": true
     },
     {
       "index": 1,
       "name": "技术全景",
-      "steps": ["step_ind_overview", "step_tech_landscape"],
+      "steps": [
+        "step_ind_overview",
+        "step_tech_landscape"
+      ],
       "parallel": true
     },
     {
       "index": 2,
       "name": "路线深度分析",
-      "steps_template": ["step_route_deep_{route}"],
+      "steps_template": [
+        "step_route_deep_{route}"
+      ],
       "parallel": true,
       "depends_on_wave": 1
     },
     {
       "index": 3,
       "name": "跨路线综合",
-      "steps": ["step_cross_compare", "step_catalyst", "step_consensus"],
+      "steps": [
+        "step_cross_compare",
+        "step_catalyst",
+        "step_consensus"
+      ],
       "parallel": true,
       "depends_on_wave": 2
     },
     {
       "index": 4,
       "name": "统稿",
-      "steps": ["step_master_synthesis"],
+      "steps": [
+        "step_master_synthesis"
+      ],
       "parallel": false,
       "depends_on_wave": 3
     }
@@ -53,23 +66,72 @@
     "step_executive_hypothesis": [],
     "step_ind_overview": [],
     "step_tech_landscape": [],
-    "step_route_deep_{route}": ["step_tech_landscape", "step_ind_overview"],
-    "step_cross_compare": ["__all_route_deep__"],
-    "step_catalyst": ["__all_route_deep__"],
-    "step_consensus": ["step_cross_compare", "__all_route_deep__"],
-    "step_master_synthesis": ["step_cross_compare", "step_catalyst", "step_consensus"]
+    "step_route_deep_{route}": [
+      "step_tech_landscape",
+      "step_ind_overview"
+    ],
+    "step_cross_compare": [
+      "__all_route_deep__"
+    ],
+    "step_catalyst": [
+      "__all_route_deep__"
+    ],
+    "step_consensus": [
+      "step_cross_compare",
+      "__all_route_deep__"
+    ],
+    "step_master_synthesis": [
+      "step_cross_compare",
+      "step_catalyst",
+      "step_consensus"
+    ]
   },
   "connector_map": {
-    "ic_executive_hypothesis": ["westock-mcp"],
-    "ic_market_overview": ["tyc-mcp", "westock-mcp"],
-    "ic_tech_landscape": ["tyc-mcp", "westock-mcp"],
-    "ic_route_deep": ["tyc-mcp", "westock-mcp"],
-    "ic_competitive": ["tyc-mcp", "westock-mcp"],
-    "ic_catalyst": ["tyc-mcp", "westock-mcp"],
-    "ic_consensus": ["tyc-mcp", "westock-mcp"],
-    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+    "ic_executive_hypothesis": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_market_overview": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_tech_landscape": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_route_deep": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_competitive": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_catalyst": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_consensus": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_report_synthesizer": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ]
   },
-  "always_active_steps": ["step_executive_hypothesis", "step_tech_landscape", "step_master_synthesis"],
+  "always_active_steps": [
+    "step_executive_hypothesis",
+    "step_tech_landscape",
+    "step_master_synthesis"
+  ],
   "step_timeouts": {
     "step_executive_hypothesis": 600,
     "step_tech_landscape": 1200,

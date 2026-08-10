@@ -7,33 +7,47 @@
     {
       "index": 0,
       "name": "投研假说",
-      "steps": ["step_executive_hypothesis"],
+      "steps": [
+        "step_executive_hypothesis"
+      ],
       "parallel": true
     },
     {
       "index": 1,
       "name": "业务与竞争",
-      "steps": ["step_business_overview", "step_competitive_position"],
+      "steps": [
+        "step_business_overview",
+        "step_competitive_position"
+      ],
       "parallel": true
     },
     {
       "index": 2,
       "name": "财务与估值",
-      "steps": ["step_financial_deep", "step_valuation_benchmark", "step_moat_analysis"],
+      "steps": [
+        "step_financial_deep",
+        "step_valuation_benchmark",
+        "step_moat_analysis"
+      ],
       "parallel": true,
       "depends_on_wave": 1
     },
     {
       "index": 3,
       "name": "风险与催化",
-      "steps": ["step_risk_assessment", "step_catalyst_analysis"],
+      "steps": [
+        "step_risk_assessment",
+        "step_catalyst_analysis"
+      ],
       "parallel": true,
       "depends_on_wave": 2
     },
     {
       "index": 4,
       "name": "统稿",
-      "steps": ["step_master_synthesis"],
+      "steps": [
+        "step_master_synthesis"
+      ],
       "parallel": false,
       "depends_on_wave": 3
     }
@@ -53,23 +67,70 @@
     "step_executive_hypothesis": [],
     "step_business_overview": [],
     "step_competitive_position": [],
-    "step_financial_deep": ["step_business_overview"],
-    "step_valuation_benchmark": ["step_financial_deep"],
-    "step_moat_analysis": ["step_business_overview", "step_competitive_position"],
-    "step_risk_assessment": ["step_business_overview", "step_financial_deep"],
-    "step_catalyst_analysis": ["step_business_overview", "step_competitive_position"],
-    "step_master_synthesis": ["step_risk_assessment", "step_catalyst_analysis", "step_moat_analysis"]
+    "step_financial_deep": [
+      "step_business_overview"
+    ],
+    "step_valuation_benchmark": [
+      "step_financial_deep"
+    ],
+    "step_moat_analysis": [
+      "step_business_overview",
+      "step_competitive_position"
+    ],
+    "step_risk_assessment": [
+      "step_business_overview",
+      "step_financial_deep"
+    ],
+    "step_catalyst_analysis": [
+      "step_business_overview",
+      "step_competitive_position"
+    ],
+    "step_master_synthesis": [
+      "step_risk_assessment",
+      "step_catalyst_analysis",
+      "step_moat_analysis"
+    ]
   },
   "connector_map": {
-    "ic_executive_hypothesis": ["westock-mcp"],
-    "ic_business_overview": ["tyc-mcp", "westock-mcp"],
-    "ic_competitive": ["tyc-mcp", "westock-mcp"],
-    "ic_supply_chain": ["tyc-mcp", "westock-mcp"],
-    "ic_policy_risk": ["tyc-mcp", "westock-mcp"],
-    "ic_catalyst": ["tyc-mcp", "westock-mcp"],
-    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+    "ic_executive_hypothesis": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_business_overview": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_competitive": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_supply_chain": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_policy_risk": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_catalyst": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_report_synthesizer": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ]
   },
-  "always_active_steps": ["step_executive_hypothesis", "step_master_synthesis"],
+  "always_active_steps": [
+    "step_executive_hypothesis",
+    "step_master_synthesis"
+  ],
   "step_timeouts": {
     "step_executive_hypothesis": 600,
     "step_financial_deep": 1200,

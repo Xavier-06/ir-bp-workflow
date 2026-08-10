@@ -58,6 +58,16 @@ from scripts.ic_constants import IC_ROLE_CONNECTOR_IDS, IC_DEFAULT_CONNECTOR_IDS
 _TOOL_GUIDE_CACHE: str = ""
 _TOOL_GUIDE_MTIME: float = 0.0
 
+# ── IMA 双语搜索硬约束（单一真实来源，所有 inline 路由分支共用）──
+# ⚠️ 修改此处即全局生效，禁止在各分支内手抄副本。
+_IMA_BILINGUAL_NOTE = (
+    "- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，"
+    "英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），"
+    "两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），"
+    "第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），"
+    "合并去重后再 fetch\n"
+)
+
 
 def _load_tool_guide(runtime_root: Path | None = None) -> str:
     """热加载 instruction_store_ic/_common_tool_guide.md（mtime 缓存）。"""
@@ -200,7 +210,17 @@ def wave_manifest_path(task_id: str) -> Path:
 # ═══════════════════════════════════════════════════════
 
 def load_instruction(role_key: str) -> str:
-    """加载角色指令（从 roles/ 子目录）。"""
+    """加载角色指令。
+
+    优先查 index.json 的 role_files 注册表（显式映射，可指向任意路径），
+    未注册则回退按 roles/{role_key}.md 文件名直读。
+    """
+    role_files = load_index().get("role_files", {})
+    rel = role_files.get(role_key)
+    if rel:
+        p = INSTRUCTION_STORE / rel
+        if p.exists():
+            return p.read_text(encoding='utf-8')
     role_file = INSTRUCTION_STORE / 'roles' / f'{role_key}.md'
     if role_file.exists():
         return role_file.read_text(encoding='utf-8')
@@ -1000,8 +1020,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     )
     if role == 'ic_executive_hypothesis':
         return (
-            f'⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            f'⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             f'- 行业板块走势/估值 → westock-mcp: data_sector（查 {sector_hint} 板块）\n'
             f'- 最新行业动态 → 中文实时新闻 tencent_news_search（Bash 调用，见 System Prompt 工具指南）\n'
             f'- 龙头公司实时估值锚 → westock-mcp: data_quote（查 {sector_hint} 龙头公司）\n'
@@ -1012,8 +1032,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_market_overview':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             '- 行业板块走势/估值水平 → westock-mcp: data_sector\n'
             '- 行业市场规模/TAM/CAGR → NeoData(Bash) → search_deep(Bash) 兜底\n'
             '- 券商行业研报 → westock-mcp: data_report → NeoData(Bash)\n'
@@ -1024,24 +1044,62 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
             '- 可比公司估值/财务 → westock-mcp: data_finance\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
-    elif role in ('ic_competitive', 'ic_segment_deep'):
+    elif role == 'ic_competitive':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
-            '- 企业工商/股东/融资 → tyc-mcp: search_companies → call_tool\n'
-            '- 上市公司财务对比 → westock-mcp: data_finance + data_quote\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
+            '- 竞品企业工商/股东/融资 → tyc-mcp: search_companies → call_tool\n'
+            '- 竞品上市公司财务对比 → westock-mcp: data_finance + data_quote\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 竞品最新动态 → 中文实时新闻 tencent_news_search(Bash)；竞品为上市公司时叠加 westock-mcp data_news(symbol="代码", type=3)\n'
-            '- 专利布局/研发能力 → tyc-mcp: call_tool(search_patents)\n'
+            '- 竞品专利布局/研发能力 → tyc-mcp: call_tool(search_patents)\n'
             '- 市场份额/CR3/CR5 → westock-mcp + search_deep(Bash) 交叉验证\n'
             '- **竞品投关记录/管理层表态** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{竞品名} 投关 调研 纪要 竞争 份额") → search 后取 media_id 调 fetch_media_content 读全文\n'
             '- **机构对竞争格局的评价** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 竞争 格局 份额 差异化") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
             '- 通用搜索兜底 → search_deep(Bash)\n\n'
         )
+    elif role == 'ic_segment_deep':
+        return (
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
+            '- 本环节产业链图谱/上下游关系 → westock-mcp: data_industry_chain\n'
+            '- 环节内企业画像/技术能力 → tyc-mcp: search_companies → get_company_capabilities\n'
+            '- 环节内上市公司财务/估值 → westock-mcp: data_finance + data_quote\n'
+            '- 环节内招投标/政府采购订单 → tyc-mcp: search_bids\n'
+            '- 环节内产能/扩产动态 → 中文实时新闻 tencent_news_search(Bash)\n'
+            '- **环节深度研报/利润池拆解** → ima-mcp: search_knowledge(KB="7311568991699459", query="{环节名} 环节 市场空间 竞争格局 利润") → fetch_media_content 读全文\n'
+            '- **机构对环节格局的点评** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{环节名} 格局 集中度 龙头 国产替代") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
+            '- 通用搜索兜底 → search_deep(Bash)\n\n'
+        )
+    elif role == 'ic_tech_landscape':
+        return (
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
+            '- 技术路线全景/成熟度地图 → search_deep(Bash, fetch_top_n) 读全文\n'
+            '- 前沿论文/技术演进 → search_deep(Bash, "arxiv {关键词}", fetch_top_n) 读全文\n'
+            '- 各路线专利布局对比 → tyc-mcp: search_patents\n'
+            '- 各路线代表公司研发投入 → westock-mcp: data_finance\n'
+            '- 技术突破/路线切换动态 → 中文实时新闻 tencent_news_search(Bash)\n'
+            '- **技术路线横评/路线 PK 研报** → ima-mcp: search_knowledge(KB="7311568991699459", query="{技术/行业} 技术路线 对比 横评 优劣势") → fetch_media_content 读全文\n'
+            '- **机构对路线演进/终局的判断** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{行业} 技术路线 演进 终局 主流") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
+            '- 学术/技术搜索可用 search_deep，商业数据仍优先结构化源\n\n'
+        )
+    elif role == 'ic_cross_cutting':
+        return (
+            '⚠️ 数据源路由（跨维度交叉验证，聚焦维度间矛盾与联动，按优先级执行）：\n' +
+            _IMA_BILINGUAL_NOTE +
+            '- 本维度相关数据复核 → westock-mcp: data_finance / data_quote（与前序环节输出交叉）\n'
+            '- 相关公司工商/经营验证 → tyc-mcp: search_companies → call_tool\n'
+            '- 维度间联动的最新动态 → 中文实时新闻 tencent_news_search(Bash)\n'
+            '- **机构对该维度的专题研报** → ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{维度关键词} 影响 传导 联动") → search 后取 media_id 调 fetch_media_content 读全文（Xavier 研报库全文可 fetch）\n'
+            '- **外资/专家非共识观点** → ima-mcp: search_knowledge(KB="7300811407257275", query="{维度关键词}") → 用 introduction 摘要\n'
+            '- 通用搜索兜底 → search_deep(Bash)\n'
+            '- ⚠️ 核心任务：找出本维度与产业链各环节/各路线输出的矛盾点与联动关系，不是重复单环节分析\n\n'
+        )
     elif role in ('ic_tech_product', 'ic_route_deep'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             '- 技术论文/arxiv → search_deep(Bash, "arxiv {关键词}", fetch_top_n) 读全文\n'
             '- 专利检索 → tyc-mcp: search_patents\n'
             '- 产品参数/性能对比 → search_deep(Bash, fetch_top_n) 读全文\n'
@@ -1053,8 +1111,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_supply_chain':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             '- 产业链图谱/环节梳理 → westock-mcp: data_industry_chain\n'
             '- 企业画像/技术能力 → tyc-mcp: search_companies → get_company_capabilities\n'
             '- 招投标/政府采购 → tyc-mcp: search_bids\n'
@@ -1066,8 +1124,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_policy_risk':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             '- 国内政策文件/产业规划 → search_deep(Bash, "site:gov.cn {关键词}")\n'
             '- 企业司法/风险/行政处罚 → tyc-mcp: call_tool（风险扫描类）\n'
             '- 出口管制/制裁清单 → search_deep(Bash, "BIS entity list {关键词}")\n'
@@ -1078,8 +1136,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role in ('ic_unit_economics', 'ic_business_overview'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             '- 公司财务 → westock-mcp: data_finance\n'
             '- 客户/供应商关系 → tyc-mcp: call_tool\n'
             '- 定价/收费模式 → search_deep(Bash, fetch_top_n)（产品官网，读全文）\n'
@@ -1090,8 +1148,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_feasibility':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             '- 学术论文/前沿研究 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文\n'
             '- 实验进展/里程碑 → search_deep(Bash) + 中文实时新闻 tencent_news_search(Bash)\n'
             '- 专利 → tyc-mcp: search_patents\n'
@@ -1101,8 +1159,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role in ('ic_catalyst', 'ic_consensus'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             '- 重大事件/业绩会/并购 → westock-mcp: data_events\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 资金流向/北向持仓 → westock-mcp: data_fund_flow + data_north_holding\n'
@@ -1119,8 +1177,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     else:
         # 通用 fallback
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n'
-            '- ⚠️ IMA 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。自建研报库 001a89fa4b807b92 必须搜两轮：第 1 轮中文（公司/行业中文名），第 2 轮英文（公司英文名或ticker + 行业英文术语 + Goldman Sachs Morgan Stanley JPMorgan），合并去重后再 fetch\n'
+            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
+            _IMA_BILINGUAL_NOTE +
             '- 公司财务/行情/估值 → westock-mcp: data_finance / data_quote\n'
             '- 企业工商/股东/专利 → tyc-mcp: search_companies → call_tool\n'
             '- 行业研报/板块数据 → westock-mcp: data_report / data_sector\n'

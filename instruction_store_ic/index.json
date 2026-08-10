@@ -47,25 +47,83 @@
     "ic_unit_economics": "roles/ic_unit_economics.md",
     "ic_catalyst": "roles/ic_catalyst.md",
     "ic_consensus": "roles/ic_consensus.md",
+    "ic_cross_cutting": "roles/ic_cross_cutting.md",
     "ic_report_synthesizer": "roles/ic_report_synthesizer.md"
   },
   "mcp_connector_authorization": {
     "_comment": "仅控制 WorkBuddy 子代理的 MCP connector 授权。非 MCP 数据源（NeoData/腾讯新闻/yfinance/web_search）通过 Bash 调用，不需要在此声明。完整数据源清单见 _common_tool_guide.md。",
-    "ic_executive_hypothesis": ["westock-mcp"],
-    "ic_market_overview": ["tyc-mcp", "westock-mcp"],
-    "ic_competitive": ["tyc-mcp", "westock-mcp"],
-    "ic_tech_product": ["tyc-mcp", "westock-mcp"],
-    "ic_supply_chain": ["tyc-mcp", "westock-mcp"],
-    "ic_policy_risk": ["tyc-mcp", "westock-mcp"],
-    "ic_segment_deep": ["tyc-mcp", "westock-mcp"],
-    "ic_tech_landscape": ["tyc-mcp", "westock-mcp"],
-    "ic_route_deep": ["tyc-mcp", "westock-mcp"],
-    "ic_business_overview": ["tyc-mcp", "westock-mcp"],
-    "ic_feasibility": ["westock-mcp"],
-    "ic_unit_economics": ["westock-mcp"],
-    "ic_catalyst": ["tyc-mcp", "westock-mcp"],
-    "ic_consensus": ["tyc-mcp", "westock-mcp"],
-    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+    "ic_executive_hypothesis": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_market_overview": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_competitive": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_tech_product": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_supply_chain": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_policy_risk": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_segment_deep": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_tech_landscape": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_route_deep": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_business_overview": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_feasibility": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_unit_economics": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_catalyst": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_consensus": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_report_synthesizer": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ]
   },
   "data_sources": {
     "_comment": "IC 管线全部可用数据源清单。connector 字段标识是否需要 MCP 授权。",

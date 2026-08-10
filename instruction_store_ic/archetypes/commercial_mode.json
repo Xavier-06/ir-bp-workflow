@@ -7,33 +7,48 @@
     {
       "index": 0,
       "name": "投研假说",
-      "steps": ["step_executive_hypothesis"],
+      "steps": [
+        "step_executive_hypothesis"
+      ],
       "parallel": true
     },
     {
       "index": 1,
       "name": "市场与竞争基础",
-      "steps": ["step_market_overview", "step_competitive_landscape", "step_value_chain"],
+      "steps": [
+        "step_market_overview",
+        "step_competitive_landscape",
+        "step_value_chain"
+      ],
       "parallel": true
     },
     {
       "index": 2,
       "name": "单元经济深度",
-      "steps": ["step_unit_economics", "step_customer_analysis", "step_pricing_model"],
+      "steps": [
+        "step_unit_economics",
+        "step_customer_analysis",
+        "step_pricing_model"
+      ],
       "parallel": true,
       "depends_on_wave": 1
     },
     {
       "index": 3,
       "name": "财务与壁垒",
-      "steps": ["step_financial_projection", "step_moat_analysis"],
+      "steps": [
+        "step_financial_projection",
+        "step_moat_analysis"
+      ],
       "parallel": true,
       "depends_on_wave": 2
     },
     {
       "index": 4,
       "name": "统稿",
-      "steps": ["step_master_synthesis"],
+      "steps": [
+        "step_master_synthesis"
+      ],
       "parallel": false,
       "depends_on_wave": 3
     }
@@ -55,22 +70,65 @@
     "step_market_overview": [],
     "step_competitive_landscape": [],
     "step_value_chain": [],
-    "step_unit_economics": ["step_market_overview", "step_competitive_landscape"],
-    "step_customer_analysis": ["step_market_overview"],
-    "step_pricing_model": ["step_competitive_landscape", "step_unit_economics"],
-    "step_financial_projection": ["step_unit_economics", "step_value_chain"],
-    "step_moat_analysis": ["step_unit_economics", "step_competitive_landscape"],
-    "step_master_synthesis": ["step_financial_projection", "step_moat_analysis", "step_pricing_model"]
+    "step_unit_economics": [
+      "step_market_overview",
+      "step_competitive_landscape"
+    ],
+    "step_customer_analysis": [
+      "step_market_overview"
+    ],
+    "step_pricing_model": [
+      "step_competitive_landscape",
+      "step_unit_economics"
+    ],
+    "step_financial_projection": [
+      "step_unit_economics",
+      "step_value_chain"
+    ],
+    "step_moat_analysis": [
+      "step_unit_economics",
+      "step_competitive_landscape"
+    ],
+    "step_master_synthesis": [
+      "step_financial_projection",
+      "step_moat_analysis",
+      "step_pricing_model"
+    ]
   },
   "connector_map": {
-    "ic_executive_hypothesis": ["westock-mcp"],
-    "ic_market_overview": ["tyc-mcp", "westock-mcp"],
-    "ic_competitive": ["tyc-mcp", "westock-mcp"],
-    "ic_supply_chain": ["tyc-mcp", "westock-mcp"],
-    "ic_unit_economics": ["westock-mcp"],
-    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+    "ic_executive_hypothesis": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_market_overview": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_competitive": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_supply_chain": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_unit_economics": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_report_synthesizer": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ]
   },
-  "always_active_steps": ["step_executive_hypothesis", "step_master_synthesis"],
+  "always_active_steps": [
+    "step_executive_hypothesis",
+    "step_master_synthesis"
+  ],
   "step_timeouts": {
     "step_executive_hypothesis": 600,
     "step_unit_economics": 1200,

@@ -7,26 +7,37 @@
     {
       "index": 0,
       "name": "投研假说",
-      "steps": ["step_executive_hypothesis"],
+      "steps": [
+        "step_executive_hypothesis"
+      ],
       "parallel": true
     },
     {
       "index": 1,
       "name": "基础扫描",
-      "steps": ["step_tech_overview", "step_key_players", "step_supply_sketch"],
+      "steps": [
+        "step_tech_overview",
+        "step_key_players",
+        "step_supply_sketch"
+      ],
       "parallel": true
     },
     {
       "index": 2,
       "name": "深度评估",
-      "steps": ["step_feasibility", "step_timeline"],
+      "steps": [
+        "step_feasibility",
+        "step_timeline"
+      ],
       "parallel": true,
       "depends_on_wave": 1
     },
     {
       "index": 3,
       "name": "统稿",
-      "steps": ["step_master_synthesis"],
+      "steps": [
+        "step_master_synthesis"
+      ],
       "parallel": false,
       "depends_on_wave": 2
     }
@@ -45,19 +56,52 @@
     "step_tech_overview": [],
     "step_key_players": [],
     "step_supply_sketch": [],
-    "step_feasibility": ["step_tech_overview", "step_key_players"],
-    "step_timeline": ["step_tech_overview", "step_supply_sketch"],
-    "step_master_synthesis": ["step_feasibility", "step_timeline"]
+    "step_feasibility": [
+      "step_tech_overview",
+      "step_key_players"
+    ],
+    "step_timeline": [
+      "step_tech_overview",
+      "step_supply_sketch"
+    ],
+    "step_master_synthesis": [
+      "step_feasibility",
+      "step_timeline"
+    ]
   },
   "connector_map": {
-    "ic_executive_hypothesis": ["westock-mcp"],
-    "ic_tech_product": ["westock-mcp"],
-    "ic_competitive": ["tyc-mcp", "westock-mcp"],
-    "ic_supply_chain": ["tyc-mcp", "westock-mcp"],
-    "ic_feasibility": ["westock-mcp"],
-    "ic_report_synthesizer": ["tyc-mcp", "westock-mcp"]
+    "ic_executive_hypothesis": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_tech_product": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_competitive": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_supply_chain": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_feasibility": [
+      "westock-mcp",
+      "ima-mcp"
+    ],
+    "ic_report_synthesizer": [
+      "tyc-mcp",
+      "westock-mcp",
+      "ima-mcp"
+    ]
   },
-  "always_active_steps": ["step_executive_hypothesis", "step_master_synthesis"],
+  "always_active_steps": [
+    "step_executive_hypothesis",
+    "step_master_synthesis"
+  ],
   "step_timeouts": {
     "step_executive_hypothesis": 600,
     "step_feasibility": 1200,
