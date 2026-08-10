@@ -12,6 +12,7 @@ STORES = {
     "ir": ROOT / "instruction_store_ir",
     "ic": ROOT / "instruction_store_ic",
     "bp": ROOT / "instruction_store_bp",
+    "lit": ROOT / "instruction_store_lit",
 }
 
 errors: list[str] = []
@@ -56,15 +57,19 @@ def check_store(name: str, store_dir: Path):
     if orphans:
         warnings.append(f"[{name}] 以下 .md 文件不在 index.json 里: {', '.join(sorted(orphans))}")
 
-    # 4. pipeline_bindings 的值必须在 roles 里
+    # 4. pipeline_bindings 的值必须可解析：在 roles 里，或对应 .md 文件存在
+    # （IR launcher 把 bindings 值当文件名直读，两种语义都合法）
     bindings = index.get("pipeline_bindings", {})
     role_keys = {r["key"] for r in roles}
     for pipeline, mapping in bindings.items():
         for step, role_key in mapping.items():
-            if role_key not in role_keys:
-                errors.append(
-                    f"[{name}] pipeline_bindings.{pipeline}.{step} → '{role_key}' 不在 roles 列表中"
-                )
+            if role_key in role_keys:
+                continue
+            if (store_dir / f"{role_key}.md").exists():
+                continue
+            errors.append(
+                f"[{name}] pipeline_bindings.{pipeline}.{step} → '{role_key}' 既不在 roles 列表中，对应 .md 文件也不存在"
+            )
 
     # 5. meta 信息
     meta = index.get("meta", {})

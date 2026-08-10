@@ -51,6 +51,11 @@
       "key": "_shared_output_protocol",
       "name": "IR 共享输出协议",
       "file": "_shared_output_protocol.md"
+    },
+    {
+      "key": "投研_统稿",
+      "name": "统稿 Agent",
+      "file": "ir_统稿.md"
     }
   ],
   "pipeline_bindings": {

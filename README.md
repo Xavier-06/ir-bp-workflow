@@ -548,7 +548,6 @@ ir-bp-workflow/
 ├── instruction_store_ic/                 # IC 角色指令库（16 角色）
 │   ├── index.json                        # archetype → role → file 三级映射
 │   ├── _common_tool_guide.md
-│   ├── ic_research_plan_enrichment.md
 │   ├── roles/                            # 16 个角色指令文件
 │   ├── archetypes/                       # 5 个原型模板 JSON
 │   └── archived/                         # 已归档角色指令（旧版）
