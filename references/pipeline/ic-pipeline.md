@@ -16,13 +16,12 @@ from runtime.entrypoints.run_ic_pipeline_entry import run_ic_job
 result = run_ic_job(job_id=..., entity="半导体", query="行业研究", market="cn")
 ```
 
-## Phase 设计（18 phases, v1.1 升级）
+## Phase 设计（17 phases, v1.6）
 
 | Phase | 名称 | 说明 | 执行模式 |
 |-------|------|------|---------|
 | phase01 | topic_intake | 课题元数据解析（DOCX/MD/JSON） | Python 自动 |
-| phase02 | multi_company_verify | 批量公司工商验证（天眼查MCP） | Python 自动 |
-| phase04a | research_plan | 研究计划子代理派发 (needs_dispatch) | Coordinator 接管 |
+| phase04a | research_plan | 研究计划子代理派发 (needs_dispatch, 含 Step 2 tyc-mcp 关键公司核验) | Coordinator 接管 |
 | phase04b | research_plan_collect | 读取子代理产出 plan，校验落盘 | Python 自动 |
 | phase06 | precompute | 行业规模 + 财务基准预计算 | Python 自动 |
 | phase07 | dispatch_prepare | Wave 派发 (needs_dispatch, sequential) | Coordinator 接管 |
@@ -40,6 +39,7 @@ result = run_ic_job(job_id=..., entity="半导体", query="行业研究", market
 | phase12 | delivery | 对抗验证 + DOCX + 交付 [heavy_bg] | 后台子进程 |
 
 > v1.5: phase03 presearch / phase05 extract 已删除，搜索由 phase04 research_plan 子代理全权执行。
+> v1.6 (2026-08-11): phase02 multi_company_verify 已删除——产物 ic_company_verify.json 全仓零消费方 + 每公司 9 轮搜索串行累积内存被 SIGKILL；工商核验下放 phase04 子代理（自带 tyc-mcp）。对齐 BP v6.0 先例。
 
 ## Wave 编排（6 波，Wave 2-4 动态生成）
 
@@ -155,7 +155,7 @@ cd ~/.workbuddy/ir_runtime && python3 -m runtime.orchestrator.pipeline_orchestra
 ### 默认模式（sequential，避免 API 429）
 
 ```python
-# Phase 0-1.5: 管线自动跑 topic_intake → multi_company_verify → research_plan(子代理派发暂停)
+# Phase 0-1.5: 管线自动跑 topic_intake → research_plan(子代理派发暂停)（v1.6 已无 company_verify）
 # （v1.5: presearch/extract 已删除，搜索由 phase04 research_plan 子代理全权执行）
 python3 -m runtime.orchestrator.pipeline_orchestrator execute --job-id TASK-XXXXX
 # → 先在 phase04_research_plan 暂停（派研究计划子代理），collect 后继续
