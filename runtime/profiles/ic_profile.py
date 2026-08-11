@@ -143,59 +143,11 @@ def _run_topic_intake(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]
     }
 
 
-# ═══════════════════════════════════════════════════════════
-# Phase 0.5: Multi-Company Verify — 批量公司工商验证
-# ═══════════════════════════════════════════════════════════
-
-def _run_multi_company_verify(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any]:
-    """Phase 0.5: 对 query 中提到的公司做批量工商验证（天眼查MCP）。
-
-    如果没有提供具体公司名，则跳过。
-    """
-    tasks_dir = runtime_root / "data" / "tasks"
-    scope_path = tasks_dir / f"{job_ctx.job_id}-ic_scope.json"
-
-    company_list = []
-    if scope_path.exists():
-        scope = json.loads(scope_path.read_text(encoding="utf-8"))
-        company_list = scope.get("company_list", [])
-
-    if not company_list:
-        return {
-            "ok": True,
-            "mode": "skipped",
-            "phase": "phase02_multi_company_verify",
-            "job_id": job_ctx.job_id,
-            "result": {"message": "No companies to verify", "verified_count": 0},
-        }
-
-    # 调用 ir_company_verify 做批量验证
-    verified = []
-    for company in company_list:
-        try:
-            from scripts.ir_company_verify import run as run_verify
-            result = run_verify(
-                task_id=job_ctx.job_id,
-                entity=company,
-                market=job_ctx.market,
-            )
-            verified.append({"company": company, "result": result})
-        except Exception as e:
-            verified.append({"company": company, "error": str(e)})
-
-    verify_path = tasks_dir / f"{job_ctx.job_id}-ic_company_verify.json"
-    verify_path.write_text(
-        json.dumps(verified, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
-    )
-
-    return {
-        "ok": True,
-        "mode": "multi_company_verify",
-        "phase": "phase02_multi_company_verify",
-        "job_id": job_ctx.job_id,
-        "result": {"verified_count": len(verified), "companies": verified},
-    }
-
+# [v1.6] phase02_multi_company_verify 已删除 (2026-08-11):
+# ① 产物 ic_company_verify.json 全仓零消费方（与 BP v6.0 删 phase02_company_verify 同理）；
+# ② IC 课题公司多为知名上市公司/独角兽，验证无增量价值；
+# ③ 每公司 9 轮搜索 × N 公司，串行累积内存导致进程被 SIGKILL；
+# ④ 公司工商核验职责下放给 phase04 research_plan 子代理（自带 tyc-mcp），按需核验。
 
 # [v1.5] phase03_presearch 已删除: 子代理全权搜索, 脚本presearch无用
 
@@ -1516,7 +1468,7 @@ class ICProfile(PipelineProfile):
 
         all_handlers = {
             "phase01_topic_intake": lambda job_ctx: _run_topic_intake(runtime_root, job_ctx),
-            "phase02_multi_company_verify": lambda job_ctx: _run_multi_company_verify(runtime_root, job_ctx),
+            # [v1.6] phase02_multi_company_verify 已删除: 零消费方+进程OOM, 工商核验下放 phase04 子代理
             # [v1.5] phase03_presearch + phase03b_extract 已删除: 子代理全权搜索
             "phase04_research_plan": lambda job_ctx: _run_research_plan(runtime_root, job_ctx),
             "phase04_research_plan_collect": lambda job_ctx: _run_research_plan_collect(runtime_root, job_ctx),
@@ -1574,7 +1526,7 @@ class ICProfile(PipelineProfile):
         """
         return {
             "phase01_topic_intake": ["ic_topic_metadata.json"],
-            "phase02_multi_company_verify": [],
+            # [v1.6] phase02_multi_company_verify 已删除
             "phase04_research_plan": [],  # 子代理直接生成 plan
             "phase04_research_plan_collect": ["{task_id}-ic_research_plan.json"],
             "phase06_precompute": [],
