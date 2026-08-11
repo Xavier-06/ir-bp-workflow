@@ -58,7 +58,12 @@ MIN_PROMPT_LENGTH = 200
 # ═══════════════════════════════════════════════════════════
 
 def _load_instruction_prompts(runtime_root: Path | None = None, force_reload: bool = False) -> dict[str, str]:
-    """Hot-load all active role prompts from instruction_store_ic/ with mtime cache."""
+    """Hot-load all active role prompts from instruction_store_ic/ with mtime cache.
+
+    v2（2026-08-11）: index.json v3 将角色注册从 `roles` 数组迁移到 `role_files`
+    字典（role_key -> 相对路径）。旧 loader 读 `roles` 导致所有角色 prompt 加载为
+    "UNKNOWN ROLE"，此处改为读 `role_files`，并保留对旧 `roles` 数组的兼容回退。
+    """
     global _INSTRUCTION_STORE_CACHE, _INSTRUCTION_STORE_MTIME
     root = runtime_root or ROOT
     store_dir = root / "instruction_store_ic"
@@ -73,13 +78,27 @@ def _load_instruction_prompts(runtime_root: Path | None = None, force_reload: bo
     except Exception:
         return _INSTRUCTION_STORE_CACHE or {}
     prompts = {}
-    for role in index.get("roles", []):
-        key = role.get("key", "")
-        if key not in IC_TOPIC_ACTIVE_ROLES:
+    # topic 管线 slug 与 role_files 键名不一致时的别名映射（topic 用独立 slug，共享指令文件）
+    _ROLE_KEY_ALIASES = {"ic_competitive_landscape": "ic_competitive"}
+    # v3 格式：role_files 字典 {role_key: "roles/xxx.md"}
+    role_files = index.get("role_files") or {}
+    for key in IC_TOPIC_ACTIVE_ROLES:
+        lookup_key = key if key in role_files else _ROLE_KEY_ALIASES.get(key, key)
+        rel = role_files.get(lookup_key)
+        if not rel:
             continue
-        path = store_dir / role.get("file", "")
+        path = store_dir / rel
         if path.exists():
             prompts[key] = path.read_text(encoding="utf-8")
+    # 兼容回退：旧 roles 数组格式
+    if not prompts:
+        for role in index.get("roles", []):
+            key = role.get("key", "")
+            if key not in IC_TOPIC_ACTIVE_ROLES:
+                continue
+            path = store_dir / role.get("file", "")
+            if path.exists():
+                prompts[key] = path.read_text(encoding="utf-8")
     _INSTRUCTION_STORE_CACHE = prompts
     _INSTRUCTION_STORE_MTIME = current_mtime
     return prompts

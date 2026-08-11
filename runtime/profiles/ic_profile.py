@@ -575,7 +575,7 @@ def _run_evidence_gate(runtime_root: Path, job_ctx: JobContext) -> dict[str, Any
                 f"  - team_name = 'ic-{{task_id}}'\n"
                 f"  - mode = 'bypassPermissions'\n"
                 f"  - prompt = manifest's 'system_prompt' field (COMPLETE)\n"
-                f"  - connectorIds = ['westock-mcp', 'tyc-mcp']\n\n"
+                f"  - connectorIds = ['westock-mcp', 'tyc-mcp', 'ima-mcp']\n\n"
                 f"子代理修复完成后，用 start_phase='phase09_evidence_gate' 恢复管线。\n"
                 + (f"\n⚠️ has_more=True: 还有 {len(failed_steps)-1} 个 step 待修复，恢复后会返回下一个 manifest。\n"
                    if has_more else "\n✅ 这是最后一个待修复 step，恢复后推进到 fact_store_merge。\n")
@@ -1260,8 +1260,8 @@ Agent tool 参数：
 - name = 'ic-research-planner'
 - team_name = 'ic-{job_ctx.job_id}'
 - mode = 'bypassPermissions'
-- subagent_type = 'general-purpose'（⚠️ 必须！子代理需要 westock-mcp/tyc-mcp 搜索能力，code-explorer 等受限类型会静默失败导致 plan 缺失）
-- connectorIds = ['westock-mcp', 'tyc-mcp']
+- subagent_type = 'general-purpose'（⚠️ 必须！子代理需要 westock-mcp/tyc-mcp/ima-mcp 搜索能力，code-explorer 等受限类型会静默失败导致 plan 缺失）
+- connectorIds = ['westock-mcp', 'tyc-mcp', 'ima-mcp']
 - prompt = 下面的完整 prompt
 
 ### 子代理 Prompt:
@@ -1286,6 +1286,20 @@ Agent tool 参数：
 - 从 brief 中读取 key_companies 列表, 逐个搜索
 - 对每个公司: tyc-mcp.search_companies -> get_company_basic_profile
 - 记录: 注册资本、成立日期、经营范围、股东、融资历史、与课题的相关性
+
+### Step 2.5: IMA 研报库 (ima-mcp，定盘星主源)
+
+研报类内容（行业空间/共识/预期差/竞争格局/机构判断）以 IMA 自建研报库为第一优先来源：
+
+- **主库 自建研报库 `001a89fa4b807b92`**（投行/券商研报全文可 fetch）：
+  - 中文轮: search_knowledge(KB="001a89fa4b807b92", query="{entity} 行业 共识 预期 投资逻辑 竞争格局 研报")
+  - 英文轮: search_knowledge(KB="001a89fa4b807b92", query="{entity} industry consensus outlook Goldman Sachs Morgan Stanley JPMorgan")（entity 换成英文行业名/ticker）
+  - ⚠️ IMA 跨语言能力极弱，中英两轮结果几乎零重叠，必须各搜一轮再合并去重
+- **行业深度库 `7311568991699459`**：search_knowledge(KB="7311568991699459", query="{entity} 行业深度 市场规模 TAM 产业链")
+- **硬规则**：
+  - **至少 5 篇全文**：从两轮搜索结果中挑最相关的，逐篇 fetch_media_content 读全文，不少于 5 篇
+  - **只采纳最近 3 个月内的研报**：研报库按周分文件夹（如 2026-08-04~2026-08-10/），超窗口的只作背景参考、不进证据链
+  - 每篇引用标注库名+标题+投行名+日期，3 个月窗口判断以研报日期为准
 
 ### Step 3: Web 全量搜索（结构化源优先，search_deep 兜底，中英双语）
 
@@ -1391,7 +1405,7 @@ brief 中的 `research_content` 列表定义了课题的具体研究方向。你
         "dispatch_info": {
             "brief_path": str(brief_path),
             "subagent_type": "general-purpose",
-            "subagent_connector_ids": ["westock-mcp", "tyc-mcp"],
+            "subagent_connector_ids": ["westock-mcp", "tyc-mcp", "ima-mcp"],
             "task_dir": str(tasks_dir),
         },
         "instruction": instruction,

@@ -68,6 +68,21 @@ _IMA_BILINGUAL_NOTE = (
     "合并去重后再 fetch\n"
 )
 
+# ── IMA 主力化硬规则（v2.5 新增：≥5篇全文 + 最近3个月窗口）──
+# ⚠️ 修改此处即全局生效，禁止在各分支内手抄副本。
+_IMA_MAINFORCE_RULE = (
+    "- ⚠️ IMA 全文硬配额（强制）：每个 step 至少 fetch 5 篇 IMA 研报全文"
+    "（fetch_media_content，从双语合并结果中挑最相关的前 5 篇；不足 5 篇时有多少读多少，"
+    "并从行业深度库 7311568991699459 / 白皮书库 7302509206984644 / 专家纪要库 7300811407257275 补足）——"
+    "只拿 search 摘要不读全文视为未完成搜索\n"
+    "- ⚠️ IMA 时效窗口（强制）：只采纳最近 3 个月内的研报/纪要作为证据——研报库按周分文件夹"
+    "（如 2026-08-04~2026-08-10/），以研报日期判断；超窗口的仅作背景参考，不进入证据链、不作引用\n"
+    "- ⚠️ IMA 引用格式：每条引用必须标注库名+标题+投行名+日期，日期用于核验 3 个月窗口\n"
+)
+
+# 组合常量：分支统一引用 _IMA_RULES
+_IMA_RULES = _IMA_BILINGUAL_NOTE + _IMA_MAINFORCE_RULE
+
 
 def _load_tool_guide(runtime_root: Path | None = None) -> str:
     """热加载 instruction_store_ic/_common_tool_guide.md（mtime 缓存）。"""
@@ -1020,8 +1035,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     )
     if role == 'ic_executive_hypothesis':
         return (
-            f'⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            f'⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             f'- 行业板块走势/估值 → westock-mcp: data_sector（查 {sector_hint} 板块）\n'
             f'- 最新行业动态 → 中文实时新闻 tencent_news_search（Bash 调用，见 System Prompt 工具指南）\n'
             f'- 龙头公司实时估值锚 → westock-mcp: data_quote（查 {sector_hint} 龙头公司）\n'
@@ -1032,8 +1047,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_market_overview':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 行业板块走势/估值水平 → westock-mcp: data_sector\n'
             '- 行业市场规模/TAM/CAGR → NeoData(Bash) → search_deep(Bash) 兜底\n'
             '- 券商行业研报 → westock-mcp: data_report → NeoData(Bash)\n'
@@ -1046,8 +1061,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_competitive':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 竞品企业工商/股东/融资 → tyc-mcp: search_companies → call_tool\n'
             '- 竞品上市公司财务对比 → westock-mcp: data_finance + data_quote\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
@@ -1060,8 +1075,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_segment_deep':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 本环节产业链图谱/上下游关系 → westock-mcp: data_industry_chain\n'
             '- 环节内企业画像/技术能力 → tyc-mcp: search_companies → get_company_capabilities\n'
             '- 环节内上市公司财务/估值 → westock-mcp: data_finance + data_quote\n'
@@ -1073,8 +1088,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_tech_landscape':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 技术路线全景/成熟度地图 → search_deep(Bash, fetch_top_n) 读全文\n'
             '- 前沿论文/技术演进 → search_deep(Bash, "arxiv {关键词}", fetch_top_n) 读全文\n'
             '- 各路线专利布局对比 → tyc-mcp: search_patents\n'
@@ -1086,8 +1101,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_cross_cutting':
         return (
-            '⚠️ 数据源路由（跨维度交叉验证，聚焦维度间矛盾与联动，按优先级执行）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（跨维度交叉验证，聚焦维度间矛盾与联动；研报/机构观点类内容以 IMA 为主力源；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 本维度相关数据复核 → westock-mcp: data_finance / data_quote（与前序环节输出交叉）\n'
             '- 相关公司工商/经营验证 → tyc-mcp: search_companies → call_tool\n'
             '- 维度间联动的最新动态 → 中文实时新闻 tencent_news_search(Bash)\n'
@@ -1098,8 +1113,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role in ('ic_tech_product', 'ic_route_deep'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 技术论文/arxiv → search_deep(Bash, "arxiv {关键词}", fetch_top_n) 读全文\n'
             '- 专利检索 → tyc-mcp: search_patents\n'
             '- 产品参数/性能对比 → search_deep(Bash, fetch_top_n) 读全文\n'
@@ -1111,8 +1126,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_supply_chain':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 产业链图谱/环节梳理 → westock-mcp: data_industry_chain\n'
             '- 企业画像/技术能力 → tyc-mcp: search_companies → get_company_capabilities\n'
             '- 招投标/政府采购 → tyc-mcp: search_bids\n'
@@ -1124,8 +1139,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_policy_risk':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 国内政策文件/产业规划 → search_deep(Bash, "site:gov.cn {关键词}")\n'
             '- 企业司法/风险/行政处罚 → tyc-mcp: call_tool（风险扫描类）\n'
             '- 出口管制/制裁清单 → search_deep(Bash, "BIS entity list {关键词}")\n'
@@ -1136,8 +1151,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role in ('ic_unit_economics', 'ic_business_overview'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 公司财务 → westock-mcp: data_finance\n'
             '- 客户/供应商关系 → tyc-mcp: call_tool\n'
             '- 定价/收费模式 → search_deep(Bash, fetch_top_n)（产品官网，读全文）\n'
@@ -1148,8 +1163,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role == 'ic_feasibility':
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 学术论文/前沿研究 → search_deep(Bash, "arxiv ...", fetch_top_n) 读全文\n'
             '- 实验进展/里程碑 → search_deep(Bash) + 中文实时新闻 tencent_news_search(Bash)\n'
             '- 专利 → tyc-mcp: search_patents\n'
@@ -1159,8 +1174,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
         )
     elif role in ('ic_catalyst', 'ic_consensus'):
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 重大事件/业绩会/并购 → westock-mcp: data_events\n'
             '- 机构评级/一致预期 → westock-mcp: data_rating\n'
             '- 资金流向/北向持仓 → westock-mcp: data_fund_flow + data_north_holding\n'
@@ -1177,8 +1192,8 @@ def _build_inline_data_source_guide(role: str, step: str, entity: str = "") -> s
     else:
         # 通用 fallback
         return (
-            '⚠️ 数据源路由（按优先级执行，结构化源优先，IMA 与结构化源并行不是兜底）：\n' +
-            _IMA_BILINGUAL_NOTE +
+            '⚠️ 数据源路由（研报/机构观点类内容以 IMA 为主力源，结构化源供实时数据与精确字段；按优先级执行）：\n' +
+            _IMA_RULES +
             '- 公司财务/行情/估值 → westock-mcp: data_finance / data_quote\n'
             '- 企业工商/股东/专利 → tyc-mcp: search_companies → call_tool\n'
             '- 行业研报/板块数据 → westock-mcp: data_report / data_sector\n'

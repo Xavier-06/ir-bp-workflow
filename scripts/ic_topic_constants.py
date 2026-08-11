@@ -18,11 +18,15 @@ IC_TOPIC_TYC_CONNECTOR_IDS = ['tyc-mcp']
 # westock-mcp: A/HK/美股行情、财务、板块、产业链、机构评级、券商研报
 IC_TOPIC_WESTOCK_CONNECTOR_IDS = ['westock-mcp']
 
+# ── 研报/机构观点知识库 Connector IDs（IMA） ──────────────────
+# ima-mcp: 自建研报库 001a89fa4b807b92 等，研报/机构观点类内容主力源（2026-08-11 v2.5 接入）
+IC_TOPIC_IMA_CONNECTOR_IDS = ['ima-mcp']
+
 # ⚠️ tdx-connector(通达信) / qcc-company(企查查) 当前环境不可用，已剔除
 
-# ── 所有 IC 子代理统一授权双源 ────────────────────────────
-IC_TOPIC_CONNECTOR_IDS = IC_TOPIC_TYC_CONNECTOR_IDS + IC_TOPIC_WESTOCK_CONNECTOR_IDS
-# = ['tyc-mcp', 'westock-mcp']
+# ── 所有 IC 子代理统一授权三源 ────────────────────────────
+IC_TOPIC_CONNECTOR_IDS = IC_TOPIC_TYC_CONNECTOR_IDS + IC_TOPIC_WESTOCK_CONNECTOR_IDS + IC_TOPIC_IMA_CONNECTOR_IDS
+# = ['tyc-mcp', 'westock-mcp', 'ima-mcp']
 
 # ── Wave 1: 基础扫描（3 角色，数据独立，sequential has_more） ─
 IC_TOPIC_WAVE1_ROLE_SLUGS: dict[str, str] = {
