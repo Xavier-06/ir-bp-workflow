@@ -13,20 +13,13 @@ import re
 from pathlib import Path
 from typing import Any
 
-# Dimension classification (generic, based on slug keywords)
-_DIMENSION_ROLES = {
-    "company_team_compliance": "团队与合规",
-    "product_commercial": "产品商业化",
-    "tech_ip_moat": "技术与壁垒",
-    "market_supply_chain": "市场与供应链",
-    "competition_positioning": "竞争定位",
-    "valuation_return": "估值与回报",
-    "dealbreaker_risk": "Deal Breaker 风险",
-}
+# Dimension classification — data-driven from instruction_store_bp/index.json
+# (no hard-coded label table; see bp_utils.dimension_label)
+from scripts.bp_utils import dimension_label
 
 
 def _slug_to_label(slug: str) -> str:
-    return _DIMENSION_ROLES.get(slug, slug.replace("_", " ").title())
+    return dimension_label(slug)
 
 
 def _extract_verdict_block(text: str) -> dict[str, str]:

@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 import re
 
+from scripts.bp_utils import dimension_label
+
 
 def _load_json(path: Path, default: Any) -> Any:
     if not path.exists():
@@ -237,8 +239,14 @@ def _answers(packages: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _module_name(package: dict[str, Any]) -> str:
-    title = str(package.get("section_title") or package.get("section_id") or "综合尽调").strip()
-    return re.sub(r"^bp[_-]", "", title)
+    title = str(package.get("section_title") or "").strip()
+    if title:
+        return re.sub(r"^bp[_-]", "", title)
+    # 无中文标题时，用 section_id 解析出中文角色名（数据驱动，禁止裸英文 slug 进成品）
+    slug = str(package.get("section_id") or "").strip()
+    if slug:
+        return dimension_label(slug)
+    return "综合尽调"
 
 
 def _compact_text(value: Any, limit: int = 90) -> str:
