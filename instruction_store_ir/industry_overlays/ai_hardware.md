@@ -26,7 +26,7 @@
 
 ## MCP 优先调用
 - westock-mcp.data_finance → 出货量/ASP（如已披露）
-- IMA Xavier 研报库 → 大行机器人产业链深度（BOM拆解/量产指引）
+- IMA 研报库 → 大行机器人产业链深度（BOM拆解/量产指引）
 
 ## 估值范式倾向
 - 未量产 → preprofit_growth（PS + TAM 份额）

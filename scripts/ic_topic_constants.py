@@ -19,7 +19,7 @@ IC_TOPIC_TYC_CONNECTOR_IDS = ['tyc-mcp']
 IC_TOPIC_WESTOCK_CONNECTOR_IDS = ['westock-mcp']
 
 # ── 研报/机构观点知识库 Connector IDs（IMA） ──────────────────
-# ima-mcp: 自建研报库 001a89fa4b807b92 等，研报/机构观点类内容主力源（2026-08-11 v2.5 接入）
+# ima-mcp: 共享研报库 7498615127803592 等，研报/机构观点类内容主力源（2026-08-11 v2.5 接入）
 IC_TOPIC_IMA_CONNECTOR_IDS = ['ima-mcp']
 
 # ⚠️ tdx-connector(通达信) / qcc-company(企查查) 当前环境不可用，已剔除

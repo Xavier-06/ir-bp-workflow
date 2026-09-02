@@ -112,9 +112,9 @@ FOR each company in target_companies:
   14. WebSearch: 公司名 + CEO/CTO → 管理层背景
   
   ── IMA 机构视角（与 Step 2-14 并行，不是兜底） ──
-  15. ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司名} 研报 投关 调研 纪要") → 取最相关 1-3 篇 fetch_media_content 读全文（自建研报库全文可取）
-  16. ima-mcp: search_knowledge(KB="001a89fa4b807b92", query="{公司名} 点评 投资 风险 研报") → 取最相关 1-3 篇 fetch_media_content 读全文
-  16b. ⚠️ 中英双语搜索（强制）：IMA 检索跨语言能力极弱，中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头）。自建研报库须再搜一轮英文（"{公司英文名或ticker} company review investment"），与 15/16 结果合并去重后再 fetch
+  15. ima-mcp: search_knowledge(KB="7498615127803592", query="{公司名} 研报 投关 调研 纪要") → 取最相关 1-3 篇 fetch_media_content 读全文（共享研报库全文可取）
+  16. ima-mcp: search_knowledge(KB="7498615127803592", query="{公司名} 点评 投资 风险 研报") → 取最相关 1-3 篇 fetch_media_content 读全文
+  16b. ⚠️ 中英双语搜索（强制）：IMA 检索跨语言能力极弱，中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头）。共享研报库须再搜一轮英文（"{公司英文名或ticker} company review investment"），与 15/16 结果合并去重后再 fetch
   
   ── 交叉验证 ──
   17. TYC 融资数据 vs NeoData 研报估值 vs WebSearch 新闻 vs IMA 机构观点 → 四方交叉验证

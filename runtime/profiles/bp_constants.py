@@ -14,9 +14,9 @@ BP_TYC_CONNECTOR_IDS = ['tyc-mcp']
 BP_WESTOCK_CONNECTOR_IDS = ['westock-mcp']
 
 # IMA 知识库 MCP connector ID 列表 —— 投研研报全文提取
-# v4.8（2026-07-27）：主力源升级为用户Xavier 研报库（投行/券商研报全文可 fetch），
+# v4.8（2026-07-27）：主力源升级为共享研报库（投行/券商研报全文可 fetch），
 # 删除长安投研(7297585010204027) + 公司调研报告(7302533890465245)（仅摘要，库主禁止导出）
-# KB IDs: Xavier 研报库(001a89fa4b807b92) / 行研智库(7311568991699459) /
+# KB IDs: 研报库(7498615127803592) / 行研智库(7311568991699459) /
 #         机构调研纪要(7300811407257275) / 精选行业数据报告(7302509206984644)
 BP_IMA_CONNECTOR_IDS = ['ima-mcp']
 
@@ -25,15 +25,15 @@ BP_IMA_CONNECTOR_IDS = ['ima-mcp']
 # 导致兜底搜索时拿不到 westock 结构化数据与 IMA 研报库全文。
 BP_FULL_CONNECTOR_IDS = BP_TYC_CONNECTOR_IDS + BP_WESTOCK_CONNECTOR_IDS + BP_IMA_CONNECTOR_IDS
 
-# IMA 知识库 ID 映射 —— v4.8：Xavier 研报库为主力源（全文可 fetch），3 个订阅库为补充
+# IMA 知识库 ID 映射 —— v4.8：研报库为主力源（全文可 fetch），3 个订阅库为补充
 IMA_KB_IDS = {
-    "self_built_research": "001a89fa4b807b92",    # ★主力源：用户Xavier 研报库（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报，全文可 fetch，按周分文件夹，03_投行报告=大行研报）
+    "self_built_research": "7498615127803592",    # ★主力源：共享研报库（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报，全文可 fetch，按周分文件夹，03_投行报告=大行研报）
     "industry_reports": "7311568991699459",       # 行研智库 3786篇（券商行业深度，全文可 fetch）
     "institutional_notes": "7300811407257275",    # 机构调研纪要 33331篇（NOTE 类型可 fetch）
     "curated_reports": "7302509206984644",        # 精选行业数据报告 1442篇（第三方白皮书，全文可 fetch）
 }
 
-# 角色 → IMA 知识库路由 —— v4.8：所有角色第一优先搜Xavier 研报库，辅以 1-2 个订阅库
+# 角色 → IMA 知识库路由 —— v4.8：所有角色第一优先搜研报库，辅以 1-2 个订阅库
 IMA_ROLE_KB_MAP = {
     "bp_company_team_compliance":  ["self_built_research", "institutional_notes"],
     "bp_product_commercial":       ["self_built_research", "industry_reports"],

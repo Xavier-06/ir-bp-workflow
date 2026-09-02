@@ -42,7 +42,7 @@ Coordinator 不需要轮询 bg_pid，但 Bash 必须设 `timeout=600000`（否�
 ## Research Plan（phase04，v3.2 起子代理唯一产出）
 
 - **指令库**：`instruction_store_ir/ir_research_plan.md`（ir_profile 读模板 + token 替换渲染）
-- **Step 0.5 大行研报骨架（最高优先级）**：IMA 自建研报库 `001a89fa4b807b92`，
+- **Step 0.5 大行研报骨架（最高优先级）**：IMA 共享研报库 `7498615127803592`，
   搜 GS/MS/JPM/Citi/HSBC/UBS/BofA/Bernstein 最新研报 → fetch 全文 → 解析为
   `{task_id}-benchmark_skeleton.json`（key_debates/财务预测/估值方法/情景分析）
 - **Step 0.6 market_anchor**：市场共识锚（一致预期/目标价/隐含假设，研报时效 ≤30 天铁律）

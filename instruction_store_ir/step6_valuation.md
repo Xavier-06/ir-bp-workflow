@@ -517,7 +517,7 @@ cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py calc --expr 
 
 ### 本 step 补搜要点
 - 可比公司估值指标：yfinance（当前股价/市值/PE/PS/EPS/β）或 NeoData api 交叉
-- 分析师目标价/DCF 参数/新兴业务收入 → NeoData doc + IMA Xavier 研报库
+- 分析师目标价/DCF 参数/新兴业务收入 → NeoData doc + IMA 研报库
 - 可比公司估值必须有市值和对应倍数来源
 
 ---

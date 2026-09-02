@@ -25,7 +25,7 @@
 
 ## MCP 优先调用
 - westock-mcp.data_finance → 交付量/ASP/毛利率（如已披露）
-- IMA Xavier 研报库 → 大行车企深度（单车经济/智驾竞争）
+- IMA 研报库 → 大行车企深度（单车经济/智驾竞争）
 
 ## 估值范式倾向
 - 未盈利新势力 → preprofit_growth（PS + 交付量×ASP 爬坡）

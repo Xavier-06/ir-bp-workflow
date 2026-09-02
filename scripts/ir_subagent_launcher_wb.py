@@ -502,7 +502,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'### 补搜工具使用指南',
         f'',
         f'数据源路由以本次派发 prompt 中的「数据源路由（强制）」表为准（含 westock-mcp / NeoData / yfinance / 天眼查 / IMA 研报库 KB ID / search_deep 的完整路由与调用方式）。',
-        f'核心原则：结构化源优先——行情/财务/研报/板块/产业链走 westock-mcp（MCP 直调），研报深度走 NeoData doc + IMA Xavier 研报库，工商/司法走天眼查；search_deep(Bash) 仅作突发新闻和长尾兜底。禁止只用通用搜索做所有搜索。',
+        f'核心原则：结构化源优先——行情/财务/研报/板块/产业链走 westock-mcp（MCP 直调），研报深度走 NeoData doc + IMA 研报库，工商/司法走天眼查；search_deep(Bash) 仅作突发新闻和长尾兜底。禁止只用通用搜索做所有搜索。',
         f'',
         f'### ⏰ 数据时效性硬要求（最高优先级，违反即任务失败）',
         f'',
@@ -511,7 +511,7 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'2. search_deep(Bash, "{entity} {{YYYY}}年{{M}}月 最新动态") — web 长尾补充',
         f'3. search_deep(Bash, "{entity} latest news {{YYYY}}") — 英文视角补充',
         f'4. 如涉及产品/技术: search_deep(Bash, "{{product}} 最新版本 发布 {{YYYY}}") — 锁定当前版本',
-        f'5. 年报/定期报告原文: westock-mcp `data_news(symbol="代码", type=0)`（type=0 公告原文）或 IMA Xavier 研报库 fetch 全文——禁止用 search_deep 在 web 上瞎捞年报',
+        f'5. 年报/定期报告原文: westock-mcp `data_news(symbol="代码", type=0)`（type=0 公告原文）或 IMA 研报库 fetch 全文——禁止用 search_deep 在 web 上瞎捞年报',
         f'',
         f'**搜索 query 必须含时间锚点：**',
         f'- ❌ "腾讯 AI 大模型" → ✅ "腾讯 混元 最新模型 2026年7月"',
@@ -569,9 +569,9 @@ def build_step_brief(task_id: str, step: str, entity: str = '', query: str = '')
         f'   - 目的: 先知道"最新"是什么，后续分析才不会引用过期信息',
         f'   - 四层组合: westock-mcp(结构化) → 腾讯新闻(分钟级) → NeoData doc(深度) → search_deep(兜底)',
         f'1. **第一轮：IMA 研报库深度扫描（最高优先级，不可跳过）**',
-        f'   - ★Xavier 研报库（投行研报全文，第一优先）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{entity} 行业 竞争格局 估值")`',
+        f'   - ★研报库（投行研报全文，第一优先）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="7498615127803592", query="{entity} 行业 竞争格局 估值")`',
         f'   - 行研智库（行业深度/TAM）: `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{{行业}} 市场规模 TAM 竞争格局")`',
-        f'   - search 命中后取最相关 5-8 篇 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")` 逐篇读全文（Xavier 研报库/行研智库/精选报告均可 fetch，放开拉，宁多勿少）',
+        f'   - search 命中后取最相关 5-8 篇 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")` 逐篇读全文（研报库/行研智库/精选报告均可 fetch，放开拉，宁多勿少）',
         f'   - 时间过滤: 只拉最近 3 个月内的投行研报——超 3 个月的参考意义不大，跳过（标题含日期如 -260703.pdf，据此判断），大行优先（GS/MS/JPM/BofA/Citi/UBS/Bernstein）',
         f'   - ⚠️ 行业分析/竞争格局/投资逻辑类查询必须搜 IMA——公开 web 搜不到的增量信息，跳过即视为质量不合格',
         f'2. **第二轮：westock-mcp 结构化数据（行情/财务/研报/板块/产业链，MCP 直调）**',
@@ -1658,17 +1658,17 @@ def launch_next_wave(task_id: str, entity: str = '', query: str = '', market: st
             f'| 美股估值/财务 | **yfinance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "import yfinance as yf; print(yf.Ticker(\\"AAPL\\").info)"` | westock-mcp → search_deep(Bash) |\n'
             f'| **美股英文新闻/earnings/分析师动态** | **Yahoo Finance** | Bash: `cd ~/.workbuddy/ir_runtime && python3 -c "from scripts.search_gateway import _yahoo_search; import json; print(json.dumps(_yahoo_search(\\"NVDA earnings\\", max_results=5), ensure_ascii=False))"` | search_deep(Bash) |\n'
             f'| 学术论文/政策文件/英文技术文档 | **search_deep(Bash, fetch_top_n)** | Bash 调用，自动抓全文 | — |\n\n'
-            f'⚠️ IMA 知识库使用提示（ima-mcp，已授权，直接调用，v4.8 Xavier 研报库为主力源）：\n'
-            f'- KB ID 速查：★Xavier 研报库(投行/券商研报全文)=001a89fa4b807b92 | 机构调研纪要=7300811407257275 | 行研智库=7311568991699459 | 精选报告=7302509206984644\n'
-            f'- ★所有搜索第一优先「Xavier 研报库」001a89fa4b807b92（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报，全文可 fetch）\n'
-            f'- 行业深度/TAM/竞争格局 → 「Xavier 研报库」+「行研智库」\n'
-            f'- 公司基本面/估值/目标价方法论 → 「Xavier 研报库」\n'
-            f'- 机构观点/电话会纪要/外资视角 → 「Xavier 研报库」+「机构调研纪要」\n'
+            f'⚠️ IMA 知识库使用提示（ima-mcp，已授权，直接调用，v4.8 研报库为主力源）：\n'
+            f'- KB ID 速查：★研报库(投行/券商研报全文)=7498615127803592 | 机构调研纪要=7300811407257275 | 行研智库=7311568991699459 | 精选报告=7302509206984644\n'
+            f'- ★所有搜索第一优先「研报库」7498615127803592（GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报，全文可 fetch）\n'
+            f'- 行业深度/TAM/竞争格局 → 「研报库」+「行研智库」\n'
+            f'- 公司基本面/估值/目标价方法论 → 「研报库」\n'
+            f'- 机构观点/电话会纪要/外资视角 → 「研报库」+「机构调研纪要」\n'
             f'- 时间过滤：只拉最近 3 个月内的投行研报，超 3 个月参考意义不大直接跳过（标题含日期如 -260703.pdf），大行优先\n'
-            f'- ⚠️ 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。Xavier 研报库必须搜两轮：第 1 轮中文（"{{中文公司名}} {{行业}} 目标价 估值"）+ 第 2 轮英文（"{{公司英文名或ticker}} {{行业英文术语}} Goldman Sachs Morgan Stanley JPMorgan"），合并去重后再 fetch\n'
+            f'- ⚠️ 中英双语搜索（强制）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。研报库必须搜两轮：第 1 轮中文（"{{中文公司名}} {{行业}} 目标价 估值"）+ 第 2 轮英文（"{{公司英文名或ticker}} {{行业英文术语}} Goldman Sachs Morgan Stanley JPMorgan"），合并去重后再 fetch\n'
             f'- 每个查询建议搜 2-3 个 KB，取交叉验证后的高价值信息；全文提取 search→fetch_media_content\n'
             f'- 脚注格式：IMA知识库 — {{KB名称}} — "{{文档标题}}" (检索日期)\n'
-            f'- ⚠️ fetch权限(v4.8)：★Xavier 研报库/行研智库/精选报告=100%可fetch全文→search后取media_id调fetch_media_content | 机构调研纪要=仅NOTE可fetch(失败用intro摘要)\n\n'
+            f'- ⚠️ fetch权限(v4.8)：★研报库/行研智库/精选报告=100%可fetch全文→search后取media_id调fetch_media_content | 机构调研纪要=仅NOTE可fetch(失败用intro摘要)\n\n'
             f'⚠️ 禁止行为：\n'
             f'- 禁止用通用搜索搜公司财务数据（用 westock-mcp: data_finance）\n'
             f'- 禁止用通用搜索搜公司股东信息（上市公司用 westock-mcp: data_shareholder；非上市主体用 tyc-mcp）\n'
@@ -1792,7 +1792,7 @@ def finalize_pipeline(task_id: str, entity: str = '', market: str = 'us') -> dic
             # 研究类 step（除管理层治理外）未使用 IMA 研报库或 westock-mcp 任一结构化源 → 扣分
             if step in set(STEP_DEPS) - {'step4_mgmt'}:
                 _used_structured = any(k in txt for k in (
-                    'IMA知识库', 'ima-mcp', 'Xavier 研报库', '行研智库', '机构调研纪要',
+                    'IMA知识库', 'ima-mcp', '研报库', '行研智库', '机构调研纪要',
                     'westock-mcp', '腾讯自选股', 'data_finance', 'data_quote', 'data_report', 'data_news'))
                 if not _used_structured and sc > 1:
                     sc = max(1, sc - 1)

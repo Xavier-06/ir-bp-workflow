@@ -22,13 +22,13 @@ Agent tool 参数：
 
 **核心原则：不重复造轮子。大行分析师已经做了 90% 的分析工作（行业框架、估值模型、财务预测），你只需在他们基础上补充增量。**
 
-**必须执行**：在 IMA Xavier 研报库搜索 __ENTITY__ 的大行研报（GS/MS/JPM/Citi/HSBC/UBS/BofA/Bernstein/Nomura/DB），找到最新的 1-2 篇全文研报并 fetch。
+**必须执行**：在 IMA 研报库搜索 __ENTITY__ 的大行研报（GS/MS/JPM/Citi/HSBC/UBS/BofA/Bernstein/Nomura/DB），找到最新的 1-2 篇全文研报并 fetch。
 
 ```
 # 第 1 轮：英文 query（命中原标题外资大行研报）
-mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="Goldman Sachs Morgan Stanley JPMorgan __ENTITY__ __TICKER__")
+mcp__ima-mcp__search_knowledge(knowledge_base_id="7498615127803592", query="Goldman Sachs Morgan Stanley JPMorgan __ENTITY__ __TICKER__")
 # 第 2 轮：中文 query（命中标题已中文化的大行研报）
-mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="__ENTITY__ 高盛 摩根士丹利 大摩 研报 目标价")
+mcp__ima-mcp__search_knowledge(knowledge_base_id="7498615127803592", query="__ENTITY__ 高盛 摩根士丹利 大摩 研报 目标价")
 ```
 
 > ⚠️ 2026-08-05 实测：IMA 检索跨语言能力极弱，英文 query 只命中原标题外资研报
@@ -94,7 +94,7 @@ mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="__EN
 **目的**：所有下游 step 动手前先有"市场现在怎么定价"的锚点。
 
 **数据源**：
-1. IMA Xavier 研报库（Step 0.5 已 fetch 的大行研报）→ 一致预期 EPS/营收、目标价、评级
+1. IMA 研报库（Step 0.5 已 fetch 的大行研报）→ 一致预期 EPS/营收、目标价、评级
 2. `westock-mcp.data_consensus` → 一致预期（如有）
 3. `westock-mcp.data_rating` → 评级分布
 4. `westock-mcp.data_quote` → 现价
@@ -168,13 +168,13 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 **如果 __ENTITY__ 是上市公司**，额外用 westock-mcp `data_news` 拿个股级公告/新闻/研报动态（比通用新闻更聚焦该公司）：
 `mcp__westock-mcp__data_news(symbol="sh600519", type=3, limit=10)`（type: 0公告 1研报 2新闻 3全部；symbol 不确定时先用 `data_search` 检索代码）
 
-## Step 6: IMA 知识库增量扫描（Xavier 研报库为主力源 — 增量信息层）
+## Step 6: IMA 知识库增量扫描（研报库为主力源 — 增量信息层）
 
-用 ima-mcp 的 search_knowledge 搜索知识库，提取机构级增量信息。**Xavier 研报库是主力源（投行/券商研报全文可 fetch），所有搜索第一优先。**
+用 ima-mcp 的 search_knowledge 搜索知识库，提取机构级增量信息。**研报库是主力源（投行/券商研报全文可 fetch），所有搜索第一优先。**
 **必须搜 2-3 个最相关的 KB，每个 KB 用不同关键词搜 1-2 次。**
 
 KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不可取正文）：
-- ★Xavier 研报库(投行/券商研报, GS/MS/JPM/BofA/Citi/UBS/Bernstein 等): `001a89fa4b807b92`
+- ★研报库(投行/券商研报, GS/MS/JPM/BofA/Citi/UBS/Bernstein 等): `7498615127803592`
 - 行研智库(行业报告): `7311568991699459`
 - 机构调研纪要(电话会/专家/外资): `7300811407257275`
 - 精选行业数据报告: `7302509206984644`
@@ -183,12 +183,12 @@ KB ID 速查（v4.8，已删除长安投研/公司调研报告——仅摘要不
 > **占位符说明**：`{行业关键词如半导体}` 是模板示例。子代理应根据 entity 实际所属行业替换。
 > 行业识别方法：用 westock-mcp `data_sector` 查 entity 的申万行业分类 → 用 `data_profile` 主营业务/行业字段推断 → 取交集即得行业关键词。
 
-**⚠️ fetch 权限（v4.8）：4 个库全文均可 fetch。Xavier 研报库/行研智库/精选报告 100% 可 fetch；机构调研纪要仅 NOTE 类型可 fetch。**
+**⚠️ fetch 权限（v4.8）：4 个库全文均可 fetch。研报库/行研智库/精选报告 100% 可 fetch；机构调研纪要仅 NOTE 类型可 fetch。**
 **⚠️ 时间过滤纪律：只拉最近 3 个月内的投行研报（超 3 个月参考意义不大，直接跳过）；标题常含日期（如 -260703.pdf=2026-07-03）；大行优先。**
-**⚠️ 中英双语搜索（2026-08-05 实测新增）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中英文原标题外资大行（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。Xavier 研报库必须中英各搜一轮，合并去重后再 fetch。**
+**⚠️ 中英双语搜索（2026-08-05 实测新增）：IMA 检索跨语言能力极弱——中文 query 只命中中文标题研报，英文 query 只命中英文原标题外资大行（Goldman Sachs-/Morgan Stanley-/JPMorgan- 开头），两组结果几乎零重叠。研报库必须中英各搜一轮，合并去重后再 fetch。**
 
-1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="__ENTITY__ {行业关键词如半导体集成电路} 研报 目标价 估值")` — ★主力源：投行研报（**全文可fetch**：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
-2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{公司英文名或ticker} {行业英文术语} Goldman Sachs Morgan Stanley JPMorgan")` — ★主力源第 2 轮：命中原标题外资大行研报（与第 1 轮结果合并去重）
+1. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7498615127803592", query="__ENTITY__ {行业关键词如半导体集成电路} 研报 目标价 估值")` — ★主力源：投行研报（**全文可fetch**：取media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
+2. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7498615127803592", query="{公司英文名或ticker} {行业英文术语} Goldman Sachs Morgan Stanley JPMorgan")` — ★主力源第 2 轮：命中原标题外资大行研报（与第 1 轮结果合并去重）
 3. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7311568991699459", query="{行业名如半导体} 市场规模 竞争格局")` — 行业深度报告（**全文可fetch**）
 4. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="__ENTITY__ {行业关键词如半导体集成电路}")` — 机构观点/外资视角（NOTE 可 fetch 全文：取 media_id → `mcp__ima-mcp__fetch_media_content(media_id="...")`）
 5. `mcp__ima-mcp__search_knowledge(knowledge_base_id="7302509206984644", query="{行业名如半导体} 市场规模 TAM")` — 精选报告（**全文可fetch**）

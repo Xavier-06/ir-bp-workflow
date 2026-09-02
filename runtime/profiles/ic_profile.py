@@ -1241,11 +1241,11 @@ Agent tool 参数：
 
 ### Step 2.5: IMA 研报库 (ima-mcp，定盘星主源)
 
-研报类内容（行业空间/共识/预期差/竞争格局/机构判断）以 IMA 自建研报库为第一优先来源：
+研报类内容（行业空间/共识/预期差/竞争格局/机构判断）以 IMA 共享研报库为第一优先来源：
 
-- **主库 自建研报库 `001a89fa4b807b92`**（投行/券商研报全文可 fetch）：
-  - 中文轮: search_knowledge(KB="001a89fa4b807b92", query="{entity} 行业 共识 预期 投资逻辑 竞争格局 研报")
-  - 英文轮: search_knowledge(KB="001a89fa4b807b92", query="{entity} industry consensus outlook Goldman Sachs Morgan Stanley JPMorgan")（entity 换成英文行业名/ticker）
+- **主库 共享研报库 `7498615127803592`**（投行/券商研报全文可 fetch）：
+  - 中文轮: search_knowledge(KB="7498615127803592", query="{entity} 行业 共识 预期 投资逻辑 竞争格局 研报")
+  - 英文轮: search_knowledge(KB="7498615127803592", query="{entity} industry consensus outlook Goldman Sachs Morgan Stanley JPMorgan")（entity 换成英文行业名/ticker）
   - ⚠️ IMA 跨语言能力极弱，中英两轮结果几乎零重叠，必须各搜一轮再合并去重
 - **行业深度库 `7311568991699459`**：search_knowledge(KB="7311568991699459", query="{entity} 行业深度 市场规模 TAM 产业链")
 - **硬规则**：

@@ -101,10 +101,10 @@
 | **创始人/高管财经报道** | **NeoData (`neodata_search` data_type=doc)** | **券商人物报道、财经新闻——比 search_deep(Bash) 更精准** |
 | 上市战略股东财务体量 | NeoData (`neodata_search` data_type=api) | 行情/财报结构化 |
 | **战略股东/关联方研报新闻** | **NeoData (`neodata_search` data_type=doc)** | **上市股东深度研报、投资分析、新闻动态** |
-| **投行对管理层/团队的研报** | **IMA Xavier 研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{创始人/CEO名} 管理层 团队 评价` → fetch 全文 | 投行研报中的团队评价 |
-| **上市关联方研报** | **IMA Xavier 研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{上市股东/战略方名} 研报 投资` → fetch 全文 | 投行研报中的关联方表态 |
+| **投行对管理层/团队的研报** | **IMA 研报库 `7498615127803592`**: `search_knowledge` 搜 `{创始人/CEO名} 管理层 团队 评价` → fetch 全文 | 投行研报中的团队评价 |
+| **上市关联方研报** | **IMA 研报库 `7498615127803592`**: `search_knowledge` 搜 `{上市股东/战略方名} 研报 投资` → fetch 全文 | 投行研报中的关联方表态 |
 
-**IMA 调用（Xavier 研报库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="001a89fa4b807b92", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
+**IMA 调用（研报库全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="7498615127803592", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -121,10 +121,10 @@
 - ⚠️ 搜不到必须标注 "该人员信息经搜索未找到独立来源验证"
 
 **Step 3: IMA 投行研报搜索（与 Step 1-2 并行，不是兜底）**
-- Xavier 研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{创始人/CEO名} 管理层 团队 评价 履历` → 取最相关 5-8 篇 `fetch_media_content` 读全文
-- Xavier 研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{上市股东/战略方名} 研报 投资 关联方` → 取最相关 5-8 篇 `fetch_media_content` 读全文
+- 研报库 `7498615127803592`: `ima-mcp.search_knowledge` 搜 `{创始人/CEO名} 管理层 团队 评价 履历` → 取最相关 5-8 篇 `fetch_media_content` 读全文
+- 研报库 `7498615127803592`: `ima-mcp.search_knowledge` 搜 `{上市股东/战略方名} 研报 投资 关联方` → 取最相关 5-8 篇 `fetch_media_content` 读全文
 - 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 交叉验证**

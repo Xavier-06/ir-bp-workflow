@@ -69,16 +69,16 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 "
 ```
 
-### Step 5: IMA 机构知识（ima-mcp — Xavier 研报库为主力源，全文可 fetch）
+### Step 5: IMA 机构知识（ima-mcp — 研报库为主力源，全文可 fetch）
 搜 web 搜索拿不到的机构级内容：
-- `ima-mcp.search_knowledge`: knowledge_base_id='001a89fa4b807b92'（★Xavier 研报库，GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报），**中英各搜一轮**：
+- `ima-mcp.search_knowledge`: knowledge_base_id='7498615127803592'（★研报库，GS/MS/JPM/BofA/Citi/UBS/Bernstein 等投行研报），**中英各搜一轮**：
   - 第 1 轮中文：query='{ENTITY} OR [行业] 研报 目标价 估值 竞争格局'
   - 第 2 轮英文：query='{公司英文名或ticker} [行业英文术语] Goldman Sachs Morgan Stanley JPMorgan'
   - 两轮合并去重 → 卖方研报全文
 - ⚠️ 双语搜索原因（2026-08-05 实测）：IMA 检索跨语言能力极弱，中文 query 只命中中文标题研报，英文 query 只命中原标题外资大行研报（Goldman Sachs-/Morgan Stanley- 开头），两组结果几乎零重叠——只搜中文会漏掉最值钱的外资研报
 - `ima-mcp.search_knowledge`: knowledge_base_id='7311568991699459'（行研智库），query='[行业] 市场规模 技术路线 竞争格局' → 行业深度报告（补充）
 - 时间过滤纪律：只拉最近 3 个月内的投行研报（超 3 个月参考意义不大，直接跳过）；标题常含日期（如 -260703.pdf=2026-07-03）；大行优先
-- 有搜索结果时，对 top 1-3 最相关 media_id 调 `ima-mcp.fetch_media_content` 读全文（Xavier 研报库/行研智库均可 fetch）
+- 有搜索结果时，对 top 1-3 最相关 media_id 调 `ima-mcp.fetch_media_content` 读全文（研报库/行研智库均可 fetch）
 - 在 search_summary 记录：搜了哪个库、用了什么 query、找到什么、fetch 了什么
 - IMA 结果是机构级 alpha — 投行研报、券商电话会纪要、专家交流
 
@@ -150,7 +150,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
 | 行业板块/券商研报 | westock-mcp `data_sector` / `data_report` | 行业基准 + 研报观点 |
 | 中英双语公开搜索 | search_deep(Bash) | 融资/竞品/客户/专利四类查询词 |
 | 实时中文新闻 | tencent_news_search（Bash 调 scripts.search_gateway） | 公司动态 + 行业政策 |
-| 投行研报全文 | ima-mcp `search_knowledge` → `fetch_media_content` | Xavier 研报库为主力源，全文可 fetch |
+| 投行研报全文 | ima-mcp `search_knowledge` → `fetch_media_content` | 研报库为主力源，全文可 fetch |
 
 ## 禁区
 - ❌ 所有 owner_section 必须是以下之一：bp_company_team_compliance、bp_product_commercial、bp_tech_ip_moat、bp_market_supply_chain、bp_competition_positioning、bp_valuation_return、bp_dealbreaker_risk（叙事层 3 角色：bp_consensus_challenge、bp_catalyst、bp_industry_research）

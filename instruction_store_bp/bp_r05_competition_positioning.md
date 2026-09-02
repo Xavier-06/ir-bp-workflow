@@ -65,10 +65,10 @@
 | 竞品产品参数/价格 | WebSearch | 搜 datasheet/评测 |
 | 行业排名/市场份额 | WebSearch | 搜行业分析 |
 | 竞品官网/产品页 | WebFetch | 直接抓取 |
-| **投行竞品研报/竞争分析** | **IMA Xavier 研报库 `001a89fa4b807b92`**: `search_knowledge` 搜 `{竞品名} 竞争 格局 份额 研报` → fetch 全文 | 投行研报中的竞争分析 |
+| **投行竞品研报/竞争分析** | **IMA 研报库 `7498615127803592`**: `search_knowledge` 搜 `{竞品名} 竞争 格局 份额 研报` → fetch 全文 | 投行研报中的竞争分析 |
 | **机构对竞品的评价** | **IMA 机构调研纪要 `7300811407257275`**: `search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化` → fetch 全文 | 专家交流中的竞争分析 |
 
-**IMA 调用（Xavier 研报库/机构调研纪要全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
+**IMA 调用（研报库/机构调研纪要全文可 fetch）**：`ima-mcp.search_knowledge(knowledge_base_id="库ID", query="搜索词")` → 取最相关结果 `media_id` → `ima-mcp.fetch_media_content(media_id="...")` 读全文。来源标注：`[^N]: IMA 研报库 —《标题》(日期, 投行名)`
 
 ## 搜索策略（分步流程）
 
@@ -84,10 +84,10 @@
 - 结果写入 facts sidecar
 
 **Step 3: IMA 竞品投行研报搜索（与 Step 2 并行，不是兜底）**
-- Xavier 研报库 `001a89fa4b807b92`: `ima-mcp.search_knowledge` 搜 `{竞品名} 竞争 格局 份额 研报` → 取最相关 5-8 篇 `fetch_media_content` 读全文
+- 研报库 `7498615127803592`: `ima-mcp.search_knowledge` 搜 `{竞品名} 竞争 格局 份额 研报` → 取最相关 5-8 篇 `fetch_media_content` 读全文
 - 机构调研纪要 `7300811407257275`: `ima-mcp.search_knowledge` 搜 `{竞品/行业名} 竞争 格局 份额 差异化` → 取最相关 5-8 篇 `fetch_media_content` 读全文
 - 每库最多取 top 5 结果，全文提取最多 3 篇（多源交叉验证）
-- 结果写入 facts sidecar，来源标注 `[^N]: IMA Xavier 研报库 —《标题》(日期, 投行名)`
+- 结果写入 facts sidecar，来源标注 `[^N]: IMA 研报库 —《标题》(日期, 投行名)`
 - 搜不到直接跳过，不硬凑
 
 **Step 4: 上市竞品财务对比（NeoData + yfinance）**

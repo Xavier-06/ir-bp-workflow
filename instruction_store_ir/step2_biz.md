@@ -239,7 +239,7 @@ Markdown 文件，必须包含以下章节（按顺序）：
 
 ### 本 step 补搜要点
 - 公司公告/年报/定期报告原文 → westock-mcp `data_news(symbol="代码", type=0)` 拉公告原文，禁止用 search_deep 在 web 上捞年报
-- 投行对公司商业模式的拆解/点评 → ima-mcp Xavier 研报库 `search_knowledge(knowledge_base_id="001a89fa4b807b92", query="{公司名} 商业模式 收入结构")` → fetch_media_content 读全文
+- 投行对公司商业模式的拆解/点评 → ima-mcp 研报库 `search_knowledge(knowledge_base_id="7498615127803592", query="{公司名} 商业模式 收入结构")` → fetch_media_content 读全文
 - 投资者关系页面/招股书等 web 一手披露 → search_deep(fetch_top_n) 兜底
 
 ---

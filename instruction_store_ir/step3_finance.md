@@ -76,7 +76,7 @@ cd ~/.workbuddy/ir_runtime && python3 scripts/ir_financial_rigor.py calc --expr 
 结构化数据（westock `data_finance`）只能给你数字，**点评必须有原文语境**：
 
 1. **业绩公告原文**：`mcp__westock-mcp__data_news(symbol="代码", type=0, limit=10)` 拉本期业绩公告/财报原文（symbol 不确定先 `data_search`）
-2. **业绩会纪要**：`mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{公司名} 业绩会 电话会 {季度}")` ——机构调研纪要库有业绩会/电话会纪要，中英各搜一轮；Xavier 研报库同步搜"{公司名} 业绩点评 {季度}"拿卖方即时解读
+2. **业绩会纪要**：`mcp__ima-mcp__search_knowledge(knowledge_base_id="7300811407257275", query="{公司名} 业绩会 电话会 {季度}")` ——机构调研纪要库有业绩会/电话会纪要，中英各搜一轮；研报库同步搜"{公司名} 业绩点评 {季度}"拿卖方即时解读
 3. **上期指引**：从上期业绩公告/上期电话会纪要中提取管理层对**本期**的指引（收入/利润/毛利率/业务量），找不到则声明"未检索到上期指引"，禁止编造
 
 拿不到原文 → 在报告顶部声明"一手资料不足，点评基于第三方数据"，并降低语气分析/附注结论的权重（照工具手册「信息丰富度评级响应协议」的 C 级纪律）。
@@ -381,7 +381,7 @@ print(json.dumps(results, ensure_ascii=False, indent=2))
 5. **一致预期数据缺失** — 需要搜分析师一致预期的营收/利润预测
 
 ### 本 step 补搜要点
-- 财务数据优先找年报/季报原文——获取路径：westock-mcp `data_news(symbol="代码", type=0)` 拉公告/定期报告原文（禁止用 search_deep 在 web 上捞年报），投行财务拆解走 ima-mcp Xavier 研报库 → fetch_media_content 读全文
+- 财务数据优先找年报/季报原文——获取路径：westock-mcp `data_news(symbol="代码", type=0)` 拉公告/定期报告原文（禁止用 search_deep 在 web 上捞年报），投行财务拆解走 ima-mcp 研报库 → fetch_media_content 读全文
 - 一致预期优先 `westock-mcp.data_consensus`，兜底具名券商研报
 
 ---

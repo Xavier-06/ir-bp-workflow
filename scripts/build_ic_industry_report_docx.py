@@ -127,6 +127,13 @@ def _add_run(para, text, bold=False, italic=False, color=None, size=None):
     return run
 
 
+def _clean_heading_text(text: str) -> str:
+    """去掉标题中的内部路线代号（route_xxx），用于目录显示与锚点统一"""
+    text = re.sub(r'（route_[^）]*）', '', text)
+    text = re.sub(r'\(route_[^)]*\)', '', text)
+    return text.strip()
+
+
 def _add_heading(doc, text, level=1):
     h = doc.add_heading(text, level=level)
     for run in h.runs:
@@ -136,6 +143,17 @@ def _add_heading(doc, text, level=1):
             run.font.color.rgb = COLOR_TITLE
         elif level == 2:
             run.font.color.rgb = COLOR_SECTION
+    # 给标题加书签（与目录 anchor 同算法：基于去 route 后的标题），供目录超链接跳转
+    try:
+        anchor_text = _clean_heading_text(text)
+        anchor = f'toc_{abs(hash(anchor_text)) % 100000}'
+        bm_id = str(abs(hash(anchor)) % 100000)
+        start = h._p.makeelement(qn('w:bookmarkStart'), {qn('w:id'): bm_id, qn('w:name'): anchor})
+        end = h._p.makeelement(qn('w:bookmarkEnd'), {qn('w:id'): bm_id})
+        h._p.insert(0, start)
+        h._p.append(end)
+    except Exception:
+        pass
     return h
 
 
@@ -144,6 +162,233 @@ def _add_body_para(doc, text, bold=False):
     _add_run(p, text, bold=bold, color=COLOR_BODY, size=10.5)
     p.paragraph_format.space_after = Pt(4)
     return p
+
+
+def _add_image(doc, img_path: str, caption: str = ''):
+    """插入图片（居中，宽15.5cm）+ 可选图注（居中灰色小字）"""
+    p = Path(img_path)
+    if not p.exists():
+        _add_body_para(doc, f"[图片缺失: {caption or img_path}]")
+        return
+    para = doc.add_paragraph()
+    para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    para.paragraph_format.space_before = Pt(6)
+    run = para.add_run()
+    run.add_picture(str(p), width=Cm(15.5))
+    if caption:
+        cap = doc.add_paragraph()
+        cap.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        _add_run(cap, caption, color=RGBColor(0x66, 0x66, 0x66), size=9)
+        cap.paragraph_format.space_after = Pt(8)
+    return para
+
+
+# ─── 编号修复（每个有序列表独立计数）────────────────────────
+
+# python-docx 全局状态：已分配的 abstractNum/num id（跨 build 调用累积，
+# python-docx 每次新建文档会重新分配 numbering，旧 id 不会冲突）
+_CLONED_LIST_NUM_IDS: set = set()
+
+
+def _find_next_list_num_id(num_part, taken: set) -> int:
+    """在 numbering.xml 中找一个未被 num/abstractNum 占用的新 id"""
+    used = set(taken)
+    for child in num_part.element.iterchildren():
+        if child.tag == qn('w:num'):
+            nid = child.get(qn('w:numId'))
+            if nid:
+                used.add(int(nid))
+        elif child.tag == qn('w:abstractNum'):
+            aid = child.get(qn('w:abstractNumId'))
+            if aid:
+                used.add(int(aid))
+    cand = (max(used) if used else 0) + 1
+    while cand in used:
+        cand += 1
+    return cand
+
+
+def _new_numbering_instance(p):
+    """克隆 List Number 样式的编号定义 → 返回一个全新 numId（独立计数）"""
+    try:
+        style = p.style
+        num_id_src = None
+        if style is not None and style.element is not None:
+            pPr = style.element.find(qn('w:pPr'))
+            if pPr is not None:
+                numPr = pPr.find(qn('w:numPr'))
+                if numPr is not None:
+                    el = numPr.find(qn('w:numId'))
+                    if el is not None and el.get(qn('w:val')):
+                        num_id_src = int(el.get(qn('w:val')))
+        if num_id_src is None:
+            return None
+        from docx.opc.constants import RELATIONSHIP_TYPE as RT
+        numbering_part = p.part.part_related_by(RT.NUMBERING)
+    except Exception:
+        return None
+
+    # 找源 abstractNum（含多级定义）
+    src_abstract = None
+    for child in numbering_part.element.iterchildren():
+        if child.tag == qn('w:num') and child.get(qn('w:numId')) == str(num_id_src):
+            ref = child.find(qn('w:abstractNumId'))
+            if ref is not None:
+                target_aid = ref.get(qn('w:val'))
+                for c2 in numbering_part.element.iterchildren():
+                    if c2.tag == qn('w:abstractNum') and c2.get(qn('w:abstractNumId')) == target_aid:
+                        src_abstract = c2
+                        break
+            break
+    if src_abstract is None:
+        return None
+
+    taken = set(_CLONED_LIST_NUM_IDS)
+    new_aid = _find_next_list_num_id(numbering_part, taken)
+    taken.add(new_aid)
+    new_nid = _find_next_list_num_id(numbering_part, taken)
+
+    # 深拷贝 abstractNum，重设 id（OOXML 要求 abstractNum 在 num 之前）
+    import copy
+    new_abstract = copy.deepcopy(src_abstract)
+    new_abstract.set(qn('w:abstractNumId'), str(new_aid))
+    nsid_el = new_abstract.find(qn('w:nsid'))
+    if nsid_el is not None:
+        new_abstract.remove(nsid_el)
+    last_abstract = None
+    for child in numbering_part.element.iterchildren():
+        if child.tag == qn('w:abstractNum'):
+            last_abstract = child
+    if last_abstract is not None:
+        last_abstract.addnext(new_abstract)
+    else:
+        numbering_part.element.insert(0, new_abstract)
+
+    # 新 num 引用新 abstractNum（追加到所有 num 之后）
+    num_el = numbering_part.element.makeelement(qn('w:num'), {qn('w:numId'): str(new_nid)})
+    ref_el = numbering_part.element.makeelement(qn('w:abstractNumId'), {qn('w:val'): str(new_aid)})
+    num_el.append(ref_el)
+    numbering_part.element.append(num_el)
+
+    _CLONED_LIST_NUM_IDS.add(new_aid)
+    _CLONED_LIST_NUM_IDS.add(new_nid)
+    return new_nid
+
+
+def _attach_numbering(p, num_id: int):
+    """段落 pPr 直接挂指定 numId（level 0）"""
+    pPr = p._p.get_or_add_pPr()
+    numPr = pPr.find(qn('w:numPr'))
+    if numPr is None:
+        numPr = pPr.makeelement(qn('w:numPr'), {})
+        pPr.insert(0, numPr)
+    for tag in ('w:ilvl', 'w:numId'):
+        el = numPr.find(qn(tag))
+        if el is not None:
+            numPr.remove(el)
+    ilvl = numPr.makeelement(qn('w:ilvl'), {qn('w:val'): '0'})
+    numid = numPr.makeelement(qn('w:numId'), {qn('w:val'): str(num_id)})
+    numPr.append(ilvl)
+    numPr.append(numid)
+
+
+# ─── 目录（TOC 域 + 可点击书签超链接）────────────────────────
+
+def _add_bookmark(doc, anchor: str):
+    """在当前位置（段落开头）插入书签，供目录超链接跳转"""
+    para = doc.add_paragraph()
+    para.paragraph_format.space_after = Pt(0)
+    start = para._p.makeelement(qn('w:bookmarkStart'), {qn('w:id'): str(abs(hash(anchor)) % 100000), qn('w:name'): anchor})
+    end = para._p.makeelement(qn('w:bookmarkEnd'), {qn('w:id'): str(abs(hash(anchor)) % 100000)})
+    para._p.append(start)
+    para._p.append(end)
+    return para
+
+
+def _add_toc_link(doc, text: str, anchor: str, level: int):
+    """目录项：带书签超链接的段落（点击跳转到正文对应标题）"""
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(2)
+    if level == 1:
+        p.paragraph_format.left_indent = Cm(0)
+    else:
+        p.paragraph_format.left_indent = Cm(0.8)
+    # 超链接 run
+    run = p.add_run(text)
+    run.font.name = FONT_NAME_ASCII
+    _set_eastasia_font_on_run(run, FONT_NAME)
+    run.bold = (level == 1)
+    run.font.size = Pt(11 if level == 1 else 10)
+    run.font.color.rgb = COLOR_TITLE if level == 1 else COLOR_BODY
+    # 内部超链接关系
+    part = doc.part
+    r_id = part.relate_to(part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
+                          is_external=False)
+    # 构造 w:hyperlink
+    hl = p._p.makeelement(qn('w:hyperlink'), {qn('w:anchor'): anchor})
+    r = p._p.makeelement(qn('w:r'), {})
+    rPr = p._p.makeelement(qn('w:rPr'), {})
+    # 超链接样式（蓝色+下划线）
+    rStyle = p._p.makeelement(qn('w:rStyle'), {qn('w:val'): 'Hyperlink'})
+    rPr.append(rStyle)
+    r.append(rPr)
+    t = p._p.makeelement(qn('w:t'), {qn('xml:space'): 'preserve'})
+    t.text = text
+    r.append(t)
+    hl.append(r)
+    # 清空默认 run，用 hyperlink 替换
+    for child in list(p._p):
+        if child.tag != qn('w:pPr'):
+            p._p.remove(child)
+    p._p.append(hl)
+    return p
+
+
+def _build_toc_field(doc, md_text: str = ''):
+    """在封面分页后插入目录页：静态目录 + 书签超链接（点击可跳转正文）"""
+    # 目录标题
+    toc_heading = doc.add_paragraph()
+    toc_heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    _add_run(toc_heading, '目  录', bold=True, color=COLOR_TITLE, size=16)
+    toc_heading.paragraph_format.space_after = Pt(12)
+
+    # 从 markdown 提取 H2/H3 标题生成静态目录（含锚点）
+    headings = []
+    if md_text:
+        for line in md_text.split('\n'):
+            m2 = re.match(r'^## (.+)$', line)
+            m3 = re.match(r'^### (.+)$', line)
+            if m2:
+                headings.append((1, m2.group(1).strip()))
+            elif m3:
+                txt = m3.group(1).strip()
+                # 去掉内部路线代号（route_xxx），目录显示干净名称
+                txt = re.sub(r'（route_[^）]*）', '', txt)
+                txt = re.sub(r'\(route_[^)]*\)', '', txt)
+                if len(txt) <= 40:
+                    headings.append((2, txt))
+
+    if headings:
+        for level, title in headings:
+            cleaned = _clean_heading_text(title)
+            anchor = f'toc_{abs(hash(cleaned)) % 100000}'
+            _add_toc_link(doc, cleaned, anchor, level)
+    else:
+        # 兜底：TOC 域
+        p = doc.add_paragraph()
+        r1 = p.add_run()
+        fld1 = r1._r.makeelement(qn('w:fldChar'), {qn('w:fldCharType'): 'begin', qn('w:dirty'): 'true'})
+        r1._r.append(fld1)
+        r2 = p.add_run()
+        instr = r2._r.makeelement(qn('w:instrText'), {})
+        instr.set(qn('xml:space'), 'preserve')
+        instr.text = ' TOC \\o "1-3" \\h \\z \\u '
+        r2._r.append(instr)
+        r3 = p.add_run()
+        fld2 = r3._r.makeelement(qn('w:fldChar'), {qn('w:fldCharType'): 'end'})
+        r3._r.append(fld2)
+
+    doc.add_page_break()
 
 
 def _add_table(doc, headers, rows):
@@ -176,6 +421,15 @@ def _add_table(doc, headers, rows):
 
 def _parse_markdown_to_docx(doc, md_text: str):
     """将 Markdown 文本增量解析并写入 docx Document"""
+    # 先提取图片行（sanitize 会删除 /Users/... 内部路径，必须在 sanitize 前暂存）
+    _img_stash = {}
+
+    def _stash_img(m):
+        key = f'@@IMG{len(_img_stash)}@@'
+        _img_stash[key] = m.group(0)
+        return key
+    md_text = re.sub(r'^!\[.*?\]\(.*?\)\s*$', _stash_img, md_text, flags=re.M)
+
     md_text = sanitize_text(md_text)
     lines = md_text.split('\n')
     i = 0
@@ -185,6 +439,16 @@ def _parse_markdown_to_docx(doc, md_text: str):
 
         # 空行跳过
         if not line.strip():
+            i += 1
+            continue
+
+        # 图片占位符 @@IMGn@@
+        m_tok = re.match(r'^@@IMG(\d+)@@\s*$', line.strip())
+        if m_tok:
+            orig = _img_stash.get(f'@@IMG{m_tok.group(1)}@@', '')
+            mm = re.match(r'^!\[(.*?)\]\((.*?)\)\s*$', orig)
+            if mm:
+                _add_image(doc, mm.group(2), mm.group(1))
             i += 1
             continue
 
@@ -222,13 +486,42 @@ def _parse_markdown_to_docx(doc, md_text: str):
             i += 1
             continue
 
-        # 有序列表
+        # 有序列表（按连续块分组，每个块独立编号计数，避免全文串号）
         if re.match(r'^\s*\d+\.\s', line):
-            text = re.sub(r'^\s*\d+\.\s', '', line).strip()
-            text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-            p = doc.add_paragraph(style='List Number')
-            _add_run(p, text, color=COLOR_BODY, size=10.5)
-            i += 1
+            # 收集连续的有序列表行（允许编号项之间存在空行）
+            block = []
+            j = i
+            while j < len(lines):
+                if re.match(r'^\s*\d+\.\s', lines[j]):
+                    block.append(lines[j])
+                    j += 1
+                elif not lines[j].strip():
+                    # 空行：仅当后面紧跟编号项时才视为块内分隔
+                    k = j
+                    while k < len(lines) and not lines[k].strip():
+                        k += 1
+                    if k < len(lines) and re.match(r'^\s*\d+\.\s', lines[k]):
+                        j = k
+                    else:
+                        break
+                else:
+                    break
+            i = j
+            # 为本块创建独立编号实例
+            first_p = doc.add_paragraph(style='List Number')
+            first_text = re.sub(r'^\s*\d+\.\s', '', block[0]).strip()
+            first_text = re.sub(r'\*\*(.*?)\*\*', r'\1', first_text)
+            _add_run(first_p, first_text, color=COLOR_BODY, size=10.5)
+            num_id = _new_numbering_instance(first_p)
+            if num_id:
+                _attach_numbering(first_p, num_id)
+            for blk_line in block[1:]:
+                text = re.sub(r'^\s*\d+\.\s', '', blk_line).strip()
+                text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+                p = doc.add_paragraph(style='List Number')
+                _add_run(p, text, color=COLOR_BODY, size=10.5)
+                if num_id:
+                    _attach_numbering(p, num_id)
             continue
 
         # 引用块
@@ -323,6 +616,9 @@ def build_ic_report(task_id: str, output_path: str = '') -> str:
              italic=True, color=RGBColor(0x99, 0x99, 0x99), size=9)
 
     doc.add_page_break()
+
+    # 4.5 目录页（静态目录：从 markdown 标题直接生成，任何环境下可见）
+    _build_toc_field(doc, master_md)
 
     # 5. 正文
     _parse_markdown_to_docx(doc, master_md)
